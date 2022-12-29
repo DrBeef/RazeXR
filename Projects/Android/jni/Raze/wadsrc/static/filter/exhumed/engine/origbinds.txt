@@ -1,0 +1,2 @@
+Mouse2 "+Strafe"
+Mouse3 "+Move_Forward"

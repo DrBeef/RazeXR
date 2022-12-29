@@ -1,13 +1,28 @@
 #if !defined(vrcommon_h)
 #define vrcommon_h
 
-#include <android/log.h>
-
-#include "../darkplaces/mathlib.h"
-
 #include "TBXR_Common.h"
 
-#define LOG_TAG "QuakeQuest"
+#include "c_cvars.h"
+
+EXTERN_CVAR(Int, vr_control_scheme)
+EXTERN_CVAR(Bool, vr_move_use_offhand)
+EXTERN_CVAR(Float, vr_weaponRotate);
+EXTERN_CVAR(Float, vr_snapTurn);
+EXTERN_CVAR(Float, vr_ipd);
+EXTERN_CVAR(Float, vr_weaponScale);
+EXTERN_CVAR(Bool, vr_teleport);
+EXTERN_CVAR(Bool, vr_switch_sticks);
+EXTERN_CVAR(Bool, vr_secondary_button_mappings);
+EXTERN_CVAR(Bool, vr_two_handed_weapons);
+EXTERN_CVAR(Bool, vr_crouch_use_button);
+
+
+#include <android/log.h>
+
+#include "mathlib.h"
+
+#define LOG_TAG "QzDoom"
 
 #ifndef NDEBUG
 #define DEBUG 1
@@ -21,21 +36,51 @@
 #define ALOGV(...)
 #endif
 
-extern ovrInputStateTrackedRemote leftTrackedRemoteState_old;
-extern ovrInputStateTrackedRemote leftTrackedRemoteState_new;
-extern ovrTrackedController leftRemoteTracking_new;
-extern ovrInputStateTrackedRemote rightTrackedRemoteState_old;
-extern ovrInputStateTrackedRemote rightTrackedRemoteState_new;
-extern ovrTrackedController rightRemoteTracking_new;
+extern bool qzdoom_initialised;
 
-extern float playerHeight;
+extern bool cinemamode;
+extern float cinemamodeYaw;
+extern float cinemamodePitch;
+
 extern float playerYaw;
+extern bool resetDoomYaw;
+extern float doomYaw;
+extern bool resetPreviousPitch;
+extern float previousPitch;
 
+extern float vrFOV;
+
+extern vec3_t worldPosition;
+
+extern vec3_t hmdPosition;
 extern vec3_t hmdorientation;
+extern vec3_t positionDeltaThisFrame;
 
-qboolean isMultiplayer();
+extern vec3_t weaponangles;
+extern vec3_t weaponoffset;
+
+extern vec3_t offhandangles;
+extern vec3_t offhandoffset;
+
+extern bool player_moving;
+
+extern bool ready_teleport;
+extern bool trigger_teleport;
+
+extern bool shutdown;
+void shutdownVR();
+
+bool isMultiplayer();
 float length(float x, float y);
 float nonLinearFilter(float in);
 bool between(float min, float val, float max);
+void rotateAboutOrigin(float v1, float v2, float rotation, vec2_t out);
+void handleTrackedControllerButton(ovrInputStateTrackedRemote * trackedRemoteState, ovrInputStateTrackedRemote * prevTrackedRemoteState, uint32_t button, int key);
+void QuatToYawPitchRoll(XrQuaternionf q, vec3_t rotation, vec3_t out);
+
+//Called from engine code
+void QzDoom_setUseScreenLayer(bool use);
+void jni_shutdown();
+
 
 #endif //vrcommon_h

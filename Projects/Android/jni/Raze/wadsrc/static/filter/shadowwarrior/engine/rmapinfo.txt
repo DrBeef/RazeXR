@@ -1,0 +1,66 @@
+// Cutscene definitions for SW
+
+Cutscenes
+{
+	intro
+	{
+		function = SWCutscenes.BuildIntro
+	}
+	sharewareend 
+	{
+		function = SWCutscenes.BuildSybexScreen
+	}
+
+	loadscreen
+	{
+		function = SWCutscenes.BuildLoading
+	}
+}
+
+map { 4 }
+{
+	outro
+	{
+		function = SWCutscenes.BuildSerpentAnim
+	}
+	sw_bossmeter_serpent
+	sw_deathexit_serpent
+	bossonlycutscene
+}
+
+map { 5 }
+{
+	sw_bossmeter_serpent
+}
+
+map { 11 }
+{
+	outro
+	{
+		function = SWCutscenes.BuildSumoAnim
+	}
+	sw_bossmeter_sumo
+	sw_deathexit_sumo
+	bossonlycutscene
+}
+
+map { 20 }
+{
+	outro
+	{
+		function = SWCutscenes.BuildZillaAnim
+	}
+	sw_bossmeter_serpent
+	sw_bossmeter_sumo
+	sw_bossmeter_zilla
+	sw_deathexit_zilla
+	next = "-"
+}
+
+gameinfo
+{
+	summaryscreen = SWCutscenes.BuildSPSummary
+	mpsummaryscreen = SWCutscenes.BuildMPSummary
+	statusbarclass = SWStatusBar
+}
+

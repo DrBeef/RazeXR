@@ -1,0 +1,8 @@
+V "toggleconsole"
+E "show_weapon"
+M "useitem 2"
+` "+Quick_Kick"
+B "useitem 3"
+C "useitem 4"
+Y "useitem 5"
+W "useitem 1"

@@ -1,0 +1,10 @@
+//
+R "useitem 2"
+Q "+Quick_Kick"
+H "useitem 3"
+J "useitem 4"
+N "useitem 5"
+M "useitem 1"
+C "+Toggle_Crouch"
+Mouse2 "useitem 4"
+Mouse3 "useitem 1"

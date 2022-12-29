@@ -1,0 +1,2055 @@
+DEFAULTLISTMENU
+{
+	Font "BigFont", "Untranslated"
+	LineSpacing 20
+}
+
+//-------------------------------------------------------------------------------------------
+//
+// Main Memu
+//
+//-------------------------------------------------------------------------------------------
+
+LISTMENU "MainMenu"
+{
+	Size 320, 200
+	ifgame(Duke, Nam, WW2GI, Redneck, RedneckRides)
+	{
+		position 160, 55
+		Linespacing 20
+		animatedtransition
+		DukeLogo
+		DukeTextItem "$MNU_NEWGAME", "n", "EpisodeMenu"
+		//DukeTextItem "$MNU_NEWGAME", "m", "MultiMenu" // In EDuke this replaces "New Game" when in networking mode. Kept here as a reminder.
+		DukeTextItem "$MNU_LOADGAME", "l", "LoadGameMenu"
+		DukeTextItem "$MNU_OPTIONS", "o", "OptionsMenu"
+		DukeTextItem "$MNU_HELP", "h", "HelpMenu"
+		DukeTextItem "$MNU_CREDITS", "c", "CreditsMenu"
+		DukeTextItem "$MNU_QUITGAME", "q", "QuitMenu"
+	}
+	ifgame(Blood)
+	{
+		CaptionItem "Blood"
+		position 160, 45
+		Linespacing 20
+		BloodTextItem "$MNU_NEWGAME", "n", "EpisodeMenu"
+		//BloodTextItem "$MNU_MULTIPLAYER", "m", "MultiMenu"
+		BloodTextItem "$MNU_OPTIONS", "o", "OptionsMenu"
+		BloodTextItem "$MNU_LOADGAME", "l", "LoadGameMenu"
+		BloodTextItem "$MNU_HELP", "h", "HelpMenu"
+		BloodTextItem "$MNU_CREDITS", "c", "CreditsMenu"
+		BloodTextItem "$MNU_QUITGAME", "q", "QuitMenu"
+		BloodDripDrawer
+		animated
+	}
+	ifgame(ShadowWarrior)
+	{
+		Position 55, 32
+		Linespacing 17
+		class SWMainMenu
+		SWLogo
+		SWTextItem "$MNU_NEWGAME", "n", "EpisodeMenu"
+		SWTextItem "$MNU_LOADGAME", "l", "LoadGameMenu"
+		SWTextItem "$MNU_SAVEGAME", "s", "none"
+		SWTextItem "$MNU_OPTIONS", "o", "OptionsMenu"
+		ifnotgame (shareware)
+		{
+			SWTextItem "$MNU_CREDITS", "c", "CreditsMenu"
+		}
+		else
+		{
+			SWTextItem "$MNU_HOWTOORDER", "h", "CreditsMenu"
+		}
+		SWTextItem "$MNU_QUITGAME", "q", "QuitMenu"
+	}
+	ifgame(Exhumed)
+	{
+		class ExhumedMainMenu
+		Position 160, 65
+		linespacing 22
+		Animated
+		ExhumedPlasma
+		ExhumedTextItem "$MNU_NEWGAME", "n", "StartGameNoSkill", 0
+		ExhumedTextItem "$MNU_LOADGAME", "l", "LoadGameMenu"
+		ExhumedTextItem "$TXT_EX_MAP00", "m", "StartGameNoSkill", 1
+		ExhumedTextItem "$MNU_OPTIONS", "v", "OptionsMenu"
+		ExhumedTextItem "$MNU_QUITGAME", "q", "QuitMenu"
+	}
+}
+
+//-------------------------------------------------------------------------------------------
+//
+// Ingame Memu (same as above with a few more options)
+//
+//-------------------------------------------------------------------------------------------
+
+LISTMENU "IngameMenu"
+{
+	Size 320, 200
+	ifgame(Duke, Nam, WW2GI, Redneck, RedneckRides)
+	{
+		position 160, 55
+		linespacing 18
+		animatedtransition
+		DukeLogo
+		DukeTextItem "$MNU_NEWGAME", "n", "EpisodeMenu"
+		DukeTextItem "$MNU_SAVEGAME", "s", "SaveGameMenu"
+		DukeTextItem "$MNU_LOADGAME", "l", "LoadGameMenu"
+		DukeTextItem "$MNU_OPTIONS", "o", "OptionsMenu"
+		DukeTextItem "$MNU_HELP", "h", "HelpMenu"
+		DukeTextItem "$MNU_ENDGAME", "e", "EndgameMenu"
+		DukeTextItem "$MNU_QUITGAME", "q", "QuitMenu"
+	}
+	ifgame(Blood)
+	{
+		position 160, 45
+		CaptionItem "Blood"
+		Linespacing 17
+		BloodTextItem "$MNU_NEWGAME", "n", "EpisodeMenu"
+		BloodTextItem "$MNU_OPTIONS", "o", "OptionsMenu"
+		BloodTextItem "$MNU_SAVEGAME", "s", "SaveGameMenu"
+		BloodTextItem "$MNU_LOADGAME", "l", "LoadGameMenu"
+		BloodTextItem "$MNU_HELP", "h", "HelpMenu"
+		BloodTextItem "$MNU_CREDITS", "c", "CreditsMenu"
+		BloodTextItem "$MNU_ENDGAME", "e", "EndgameMenu"
+		BloodTextItem "$MNU_QUITGAME", "q", "QuitMenu"
+		BloodDripDrawer
+		animated
+	}
+	ifgame(ShadowWarrior)
+	{
+		Position 55, 32
+		Linespacing 17
+		class SWMainMenu
+		SWLogo
+		SWTextItem "$MNU_NEWGAME", "n", "EpisodeMenu"
+		SWTextItem "$MNU_LOADGAME", "l", "LoadGameMenu"
+		SWTextItem "$MNU_SAVEGAME", "s", "SaveGameMenu"
+		SWTextItem "$MNU_OPTIONS", "o", "OptionsMenu"
+		ifnotgame (shareware)
+		{
+			SWTextItem "$MNU_CREDITS", "c", "CreditsMenu"
+		}
+		else
+		{
+			SWTextItem "$MNU_HOWTOORDER", "h", "CreditsMenu"
+		}
+		SWTextItem "$MNU_QUITGAME", "q", "QuitMenu"
+	}
+	ifgame(Exhumed)
+	{
+		class ExhumedMainMenu
+		Position 160, 65
+		linespacing 22
+		ExhumedLogo
+		ExhumedTextItem "$MNU_NEWGAME", "n", "StartGameNoSkill", 0
+		ExhumedTextItem "$MNU_LOADGAME", "l", "LoadGameMenu"
+		ExhumedTextItem "$TXT_EX_MAP00", "m", "StartGameNoSkill", 1
+		ExhumedTextItem "$MNU_OPTIONS", "v", "OptionsMenu"
+		ExhumedTextItem "$MNU_QUITGAME", "q", "QuitMenu"
+	}
+}
+
+//-------------------------------------------------------------------------------------------
+//
+// Episode and skill menu are filled in programmatically
+//
+//-------------------------------------------------------------------------------------------
+
+LISTMENU "EpisodeMenu"
+{
+	Size 320, 200
+	ifgame(Duke, Nam, WW2GI, Redneck, RedneckRides)
+	{
+		position 160, 48
+		Linespacing 20
+		captionItem "$MNU_SELECTEPISODE"
+		animatedtransition
+	}
+	ifgame(blood)
+	{
+		position 160, 45
+		Linespacing 20
+		CaptionItem "$MNU_EPISODES"
+		BloodDripDrawer
+		animated
+	}
+	ifgame(ShadowWarrior)
+	{
+		CaptionItem "$MNU_EPISODES"
+		Position 35, 32
+		Linespacing 17
+	}
+}
+
+LISTMENU "SkillMenu"
+{
+	Size 320, 200
+	ifgame(Duke, Nam, WW2GI, Redneck, RedneckRides)
+	{
+		position 160, 48
+		Linespacing 20
+		captionItem "$MNU_SELECTSKILL"
+		animatedtransition
+	}
+	ifgame(blood)
+	{
+		position 160, 60
+		Linespacing 20
+		CaptionItem "$MNU_DIFFICULTY"
+		BloodDripDrawer
+		animated
+	}
+	ifgame(ShadowWarrior)
+	{
+		class SWMainMenu
+		CaptionItem "$MNU_DIFFICULTY"
+		Position 35, 32
+		Linespacing 17
+	}
+}
+
+//-------------------------------------------------------------------------------------------
+//
+//
+//
+//-------------------------------------------------------------------------------------------
+
+ImageScroller "HelpMenu"
+{
+	ifgame(Duke, Nam, WW2GI, Redneck, RedneckRides)
+	{
+		
+		ImageItem "TEXTSTORY"
+		ImageItem "F1HELP"
+		ifgame(RedneckRides)
+		{
+			ImageItem "DRIVABLES"
+		}
+		animatedtransition
+	}
+	ifgame(blood)
+	{
+		// The duplication here is to integrate the alternating versions of HELP3
+		QAVDrawer "Help4.qav"
+		QAVDrawer "Help5.qav"
+		QAVDrawer "Help3.qav"
+		QAVDrawer "Help4.qav"
+		QAVDrawer "Help5.qav"
+		QAVDrawer "Help3b.qav"
+		animated
+	}
+	ifgame(ShadowWarrior)
+	{
+		// The menu has no default binding, but if someone tries to open it anyway show the cool retro ads that were shipped with the game. :D
+		ImageItem "ADSCREEN1"
+		ifnotgame (shareware)
+		{
+			ImageItem "ADSCREEN2"
+		}
+	}
+	ifgame(Exhumed)
+	{
+		// This is only here to prevent crashes if someone decides to open the menu from the console
+		ImageItem "TileBMGLogo"
+		ImageItem "TilePIELogo"
+	}
+}
+
+//-------------------------------------------------------------------------------------------
+//
+// Credits menu. This is logically highly game specific.
+// Note that this has been split into two submenus so that the engine
+// credits can be handled in a generic fashion instead of having to define
+// them for each game natively.
+//
+// Engine credits are now in the options menu, i.e. the generic part of the menu.
+//
+//-------------------------------------------------------------------------------------------
+
+ImageScroller "CreditsMenu"
+{
+	ifgame(Duke, Nam, WW2GI)
+	{
+		ifgame(PLUTOPAK)
+		{
+			ImageItem "CREDITPAGE1"
+			ImageItem "CREDITPAGE2"
+			ImageItem "CREDITPAGE3"
+		}
+		else
+		{
+			DukeCredits1
+			DukeCredits2
+			DukeCredits3
+		}
+		animatedtransition
+	}
+	ifgame(Redneck)
+	{
+		TextBackground "MENUSCREEN"
+		TextBackgroundBrightness 0.5
+		TextFont "SmallFont"
+		TextScale 0.45
+		// no point putting this into the string table.
+		TextItem "ORIGINAL CONCEPT, DESIGN AND DIRECTION\n\nDREW MARKHAM" //, 80
+		TextItem "PRODUCED BY\n\nGREG GOODRICH" //, 80
+		TextItem "GAME PROGRAMMING\n\nRAFAEL PAIZ" //, 80
+		TextItem "ART DIRECTORS\n\nCLAIRE PRADERIE     MAXX KAUFMAN " //, 80
+		TextItem "LEAD LEVEL DESIGNER\nALEX MAYBERRY\n\nLEVEL DESIGN\nMAL BLACKWELL\nSVERRE KVERNMO" //, 60
+		TextItem "SENIOR ANIMATOR AND ARTIST\n\nJASON HOOVER" //, 80
+		TextItem "TECHNICAL DIRECTOR\n\nBARRY DEMPSEY" //, 80
+		TextItem "MOTION CAPTURE SPECIALIST AND\nCHARACTER ANIMATION\nAMIT DORON\n\nA.I. PROGRAMMING\nARTHUR DONAVAN\n\nADDITIONAL ANIMATION\nGEORGE KARL" //, 60
+		TextItem "CHARACTER DESIGN\nCORKY LEHMKUHL\n\nMAP PAINTERS\nVIKTOR ANTONOV\nMATTHIAS BEEGUER\nSTEPHAN BURLE\n\nSCULPTORS\nGEORGE ENGEL\nJAKE GARBER\nJEFF HIMMEL" //, 30
+		TextItem "CHARACTER VOICES\n\nLEONARD\nBURTON GILLIAM\n\nBUBBA, BILLY RAY, SKINNY OL' COOT\nAND THE TURD MINION\nDREW MARKHAM\n\nSHERIFF LESTER T. HOBBES\nMOJO NIXON\n\nALIEN VIXEN\nPEGGY JO JACOBS" //, 30
+		TextItem "SOUND DESIGN\nGARY BRADFIELD\n\nMUSIC\nMOJO NIXON\nTHE BEAT FARMERS\nTHE REVEREND HORTON HEAT\nCEMENT POND\n\nADDITIONAL SOUND EFFECTS\nJIM SPURGIN" //, 30
+		TextItem "MOTION CAPTURE ACTOR\nJ.P. MANOUX\n\nMOTION CAPTURE VIXEN\nSHAWN WOLFE" //, 70
+		TextItem "PRODUCTION ASSISTANCE\nMINERVA MAYBERRY\n\nNUTS AND BOLTS\nSTEVE GOLDBERG\nMARCUS HUTCHINSON\n\nBEAN COUNTING\nMAX YOSHIKAWA\n\nADMINISTRATIVE ASSISTANCE\nSERAFIN LEWIS" //, 50
+		TextItem "LOCATION MANAGER, LOUISIANA\nRICK SKINNER\n\nLOCATION SCOUT, LOUISIANA\nBRIAN BENOS\n\nPHOTOGRAPHER\nCARLOS SERRAO" //, 70
+		TextItem "ADDITIONAL 3D MODELING BY\n3 NAME 3D\nVIEWPOINT DATALABS INTERNATIONAL\n\nAUDIO RECORDED AT\nPACIFIC OCEAN POST, SANTA MONICA, C.A.\n\nCEMENT POND TRACKS RECORDED AT\nDREAMSTATE RECORDING, BURBANK, C.A.\n\nRECORDING ENGINEER\nDAVE AHLERT" //, 50
+		TextItem "3D BUILD ENGINE LICENSED FROM\n3D REALMS ENTERTAINMENT\n\nBUILD ENGINE AND RELATED TOOLS\nCREATED BY KEN SILVERMAN" //, 80
+		TextItem "FOR INTERPLAY\n\nLEAD TESTER\nDARRELL JONES\n\nTESTERS\nTIM ANDERSON\nERICK LUJAN\nTIEN TRAN" //, 60
+		TextItem "IS TECHS\nBILL DELK\nAARON MEYERS\n\nCOMPATIBILITY TECHS\nMARC DURAN\nDAN FORSYTH\nDEREK GIBBS\nAARON OLAIZ\nJACK PARKER" //, 60
+		TextItem "DIRECTOR OF COMPATIBILITY\nPHUONG NGUYEN\n\nASSISTANT QA DIRECTOR\nCOLIN TOTMAN\n\nQA DIRECTOR\nCHAD ALLISON" //, 70
+		TextItem "INTERPLAY PRODUCER\nBILL DUGAN\n\nINTERPLAY LINE PRODUCER\nCHRIS BENSON\n\nPRODUCT MANAGER\nJIM VEEVAERT\n\nPUBLIC RELATIONS\nERIKA PRICE" //, 50
+		TextItem "SPECIAL THANKS\n\nJIM GAUER\nPAUL VAIS\nSCOTT MILLER\nTODD REPLOGLE\nCHUCK BUECHE\nCARTER LIPSCOMB\nJOHN CONLEY\nDON MAGGI" //, 60
+		TextItem "EXTRA SPECIAL THANKS\n\nBRIAN FARGO" //, 80
+		TextItem "REDNECK RAMPAGE\n(c) 1997 XATRIX ENTERTAINMENT, INC.\n\nREDNECK RAMPAGE IS A TRADEMARK OF\nINTERPLAY PRODUCTIONS" //, 60
+		animatedtransition
+	}
+	ifgame(RedneckRides)
+	{
+		TextBackground "MENUSCREEN"
+		TextBackgroundBrightness 0.5
+		TextFont "SmallFont"
+		TextScale 0.45
+		TextItem "ORIGINAL CONCEPT, DESIGN AND DIRECTION\n\nDREW MARKHAM" //, 80
+		TextItem "ART DIRECTION AND ADDITIONAL DESIGN\n\nCORKY LEHMKUHL" //, 80
+		TextItem "PRODUCED BY\n\nGREG GOODRICH" //, 80
+		TextItem "GAME PROGRAMMING\n\nJOSEPH AURILI" //, 80
+		TextItem "ORIGINAL GAME PROGRAMMING\n\nRAFAEL PAIZ" //, 80
+		TextItem "LEVEL DESIGN\n\nRHETT BALDWIN & AARON BARBER" //, 80
+		TextItem "ORIGINAL ART DIRECTION AND SUPPORT\n\nMAXX KAUFMAN & CLAIRE PRADERIE-MARKHAM" //, 80
+		TextItem "COMPUTER GRAPHICS SUPERVISOR &\nCHARACTER ANIMATION DIRECTION\n\nBARRY DEMPSEY" //, 80
+		TextItem "SENIOR ANIMATOR & MODELER\n\nJASON HOOVER" //, 80
+		TextItem "CHARACTER ANIMATION &\nMOTION CAPTURE SPECIALIST\n\nAMIT DORON" //, 80
+		TextItem "SOUND DESIGN &\nMUSIC PRODUCTION COORDINATION\n\nGARY BRADFIELD" //, 80
+		TextItem "INTRODUCTION ANIMATION\n\nDOMINIQUE DROZDZ" //, 80
+		TextItem "ARTIST\n\nMATTHIAS BEEGUER" //, 80
+		TextItem "ADDITIONAL ART\n\nVIKTOR ANTONOV" //, 80
+		TextItem "PRODUCTION COORDINATOR\n\nVICTORIA SYLVESTER" //, 80
+		TextItem "CHARACTER VOICES\n\nLEONARD\nBURTON GILLIAM\n\nDAISY MAE\nTARA CHARENDOFF\n\nBUBBA, BILLY RAY, SKINNY OL' COOT,\nFRANK THE BIKER, THE TURD MINION\n& ALL OTHER VARIOUS RAMBLINGS...\nDREW MARKHAM" //, 40
+		TextItem "SPECIAL APPEARENCE BY\n\nSHERIFF LESTER T. HOBBES\nMOJO NIXON\n\nALIEN VIXEN\nPEGGY JO JACOBS" //, 70
+		TextItem "REDNECK RAMPAGE TITLE TRACK & CYBERSEX\nWRITTEN & PERFORMED BY\nMOJO NIXON\n\n(c) MUFFIN'STUFFIN' MUSIC (BMI)\nADMINISTERED BY BUG.", 70
+		TextItem "MUSIC\n\nDISGRACELAND\nTINY D & THE SOFA KINGS\n\nBANJO AND GUITAR PICKIN\nJOHN SCHLOCKER\nHOWARD YEARWOOD" //, 60
+		TextItem "RECORDING ENGINEER\nDAVE AHLERT\n\nRECORDING ASSISTANCE\nJEFF GILBERT" //, 80
+		TextItem "MOTION CAPTURE ACTOR\nJ.P. MANOUX\n\nMOTION CAPTURE ACTRESS\nSHAWN WOLFE" //, 80
+		TextItem "THIS GAME COULD NOT HAVE BEEN MADE WITHOUT\nALEX MAYBERRY\nMAL BLACKWELL\n\nNUTS AND BOLTS\nSTEVE GOLDBERG\n\nBEAN COUNTING\nMAX YOSHIKAWA\n\nADMINISTRATIVE ASSISTANCE\nMINERVA MAYBERRY" //, 50
+		TextItem "FOR INTERPLAY\n\nPRODUCER\nBILL DUGAN\n\nLINE PRODUCER\nCHRIS BENSON\n\nLEAD TESTER\nDARRELL JONES" //, 60
+		TextItem "TESTERS\n\nTIM ANDERSON\nPRIMO PULANCO\nMARK MCCARTY\nBRIAN AXLINE" //, 70
+		TextItem "PRODUCTION BABY\n\nPAULINE MARIE MARKHAM" //, 80
+		TextItem "ORIGINAL PRODUCTION BABY\n\nALYSON KAUFMAN" //, 80
+		TextItem "3D BUILD ENGINE LICENSED FROM\n3D REALMS ENTERTAINMENT\n\nBUILD ENGINE AND RELATED TOOLS\nCREATED BY KEN SILVERMAN" //, 80
+		TextItem "SPECIAL THANKS\n\nSCOTT MILLER\nGEORGE BROUSSARD" //, 80
+		TextItem "EXTRA SPECIAL THANKS\n\nBRIAN FARGO" //, 80
+		TextItem "REDNECK RAMPAGE RIDES AGAIN\n(c) 1998 XATRIX ENTERTAINMENT, INC.\n\nREDNECK RAMPAGE RIDES AGAIN\nIS A TRADEMARK OF\nINTERPLAY PRODUCTIONS" //, 70
+		animatedtransition
+	}
+	ifgame(blood)
+	{
+		QAVDrawer "Credits.qav"
+		animated
+	}
+	ifgame(ShadowWarrior)
+	{
+		ifgame (shareware)
+		{
+			ImageItem "SWORDER1"
+			ImageItem "SWORDER2"
+		}
+		ImageItem "CREDITS1"
+		ImageItem "CREDITS2"
+		ImageItem "SUPPORT"
+		ImageItem "ONLINE"
+	}
+	ifgame(Exhumed)
+	{
+		// This is only here to prevent crashes if someone decides to open the menu from the console
+		ImageItem "TileBMGLogo"
+		ImageItem "TilePIELogo"
+	}
+}
+	
+//-------------------------------------------------------------------------------------------
+//
+// Base definition for load game menu. Only the configurable part is done here
+//
+//-------------------------------------------------------------------------------------------
+
+ListMenu "LoadGameMenu"
+{
+	Position 0, 40
+	Class "LoadMenu"	// uses its own implementation
+	CaptionItem "$MNU_LOADGAME"
+}
+
+//-------------------------------------------------------------------------------------------
+//
+// Base definition for save game menu. Only the configurable part is done here
+//
+//-------------------------------------------------------------------------------------------
+
+ListMenu "SaveGameMenu"
+{
+	Position 0, 40
+	Class "SaveMenu"	// uses its own implementation
+	CaptionItem "$MNU_SAVEGAME"
+}
+	
+//-------------------------------------------------------------------------------------------
+//
+// The generic options menus start here
+//
+//-------------------------------------------------------------------------------------------
+
+OptionValue "YesNo"
+{
+	0, "$TXT_NO"
+	1, "$TXT_YES"
+}
+
+OptionValue "NoYes"
+{
+	0, "$TXT_YES"
+	1, "$TXT_NO"
+}
+
+OptionValue "OnOff"
+{
+	0, "$OPTVAL_OFF"
+	1, "$OPTVAL_ON"
+}
+
+OptionValue "OffOn"
+{
+	0, "$OPTVAL_ON"
+	1, "$OPTVAL_OFF"
+}
+
+OptionValue AutoOffOn
+{
+	-1, "$OPTVAL_AUTO"
+	0, "$OPTVAL_OFF"
+	1, "$OPTVAL_ON"
+}
+
+OptionMenuSettings
+{
+	Linespacing 17
+	// todo: implement color themes that fit the games
+}
+
+DefaultOptionMenu
+{
+	Position -20
+}
+
+OptionMenu "OptionsMenu" protected
+{
+	Caption "$MNU_OPTIONS"
+	Submenu "$OPTMNU_CONTROLS",			"CustomizeControls"
+	Submenu "$OPTMNU_MOUSE",			"MouseOptions"
+	Submenu "$OPTMNU_JOYSTICK",			"JoystickOptions"
+	StaticText " "
+	Submenu "$OPTMNU_PLAYER",			"NewPlayerMenu"
+	Submenu "$OPTMNU_SOUND",			"SoundOptions"
+	Submenu "$OPTMNU_DISPLAY",			"VideoOptions"
+	Submenu "$OPTMNU_VIDEO",			"VideoModeMenu"
+	Submenu "$OPTMNU_GAMEPLAY",			"GameplayOptions"
+	Submenu "$OPTMNU_MISCELLANEOUS",	"MiscOptions"
+	StaticText " "
+	Submenu "$OS_TITLE", "os_Menu"
+	StaticText " "
+	Submenu "$MNU_ENGINECREDITS",		"EngineCredits"
+	SafeCommand "$OPTMNU_DEFAULTS",	"reset2defaults"
+	SafeCommand	"$OPTMNU_RESETTOSAVED",	"reset2saved"
+	//Command "$OPTMNU_CONSOLE",			"menuconsole"
+}	
+	
+//-------------------------------------------------------------------------------------------
+//
+// Controls Menu
+//
+//-------------------------------------------------------------------------------------------
+
+OptionMenu "CustomizeControls" protected
+{
+	Title "$CNTRLMNU_TITLE"
+
+	Submenu    "$CNTRLMNU_ACTION"      , "ActionControlsMenu"
+	Submenu    "$CNTRLMNU_CHAT"        , "ChatControlsMenu"
+	Submenu    "$CNTRLMNU_WEAPONS"     , "WeaponsControlMenu"
+	Submenu    "$CNTRLMNU_INVENTORY"   , "InventoryControlsMenu"
+	Submenu    "$CNTRLMNU_OTHER"       , "OtherControlsMenu"
+	Submenu    "$MAPCNTRLMNU_CONTROLS" , "MapControlsMenu" // todo after thorough cleanup
+	StaticText ""
+	StaticText "$CTRL_PRESET"
+	SafeCommand		"$CTRL_DEFAULT",		"controlpreset 0" //engine/defbinds.txt
+	SafeCommand		"$CTRL_CLASSIC",		"controlpreset 1" //engine/origbinds.txt
+	SafeCommand		"$CTRL_LEFTHANDED",		"controlpreset 2" //engine/leftbinds.txt
+}
+
+OptionMenu "ActionControlsMenu" protected
+{
+	Title "$CNTRLMNU_ACTION_TITLE"
+	ScrollTop 2
+	StaticTextSwitchable "$CNTRLMNU_SWITCHTEXT1", "$CNTRLMNU_SWITCHTEXT2", "ControlMessage"
+
+	StaticText ""
+	Control    "$CNTRLMNU_ATTACK"           , "+fire"
+	ifgame(Blood)
+	{
+		Control    "$CNTRLMNU_ALTATTACK"        , "+alt_fire"
+	}
+
+	StaticText ""
+	Control    "$CNTRLMNU_USE"              , "+open"
+
+	StaticText ""
+	Control    "$CNTRLMNU_FORWARD"          , "+move_forward"
+	Control    "$CNTRLMNU_BACK"             , "+move_backward"
+	Control    "$CNTRLMNU_MOVELEFT"         , "+strafe_left"
+	Control    "$CNTRLMNU_MOVERIGHT"        , "+strafe_right"
+
+	StaticText ""
+	Control    "$CNTRLMNU_TURNLEFT"         , "+turn_left"
+	Control    "$CNTRLMNU_TURNRIGHT"        , "+turn_right"
+	Control    "$CNTRLMNU_TURN180"          , "turnaround"
+
+	StaticText ""
+	Control    "$CNTRLMNU_JUMP"             , "+jump"
+	Control    "$CNTRLMNU_CROUCH"           , "+crouch"
+	Control    "$CNTRLMNU_TOGGLECROUCH"     , "+toggle_crouch"
+
+	StaticText ""
+	Control    "$CNTRLMNU_MOUSELOOK"        , "+mouse_aiming"
+	Control    "$CNTRLMNU_MLOOKTOGGLE"		, "togglemouseaim"
+	
+	Control    "$CNTRLMNU_AIMUP"           , "+aim_up"
+	Control    "$CNTRLMNU_AIMDOWN"         , "+aim_down"
+	Control    "$CNTRLMNU_LOOKUP"           , "+look_up"
+	Control    "$CNTRLMNU_LOOKDOWN"         , "+look_down"
+	Control    "$CNTRLMNU_LOOKLEFT"           , "+look_left"
+	Control    "$CNTRLMNU_LOOKRIGHT"         , "+look_right"
+	Control    "$CNTRLMNU_CENTERVIEW"       , "centerview"
+
+	StaticText ""
+	Control    "$CNTRLMNU_RUN"              , "+run"
+	Control    "$CNTRLMNU_TOGGLERUN"        , "toggle cl_autorun"
+	Control    "$CNTRLMNU_STRAFE"           , "+strafe"
+
+	// For later. Currently we have no working multiplayer.
+	//StaticText ""
+	//Control    "$CNTRLMNU_SCOREBOARD"       , "+show_dukematch_scores"
+}
+
+OptionMenu "ChatControlsMenu" protected
+{
+	Title "$CNTRLMNU_CHAT_TITLE"
+	ScrollTop 2
+	StaticTextSwitchable "$CNTRLMNU_SWITCHTEXT1", "$CNTRLMNU_SWITCHTEXT2", "ControlMessage"
+
+	StaticText ""
+	Control    "$CNTRLMNU_SAY"     , "messagemode"
+}
+
+OptionMenu "WeaponsControlMenu" protected
+{
+	Title "$CNTRLMNU_WEAPONS_TITLE"
+	ScrollTop 2
+	StaticTextSwitchable "$CNTRLMNU_SWITCHTEXT1", "$CNTRLMNU_SWITCHTEXT2", "ControlMessage"
+
+	StaticText ""
+	Control    "$CNTRLMNU_NEXTWEAPON"     , "weapnext"
+	Control    "$CNTRLMNU_PREVIOUSWEAPON" , "weapprev"
+	ifnotgame(Exhumed)
+	{
+		Control    "$CNTRLMNU_ALTWEAPON"        , "weapalt"
+	}
+
+	StaticText ""
+	Control    "$CNTRLMNU_SLOT1"          , "slot 1"
+	Control    "$CNTRLMNU_SLOT2"          , "slot 2"
+	Control    "$CNTRLMNU_SLOT3"          , "slot 3"
+	Control    "$CNTRLMNU_SLOT4"          , "slot 4"
+	Control    "$CNTRLMNU_SLOT5"          , "slot 5"
+	Control    "$CNTRLMNU_SLOT6"          , "slot 6"
+	Control    "$CNTRLMNU_SLOT7"          , "slot 7"
+	ifnotgame(Exhumed)
+	{
+		Control    "$CNTRLMNU_SLOT8"          , "slot 8"
+		Control    "$CNTRLMNU_SLOT9"          , "slot 9"
+		Control    "$CNTRLMNU_SLOT0"          , "slot 10"
+		StaticText ""
+		Control    "$CNTRLMNU_HOLSTER"        , "holsterweapon"
+	}
+	ifgame(Duke, Nam, WW2GI)
+	{
+		Control "$CNTRLMNU_QUICKKICK"     , "+quick_kick"
+	}
+
+	ifgame(Blood)
+	{
+		Control "$CNTRLMNU_PROXIMITYBOMBS","slot 11"
+		Control "$CNTRLMNU_REMOTEBOMBS"   ,"slot 12"
+	}
+	ifgame(ShadowWarrior)
+	{
+		Control "$CNTRLMNU_SMOKEBOMB","useitem 3"
+		Control "$CNTRLMNU_GASBOMB"   ,"useitem 5"
+		Control "$CNTRLMNU_FLASHBOMB","useitem 6"
+		Control "$CNTRLMNU_CALTROPS"   ,"useitem 7"
+	}
+
+}
+
+OptionMenu "InventoryControlsMenu" protected
+{
+	Title "$CNTRLMNU_INVENTORY_TITLE"
+	ScrollTop 2
+	StaticTextSwitchable "$CNTRLMNU_SWITCHTEXT1", "$CNTRLMNU_SWITCHTEXT2", "ControlMessage"
+
+	StaticText ""
+	Control    "$CNTRLMNU_USEITEM"      , "invuse"
+
+	StaticText ""
+	Control    "$CNTRLMNU_NEXTITEM"     , "invnext"
+	Control    "$CNTRLMNU_PREVIOUSITEM" , "invprev"
+	
+	// Item numbers here are are defined by the games' internal order.
+	ifgame(Duke)
+	{
+		StaticText ""
+		Control    "$CNTRLMNU_HOLODUKE" , "useitem 3"
+		Control    "$CNTRLMNU_JETPACK" , "useitem 4"
+		Control    "$CNTRLMNU_NIGHTVISION" , "useitem 5"
+		Control    "$CNTRLMNU_MEDKIT" , "useitem 1"
+		Control    "$CNTRLMNU_STEROIDS" , "useitem 2"
+	}
+	ifgame(Nam)
+	{
+		StaticText ""
+		Control    "$CNTRLMNU_HOLOSOLDIER" , "useitem 3"
+		Control    "$CNTRLMNU_HUEY" , "useitem 4"
+		Control    "$CNTRLMNU_NIGHTVISION" , "useitem 5"
+		Control    "$CNTRLMNU_MEDKIT" , "useitem 1"
+		Control    "$CNTRLMNU_TANKMODE" , "useitem 2"
+	}
+	ifgame(WW2GI)
+	{
+		StaticText ""
+		Control    "$CNTRLMNU_FIRE MISSION" , "useitem 3"
+		Control    "$CNTRLMNU_NIGHTVISION" , "useitem 5"
+		Control    "$CNTRLMNU_MEDKIT" , "useitem 1"
+		Control    "$CNTRLMNU_SMOKES" , "useitem 2"
+	}
+	ifgame(Redneck, RedneckRides)
+	{
+		StaticText ""
+		Control    "$CNTRLMNU_BEER" , "useitem 3"
+		Control    "$CNTRLMNU_COWPIE" , "useitem 4"
+		Control    "$CNTRLMNU_YEEHAA" , "useitem 5"
+		Control    "$CNTRLMNU_WHISKEY" , "useitem 1"
+		Control    "$CNTRLMNU_MOONSHINE" , "useitem 2"
+		Control    "$CNTRLMNU_PEE", "+quick_kick"
+	}
+	ifgame(Blood)
+	{
+		StaticText ""
+		Control    "$CNTRLMNU_CRYSTALBALL" , "useitem 2"
+		Control    "$CNTRLMNU_JUMPBOOTS" , "useitem 4"
+		Control    "$CNTRLMNU_BEASTVISION" , "useitem 3"
+		Control    "$CNTRLMNU_MEDKIT" , "useitem 1"
+	}
+	ifgame(ShadowWarrior)
+	{
+		StaticText ""
+		Control    "$CNTRLMNU_NIGHTVISION" , "useitem 4"
+		Control    "$CNTRLMNU_MEDKIT" , "useitem 1"
+	}
+	ifgame(Exhumed)
+	{
+		StaticText ""
+		Control    "$TXT_EX_USEINV1" , "useitem 4"
+		Control    "$TXT_EX_USEINV2" , "useitem 5"
+		Control    "$TXT_EX_USEINV3" , "useitem 6"
+		Control    "$TXT_EX_USEINV4" , "useitem 1"
+		Control    "$TXT_EX_USEINV5" , "useitem 3"
+		Control    "$TXT_EX_USEINV6" , "useitem 2"
+	}
+}
+
+OptionMenu "OtherControlsMenu" protected
+{
+	Title "$CNTRLMNU_OTHER_TITLE"
+	ScrollTop 2
+	StaticTextSwitchable "$CNTRLMNU_SWITCHTEXT1", "$CNTRLMNU_SWITCHTEXT2", "ControlMessage"
+
+	StaticText ""
+	Control    "$CNTRLMNU_CHASECAM"        , "third_person_view"
+
+	StaticText ""
+	Control    "$CNTRLMNU_SCREENSHOT"      , "screenshot"
+	Control    "$CNTRLMNU_CONSOLE"         , "toggleconsole"
+	Control    "$CNTRLMNU_PAUSE"           , "pause"
+
+	StaticText ""
+	Control    "$CNTRLMNU_DISPLAY_INC"     , "sizeup"
+	Control    "$CNTRLMNU_DISPLAY_DEC"     , "sizedown"
+	Control    "$CNTRLMNU_TOGGLE_MESSAGES" , "togglemessages"
+	Control    "$CNTRLMNU_ADJUST_GAMMA"    , "bumpgamma"
+
+	StaticText ""
+	ifnotgame(Exhumed)
+	{
+		Control    "$CNTRLMNU_OPEN_HELP"       , "openhelpmenu"
+	}
+	Control    "$CNTRLMNU_OPEN_SAVE"       , "opensavemenu"
+	Control    "$CNTRLMNU_OPEN_LOAD"       , "openloadmenu"
+	Control    "$CNTRLMNU_OPEN_OPTIONS"    , "openmenu optionsmenu"
+	Control    "$CNTRLMNU_OPEN_DISPLAY"    , "openmenu videooptions"
+	Control    "$CNTRLMNU_EXIT_TO_MAIN"    , "menu_endgame"
+	Control    "$CNTRLMNU_MENU_QUIT"       , "menu_quit"
+
+	StaticText ""
+	Control    "$CNTRLMNU_QUICKSAVE"       , "quicksave"
+	Control    "$CNTRLMNU_QUICKLOAD"       , "quickload"
+}
+
+
+OptionMenu "MapControlsMenu" protected
+{
+	Title "$MAPCNTRLMNU_CONTROLS"
+
+	StaticText ""
+	Control    "$CNTRLMNU_AUTOMAP"         , "togglemap"
+	MapControl "$MAPCNTRLMNU_TOGGLEFOLLOW" ,"togglefollow"
+	MapControl "$MAPCNTRLMNU_ROTATE"			,"togglerotate"
+	StaticText ""
+	MapControl "$MAPCNTRLMNU_ZOOMIN"       , "+enlarge_Screen"
+	MapControl "$MAPCNTRLMNU_ZOOMOUT"      , "+shrink_screen"
+	StaticText ""
+	MapControl "$MAPCNTRLMNU_PANLEFT",			"+am_panleft"
+	MapControl "$MAPCNTRLMNU_PANRIGHT",			"+am_panright"
+	MapControl "$MAPCNTRLMNU_PANUP",			"+am_panup"
+	MapControl "$MAPCNTRLMNU_PANDOWN",			"+am_pandown"
+	}
+//-------------------------------------------------------------------------------------------
+//
+// Mouse Menu
+//
+//-------------------------------------------------------------------------------------------
+
+OptionValue "Corners"
+{
+	-1, "$OPTVAL_OFF"
+	0, "$OPTVAL_UPPERLEFT"
+	1, "$OPTVAL_UPPERRIGHT"
+	2, "$OPTVAL_LOWERLEFT"
+	3, "$OPTVAL_LOWERRIGHT"
+}
+
+OptionValue "MenuMouse"
+{
+	0, "$TXT_NO"
+	1, "$TXT_YES"
+	2, "$OPTVAL_TOUCHSCREENLIKE"
+}
+
+OptionString "Cursors"
+{
+	"None", "$OPTVAL_DEFAULT"
+	"cursor", "$OPTSTR_SIMPLEARROW"
+	"-", "$OPTSTR_SYSTEMCURSOR"
+}
+
+OptionMenu "MouseOptions" protected
+{
+	Title "$MOUSEMNU_TITLE"
+	//Option "$MOUSEMNU_ENABLEMOUSE",		"in_mouse", "YesNo"
+	Option "$MOUSEMNU_MOUSEINMENU",		"m_use_mouse", "MenuMouse", "use_mouse"
+	Option "$MOUSEMNU_SHOWBACKBUTTON",	"m_show_backbutton", "Corners", "use_mouse"
+	IfOption(Windows)
+	{
+		Option "$MOUSEMNU_SWAPBUTTONS", "m_swapbuttons", "YesNo"
+	}
+	// todo Option "$MOUSEMNU_CURSOR",			"vid_cursor", "Cursors"
+	StaticText 	""
+	Slider "$MOUSEMNU_SENSITIVITY_X",	"m_sensitivity_x", 0.5, 8, 0.25
+	Slider "$MOUSEMNU_SENSITIVITY_Y",	"m_sensitivity_y", 0.5, 8, 0.25
+	Option "$MOUSEMNU_SMOOTHMOUSE",		"m_filter", "YesNo"
+	StaticText 	""
+	Slider "$MOUSEMNU_TURNSPEED",		"m_yaw", 0, 2.5, 0.1
+	Slider "$MOUSEMNU_MOUSELOOKSPEED",	"m_pitch", 0, 2.5, 0.1
+	Slider "$MOUSEMNU_FORWBACKSPEED",	"m_forward", 0, 2.5, 0.1
+	Slider "$MOUSEMNU_STRAFESPEED",		"m_side", 0, 2.5, 0.1
+	StaticText 	""
+	Option "$MOUSEMNU_ALWAYSMOUSELOOK",	"in_mousemode", "OnOff"
+	Option "$MOUSEMNU_INVERTMOUSEX",	"invertmousex", "OnOff"
+	Option "$MOUSEMNU_INVERTMOUSE",		"invertmouse", "OnOff"
+	// Do we need this? Option "$MOUSEMNU_LOOKSTRAFE",		"lookstrafe", "OnOff"
+}
+
+//-------------------------------------------------------------------------------------------
+//
+// Joystick Menu
+//
+//-------------------------------------------------------------------------------------------
+
+OptionMenu "JoystickOptionsDefaults" protected
+{
+	Title "$JOYMNU_OPTIONS"
+	Option "$JOYMNU_ENABLE", "use_joystick", "YesNo"
+	Option "$JOYMNU_NOMENU", "m_blockcontrollers", "YesNo"
+	IfOption(Windows)
+	{
+		Option "$JOYMNU_DINPUT", "joy_dinput", "YesNo"
+		Option "$JOYMNU_XINPUT", "joy_xinput", "YesNo"
+		Option "$JOYMNU_PS2", "joy_ps2raw", "YesNo"
+	}
+	StaticText ""
+	StaticTextSwitchable "$JOYMNU_NOCON", "$JOYMNU_CONFIG", "ConfigureMessage"
+	StaticTextSwitchable " ", "$JOYMNU_DISABLED1", "ConnectMessage1"
+	StaticTextSwitchable " ", "$JOYMNU_DISABLED2", "ConnectMessage2"
+
+	// The rest will be filled in by joystick code if devices get connected or disconnected
+}
+
+OptionMenu "JoystickOptions" protected
+{
+	Title "$JOYMNU_OPTIONS"
+}
+
+OptionValue "JoyAxisMapNames"
+{
+	-1, "$OPTVAL_NONE"
+	0, "$OPTVAL_TURNING"
+	1, "$OPTVAL_LOOKINGUPDOWN"
+	2, "$OPTVAL_MOVINGFORWARD"
+	3, "$OPTVAL_STRAFING"
+	4, "$OPTVAL_MOVINGUPDOWN"
+}
+
+OptionValue "Inversion"
+{
+	0, "$OPTVAL_NOTINVERTED"
+	1, "$OPTVAL_INVERTED"
+}
+
+OptionMenu "JoystickConfigMenu" protected
+{
+	Title "$JOYMNU_TITLE"
+	Class "JoystickConfigMenu"
+	// Will be filled in by joystick code.
+}
+
+
+OptionValue "PlayerColors"
+{
+	0, "$OPTVAL_AUTO"
+	1, "$TXT_COLOR_BLUE"
+	2, "$TXT_COLOR_RED"
+	3, "$TXT_COLOR_GREEN"
+	4, "$TXT_COLOR_GRAY"
+	5, "$TXT_COLOR_DARKGRAY"
+	6, "$TXT_COLOR_DARKGREEN"
+	7, "$TXT_COLOR_BROWN"
+	8, "$TXT_COLOR_DARKBLUE"
+	9, "$TXT_COLOR_LIGHTRED"
+	//10, "$TXT_COLOR_YELLOW"
+}
+
+OptionValue "PlayerColorsSW"
+{
+	0, "$TXT_COLOR_BROWN"
+	1, "$TXT_COLOR_GRAY"
+	2, "$TXT_COLOR_PURPLE"
+	3, "$TXT_COLOR_RED"
+	4, "$TXT_COLOR_YELLOW"
+	5, "$TXT_COLOR_DULLGREEN"
+	6, "$TXT_COLOR_GREEN"
+	7, "$TXT_COLOR_BLUE"
+}
+
+OptionValue "PlayerTeam"
+{
+	0, "$TXT_COLOR_BLUE"
+	1, "$TXT_COLOR_RED"
+	2, "$TXT_COLOR_GREEN"
+	3, "$TXT_COLOR_GRAY"
+}
+
+OptionValue "Gender"
+{
+	0, "$OPTVAL_MALE"
+	1, "$OPTVAL_FEMALE"
+	2, "$OPTVAL_NEUTRAL"
+	3, "$OPTVAL_OTHER"
+}
+
+
+OptionMenu "NewPlayerMenu" protected
+{
+	Title "$MNU_PLAYERSETUP"
+	TextField "$PLYRMNU_NAME", playername
+	ifgame(Duke, Nam, WW2GI, Redneck, RedneckRides)
+	{
+		Option "$PLYRMNU_PLAYERCOLOR", "playercolor", "PlayerColors"
+	}
+	ifgame(ShadowWarrior)
+	{
+		// This curently does not get applied to the single player game.
+		Option "$PLYRMNU_PLAYERCOLOR", "playercolor", "PlayerColorsSW"
+	}
+	Option "$PLYRMNU_PLAYERGENDER", "playergender", "Gender"
+	Submenu "$PLRMNU_TAUNTS", "TauntsMenu"
+	Class "PlayerMenu"
+}
+
+OptionMenu "TauntsMenu" protected
+{
+	Title "$PLRMNU_TAUNTS"
+	TextField "1", "combatmacro0"
+	TextField "2", "combatmacro1"
+	TextField "3", "combatmacro2"
+	TextField "4", "combatmacro3"
+	TextField "5", "combatmacro4"
+	TextField "6", "combatmacro5"
+	TextField "7", "combatmacro6"
+	TextField "8", "combatmacro7"
+	TextField "9", "combatmacro8"
+	TextField "10", "combatmacro9"
+}
+
+//-------------------------------------------------------------------------------------------
+//
+// Game Setup
+//
+//-------------------------------------------------------------------------------------------
+
+OptionValue "AimMode"
+{
+	0, "$OPTVAL_NEVER"
+	1, "$OPTVAL_ALWAYS"
+	2, "$OPTVAL_HITSCAN"
+}
+
+OptionValue "RunMode"
+{
+	0, "$PLRMNU_TOGGLE"
+	1, "$PLRMNU_OVERRIDE"
+}
+
+OptionValue "WeapSwitch"
+{
+	0, "$OPTVAL_NEVER"
+	1, "$PLRMNU_IFNEW"
+	3, "$PLRMNU_PREFERRED"
+}
+
+OptionValue "ExplosBehavior"
+{
+	0, "$OPTVAL_DEFAULT"
+	1, "$OPTVAL_OLD"
+}
+
+OptionValue "EnemyBehavior"
+{
+	0, "$OPTVAL_DEFAULT"
+	1, "$OPTVAL_OLD"
+}
+
+
+OptionMenu GameplayOptions protected
+{
+	Title 	"$GMPLYMNU_TITLE"
+	ifgame(Duke, Nam, WW2GI, Redneck, RedneckRides, Blood, ShadowWarrior)
+	{
+		Option "$PLYRMNU_AUTOAIM", "cl_autoaim", "AimMode"
+	}
+	else
+	{
+		Option "$PLYRMNU_AUTOAIM", "cl_autoaim", "OnOff"
+	}
+	Option "$PLYRMNU_ALWAYSRUN", "cl_autorun", "OnOff"
+	Option "$PLRMNU_RUNMODE", "cl_runmode", "RunMode"
+	ifgame(ShadowWarrior)
+	{
+		Option "$PLRMNU_EQUIP", "cl_weaponswitch", "OnOff" // does not have the 'preferred' option.
+	}
+	ifgame(Blood)
+	{
+		Option "$PLRMNU_EQUIP", "cl_weaponswitch", "WeapSwitch"
+		Option "$EXPLOS_BEHAVIOR", "cl_bloodvanillaexplosions", "ExplosBehavior"
+		Option "$ENEMY_BEHAVIOR", "cl_bloodvanillaenemies", "EnemyBehavior"
+	}
+	StaticText ""
+	ifgame(Blood)
+	{
+		Option "$PLRMNU_BLDQAVINTERP", "cl_bloodqavinterp", "OnOff"
+		Option "$PLRMNU_BLDWEAPINTERP", "cl_bloodweapinterp", "OnOff", "cl_bloodqavinterp"
+	}
+	// StaticText ""
+	// Option "Record Demo", "m_recstat", "OnOff"
+	// Submenu "Cheats" "CheatsMenu
+}
+
+//-------------------------------------------------------------------------------------------
+//
+// Display options
+//
+//-------------------------------------------------------------------------------------------
+
+OptionValue "FilterModes"
+{
+	0, "$OPTVAL_NONE"
+	1, "$OPTVAL_NONENEARESTMIPMAP"
+	5, "$OPTVAL_NONELINEARMIPMAP"
+	6, "$OPTVAL_NONETRILINEAR"
+	2, "$OPTVAL_LINEAR_2"
+	3, "$OPTVAL_BILINEAR"
+	4, "$OPTVAL_TRILINEAR"
+}
+
+OptionValue "Anisotropy"
+{
+	1, "$OPTVAL_OFF"
+	2, "$OPTVAL_2X"
+	4, "$OPTVAL_4X"
+	8, "$OPTVAL_8X"
+	16, "$OPTVAL_16X"
+}
+
+OptionValue "Multisample"
+{
+	1, "$OPTVAL_OFF"
+	2, "$OPTVAL_2X"
+	4, "$OPTVAL_4X"
+	8, "$OPTVAL_8X"
+	16, "$OPTVAL_16X"
+	32, "$OPTVAL_32X"
+}
+
+
+OptionMenu "VideoOptions" protected
+{
+	Title "$DSPLYMNU_TITLE"
+	
+	Submenu "$OPTMNU_HUD", "HUDOptions"
+	Submenu "$RENDER_OPTIONS", "RenderOptions"
+	Submenu "$AUTOMAPMNU_TITLE", "AutomapOptions"
+	Submenu "$GLMNU_POSTPROCESS", "PostProcessMenu"
+	Submenu "$GLTEXMNU_TITLE", "GLTextureGLOptions"
+	StaticText ""
+
+	Slider "$DSPLYMNU_GAMMA",					"vid_gamma",					0.75, 3.0, 0.05, 2
+	Slider "$DSPLYMNU_BRIGHTNESS",				"vid_brightness",				-0.8,0.8, 0.05,2
+	Slider "$DSPLYMNU_CONTRAST",				"vid_contrast",	   				0.1, 3.0, 0.1
+	Slider "$DSPLYMNU_SATURATION",				"vid_saturation",  				-3.0, 3.0, 0.25, 2
+	Slider "$DSPLYMNU_AMBIENT_LIGHT",			"r_ambientlight",  				0.5, 4.0, 0.1
+
+	StaticText ""
+	Option "$DSPLYMNU_VOXELS",					"r_voxels",					"OnOff"
+	Option "$DSPLYMNU_SHADOWS",					"r_shadows",					"OnOff"
+	Option "$DSPLYMNU_SLOPETILT",				"cl_slopetilting",					"OnOff"
+	Option "$GLPREFMNU_ENVIRONMENTMAPMIRROR",	gl_mirror_envmap,				"OnOff"
+	ifnotgame(Blood, Exhumed)
+	{
+		Option "$DSPLYMNU_VIEWBOB",					"cl_viewbob",					"OnOff"
+	}
+	ifgame(Blood)
+	{
+		Option "$DSPLYMNU_VIEWBOB",					"cl_viewvbob",					"OnOff"
+		Option "$DSPLYMNU_VIEWSWAY",				"cl_viewhbob",					"OnOff"
+	}
+	StaticText ""
+	Slider "$DSPLYMNU_FOV",						"r_fov",					60, 130, 10, 1
+
+	StaticText ""
+	Option "$GLTEXMNU_TEXFILTER",		gl_texture_filter,				"FilterModes"
+	Option "$GLTEXMNU_ANISOTROPIC",		gl_texture_filter_anisotropic,				"Anisotropy"
+	StaticText " "
+	Option "$GLPREFMNU_MULTISAMPLE", 			gl_multisample,					"Multisample"
+
+}
+
+OptionValue "DitherModes"
+{
+	0, "$OPTVAL_OFF"
+	-1, "$OPTVAL_ON"
+	6, "6 BPC"
+	8, "8 BPC"
+	10, "10 BPC"
+	12, "12 BPC"
+}
+
+OptionValue "FXAAQuality"
+{
+	0, "$OPTVAL_OFF"
+	1, "$OPTVAL_LOW"
+	2, "$OPTVAL_MEDIUM"
+	3, "$OPTVAL_HIGH"
+	4, "$OPTVAL_EXTREME"
+}
+
+OptionValue "TonemapModes"
+{
+	0, "$OPTVAL_OFF"
+	1, "$OPTVAL_UNCHARTED2"
+	2, "$OPTVAL_HEJLDAWSON"
+	3, "$OPTVAL_REINHARD"
+	5, "$OPTVAL_PALETTE"
+}
+
+OptionValue "LookupOrder"
+{
+	0, "$OPTVAL_OBVERSEFIRST"
+	1, "$OPTVAL_REVERSEFIRST"
+}
+
+OptionValue "HqResizeModes"
+{
+   0, "$OPTVAL_OFF"
+   1, "$OPTVAL_SCALENX"
+   2, "$OPTVAL_HQNX"
+   3, "$OPTVAL_HQNXMMX"
+   4, "$OPTVAL_NXBRZ"
+   5, "$OPTVAL_OLD_NXBRZ"
+   6, "$OPTVAL_NORMALNX"
+}
+
+OptionValue "HqResizeMultipliers"
+{
+   1, "$OPTVAL_OFF"
+   2, "2x"
+   3, "3x"
+   4, "4x"
+   5, "5x"
+   6, "6x"
+}
+
+OptionValue "HqResizeModesNoMMX"
+{
+   0, "$OPTVAL_OFF"
+   1, "$OPTVAL_SCALENX"
+   2, "$OPTVAL_HQNX"
+   4, "$OPTVAL_NXBRZ"
+   5, "$OPTVAL_OLD_NXBRZ"
+   6, "$OPTVAL_NORMALNX"
+}
+
+OptionMenu "PostProcessMenu"
+{
+	Title "$GLMNU_POSTPROCESS"
+	//Option "$GLPREFMNU_BLOOM",		 			gl_bloom,						"OnOff"
+	Option "$GLPREFMNU_LENS",		 			gl_lens,						"OnOff"
+	//Option "$GLPREFMNU_SSAO",		 			gl_ssao,						"SSAOModes"
+	//Slider "$GLPREFMNU_SSAO_PORTALS",			gl_ssao_portals,				0.0, 4.0, 1.0, 0
+	Option "$GLPREFMNU_FXAA",		 			gl_fxaa,						"FXAAQuality"
+	Option "$GLPREFMNU_DITHER",		 			gl_dither_bpc,					"DitherModes"
+	Option "$GLPREFMNU_TONEMAP", 				gl_tonemap,						"TonemapModes"
+	StaticText " "
+	Slider "$GLPREFMNU_PALTONEMAPPOWER",		gl_paltonemap_powtable,			0.2, 3.0, 0.1, 1
+	Option "$GLPREFMNU_PALTONEMAPORDER",		gl_paltonemap_reverselookup,	"LookupOrder"
+}
+
+OptionMenu "AutomapOptions"
+{
+	Title "$AUTOMAPMNU_TITLE"
+	Submenu    "$MAPCNTRLMNU_CONTROLS" , "MapControlsMenu"
+	StaticText ""
+	Option "$AUTOMAPMNU_ROTATE",				"am_rotate",					"OnOff"
+	Option "$AUTOMAPMNU_FOLLOW",				"am_followplayer",				"OnOff"
+	Slider "$AUTOMAPMNU_LINEALPHA",				"am_linealpha", 0.1, 1.0, 0.1, 1
+	Slider "$AUTOMAPMNU_LINETHICKNESS",			"am_linethickness", 1, 8, 1, 0
+
+	// todo:
+	//CVAR(Bool, am_textfont, false, CVAR_ARCHIVE)
+	//CVAR(Bool, am_showlabel, false, CVAR_ARCHIVE)
+	//CVAR(Bool, am_nameontop, false, CVAR_ARCHIVE)
+
+	//CVAR(Color, am_twosidedcolor, 0xaaaaaa, CVAR_ARCHIVE)
+	//CVAR(Color, am_onesidedcolor, 0xaaaaaa, CVAR_ARCHIVE)
+	//CVAR(Color, am_playercolor, 0xaaaaaa, CVAR_ARCHIVE)
+	//CVAR(Color, am_ovtwosidedcolor, 0xaaaaaa, CVAR_ARCHIVE)
+	//CVAR(Color, am_ovonesidedcolor, 0xaaaaaa, CVAR_ARCHIVE)
+	//CVAR(Color, am_ovplayercolor, 0xaaaaaa, CVAR_ARCHIVE)
+
+}
+
+OptionMenu "GLTextureGLOptions" protected
+{
+	Title "$GLTEXMNU_TITLE"
+	ifOption(MMX)
+	{
+		Option "$GLTEXMNU_HQRESIZE",		gl_texture_hqresizemode,		"HqResizeModes"
+	}
+	else
+	{
+		Option "$GLTEXMNU_HQRESIZE",		gl_texture_hqresizemode,		"HqResizeModesNoMMX"
+	}
+	Option "$GLTEXMNU_HQRESIZEMULT",	gl_texture_hqresizemult,		"HqResizeMultipliers"
+	StaticText "!HQRESIZE_WARNING!"
+
+	Option "$GLTEXMNU_RESIZETEX",		gl_texture_hqresize_textures,	"OnOff"
+	Option "$GLTEXMNU_RESIZESPR",		gl_texture_hqresize_sprites,	"OnOff"
+	Option "$GLTEXMNU_RESIZEFNT",		gl_texture_hqresize_fonts,		"OnOff"
+	Option "$GLTEXMNU_RESIZESKN",		gl_texture_hqresize_skins,		"OnOff"
+	Option "$GLTEXMNU_PRECACHETEX",		gl_precache,					"YesNo"
+	Class "GLTextureGLOptions"
+}
+//-------------------------------------------------------------------------------------------
+//
+// HUD options
+//
+//-------------------------------------------------------------------------------------------
+
+OptionValue "HUDMessages"
+{
+	0, "$OPTVAL_OFF"
+	1, "$OPTVAL_ON"
+}
+
+OptionValue "HUDMessageStyle"
+{
+	0, "$OPTVAL_CLASSIC"
+	1, "$OPTVAL_ADVANCED"
+}
+
+OptionValue Crosshairs
+{
+	// will be filled in from the XHAIRS lump
+}
+
+OptionValue CrosshairHealthTypes
+{
+	0.0, "$TXT_NO"
+	1.0, "$OPTVAL_YES_STANDARD"
+	2.0, "$OPTVAL_YES_ENHANCED"
+}
+
+OptionMenu "HUDOptions" protected
+{
+	Title "$OPTMNU_HUD"
+
+	Slider "$DSPLYMNU_SCREENSIZE",				"hud_size", 				0.0, 9.0, 1.0, -1
+	Slider "$DSPLYMNU_SBSCALE",					"hud_scalefactor",			0.36, 1.0, 0.04, 2
+	StaticText ""
+	Option "$DSPLYMNU_LEVELSTATS",				"hud_stats",				"OnOff"
+	Slider "$DSPLYMNU_STATSCALE",				"hud_statscale",			0.36, 1.0, 0.04, 2
+
+	StaticText ""
+	Option "$DSPLYMNU_MESSAGES",				"hud_messages",				"HudMessages"
+	Option "$DSPLYMNU_MESSAGEDISP",				"con_notify_advanced",		"HudMessageStyle"
+	Option "$MSGMNU_CENTERMESSAGES",			"con_centernotify", 		"OnOff", "con_notify_advanced"
+	Option "$MSGMNU_PULSEMESSAGES",				"con_pulsetext", 			"OnOff", "con_notify_advanced"
+	Slider "$MSGMNU_MESSAGESCALE", 				"con_notifyscale", 			0.36, 1.0, 0.04, 2
+
+	StaticText ""
+	Option "$DSPLYMNU_CLIPAMT",				"cl_showmagamt",	OnOff
+
+	StaticText ""
+	Option "$DSPLYMNU_CROSSHAIR",				"cl_crosshair",	OnOff
+	Slider "$DSPLYMNU_CROSSHAIRSCALE",			"crosshairscale",		0.25, 1.0, 0.125, 2
+	Option "$HUDMNU_CROSSHAIR",				"crosshair", "Crosshairs"
+	//ColorPicker "$HUDMNU_CROSSHAIRCOLOR", 	"crosshaircolor" fixme: Does not exist yet in Raze.
+	Option "$HUDMNU_CROSSHAIRHEALTH",		"crosshairhealth", "CrosshairHealthTypes"
+}
+
+
+//-------------------------------------------------------------------------------------------
+//
+// Render options
+//
+//-------------------------------------------------------------------------------------------
+
+OptionMenu "RenderOptions"
+{
+	Title "Render Options"
+	Option "$RENDER_TC", "hw_hightile", "OnOff"
+	Option "$RENDER_CACHE", "r_precache", "OnOff"
+	StaticText ""
+	Option "$RENDER_PALETTEEMU", "hw_useindexedcolortextures", "OnOff"
+	Option "$RENDER_PALINTER", "hw_shadeinterpolate", "OnOff", "hw_useindexedcolortextures"
+	StaticText ""
+	Option "$RENDER_MODELS", "hw_models", "OnOff"
+}
+
+//-------------------------------------------------------------------------------------------
+//
+// Sound options
+// Many of these options are not active, but will be needed should I manage to transition
+// the entire sound system to OpenAL 3D. So it is easier to just copy all this verbatim
+// and only disable the options not yet usable instead of deleting the content.
+//
+//-------------------------------------------------------------------------------------------
+
+OptionValue SampleRates
+{
+	//0,		"$OPTVAL_DEFAULT"
+	//4000,	"$OPTVAL_4000HZ"
+	//8000,	"$OPTVAL_8000HZ"
+	11025,	"$OPTVAL_11025HZ"
+	22050,	"$OPTVAL_22050HZ"
+	32000,	"$OPTVAL_32000HZ"
+	44100,	"$OPTVAL_44100HZ"
+	48000,	"$OPTVAL_48000HZ"
+}
+
+OptionValue SampleRates2
+{
+	0,		"$OPTVAL_DEFAULT"
+	11025,	"$OPTVAL_11025HZ"
+	22050,	"$OPTVAL_22050HZ"
+	32000,	"$OPTVAL_32000HZ"
+	44100,	"$OPTVAL_44100HZ"
+	48000,	"$OPTVAL_48000HZ"
+}
+
+
+OptionValue BufferSizes
+{
+	   0, "$OPTVAL_DEFAULT"
+	  64, "$OPTVAL_64SAMPLES"
+	 128, "$OPTVAL_128SAMPLES"
+	 256, "$OPTVAL_256SAMPLES"
+	 512, "$OPTVAL_512SAMPLES"
+	1024, "$OPTVAL_1024SAMPLES"
+	2048, "$OPTVAL_2048SAMPLES"
+	4096, "$OPTVAL_4096SAMPLES"
+}
+
+OptionString ALDevices
+{
+	// filled in by the sound code
+}
+
+OptionString ALResamplers
+{
+	// filled in by the sound code
+}
+
+OptionString SpeakerModes
+{
+	"Auto",		"$OPTSTR_AUTO"
+	"Mono",		"$OPTSTR_MONO"
+	"Stereo",	"$OPTSTR_STEREO"
+	"Prologic",	"$OPTSTR_PROLOGIC"
+	"Quad",		"$OPTSTR_QUAD"
+	"Surround",	"$OPTSTR_SURROUND"
+	"5.1",		"$OPTSTR_5POINT1"
+	"7.1",		"$OPTSTR_7POINT1"
+}
+
+
+OptionMenu OpenALSoundItems protected
+{
+	Title "$OPENALMNU_TITLE"
+	Option "$OPENALMNU_PLAYBACKDEVICE",		"snd_aldevice",		"ALDevices"
+	Option "$OPENALMNU_ENABLEEFX",			"snd_efx",			"OnOff"
+	Option "$OPENALMNU_RESAMPLER",			"snd_alresampler",	"ALResamplers"
+}
+
+
+OptionValue MidiDevices
+{
+	// filled in by the sound code
+}
+
+OptionMenu SoundOptions protected
+{
+	Title "$SNDMNU_TITLE"
+	Slider "$MODMNU_MASTERVOLUME",		"snd_mastervolume", 0, 1, 0.05, 2
+	StaticText " "
+	Option "$SNDMNU_SNDENABLED",		"snd_enabled", "YesNo"
+	Slider "$SNDMNU_SFXVOLUME",			"snd_sfxvolume", 0, 1, 0.05, 2
+	Option "$SNDMNU_MUSENABLED",		"mus_enabled", "YesNo"	
+	Slider "$SNDMNU_MUSICVOLUME",		"snd_musicvolume", 0, 1, 0.05, 2
+	Option "$SNDMNU_MENUSOUND",		"menu_sounds", "OnOff" // placeholder until the slider can be made to work
+	//Slider "$SNDMNU_MENUVOLUME",		"snd_menuvolume", 0, 1, 0.05, 2
+	StaticText " "
+	Option "$SNDMNU_MIDIDEVICE",		"snd_mididevice", "MidiDevices"
+	//StaticText " "
+	//Option "$SNDMNU_UNDERWATERREVERB",	"snd_waterreverb", "OnOff"
+	Slider "$SNDMNU_CHANNELS",			"snd_channels", 64, 256, 16, 0
+	staticText ""
+	ifgame (Blood, ShadowWarrior, Redneck, RedneckRides)
+	{
+		Option "$SNDMNU_CDEMU",			"mus_redbook", "OnOff"
+	}
+	ifgame(Worldtour)
+	{
+		Option "$SNDMNU_WTSOUND",			"wt_forcevoc", "OnOff"
+		Option "$SNDMNU_WTMUSIC",			"wt_forcemidi", "OnOff"
+		Option "$SNDMNU_WTCOMMENT",			"wt_commentary", "OnOff"
+	}
+	ifgame(Duke, Nam, WW2GI, Redneck, RedneckRides, ShadowWarrior)
+	{
+		Option "$SNDMNU_AMBIENCE",		"snd_ambience", "OnOff"
+		Option "$SNDMNU_SPEECH",		"snd_speech", "OnOff"
+	}
+	StaticText " "
+	Submenu "$SNDMNU_ADVANCED",			"AdvSoundOptions"
+	//Submenu "$OPTMNU_REVERB",			"ReverbEdit" // disabled because there's no way to use the edited data.
+}
+
+/*=======================================
+ *
+ * Advanced Sound Options Menu
+ *
+ *=======================================*/
+
+
+OptionMenu AdvSoundOptions protected
+{
+	Title "$ADVSNDMNU_TITLE"
+	Option "$ADVSNDMNU_LOOKUPMUS",			"mus_extendedlookup", "OnOff"
+	Option "$ADVSNDMNU_LOOKUPSND",			"snd_extendedlookup", "OnOff"
+	StaticText " "
+	
+	//Option "$ADVSNDMNU_HRTF",				"snd_hrtf", "AutoOffOn"
+	StaticText " "
+	//Option "$SNDMNU_BACKGROUND",			"i_soundinbackground", "OnOff"
+	//StaticText " "
+
+	ifoption(openal)
+	{
+	StaticText " "
+		Submenu "$SNDMNU_OPENAL",		"OpenALSoundItems"
+	}
+
+	StaticText " "
+	Submenu "$SNDMNU_MIDIPLAYER",		"MidiPlayerOptions"
+	Submenu "$SNDMNU_MODREPLAYER",		"ModReplayerOptions"
+	StaticText " "
+	Command "$SNDMNU_RESTART",			"snd_reset"
+}
+
+
+OptionMenu TimidityConfigMenu protected
+{
+	Title "$ADVSNDMNU_SELCONFIG"
+}
+
+OptionMenu FluidPatchsetMenu protected
+{
+	Title "$ADVSNDMNU_SELCONFIG"
+}
+
+/*=======================================
+ *
+ * Module Replayer Options Menu
+ *
+ *=======================================*/
+
+OptionValue ModQuality
+{
+	0.0, "$OPTVAL_ALIASING"
+	1.0, "$OPTVAL_LINEAR_1"
+	2.0, "$OPTVAL_CUBIC"
+	3.0, "$OPTVAL_BLEP"		// Band-limited step
+	4.0, "$OPTVAL_LINEARSLOW"
+	5.0, "$OPTVAL_BLAM"		// Band-limited linear
+	6.0, "$OPTVAL_CUBICSLOW"
+	7.0, "$OPTVAL_SINC"
+}
+
+
+OptionValue ModVolumeRamps
+{
+	0.0, "$OPTVAL_NONE"
+	1.0, "$OPTVAL_NOTEONOFFONLY"
+	2.0, "$OPTVAL_FULLRAMPING"
+}
+
+
+
+OptionMenu ModReplayerOptions protected
+{
+	Title "$MODMNU_TITLE"
+	Slider "$MODMNU_MASTERVOLUME",			"mod_dumb_mastervolume", 0.25, 4, 0.1, 1
+	Option "$ADVSNDMNU_SAMPLERATE",			"mod_samplerate", "SampleRates2"
+	Option "$MODMNU_QUALITY",				"mod_interp", "ModQuality"
+	Option "$MODMNU_VOLUMERAMPING",			"mod_volramp", "ModVolumeRamps"
+	StaticText " "
+	Option "$MODMNU_CHIPOMATIC",			"mod_autochip", "OnOff"
+	// TODO if the menu system is ever rewritten: Provide a decent
+	// mechanism to edit the chip-o-matic settings like you can with
+	// the foo_dumb preferences in foobar2000.
+}
+
+/*=======================================
+ *
+ * MIDI player
+ *
+ *=======================================*/
+
+ OptionMenu MidiPlayerOptions /*FluidsynthOptions*/ protected
+ {
+	Title "$SNDMNU_MIDIPLAYER"
+	//Title "$ADVSNDMNU_FLUIDSYNTH"
+	LabeledSubMenu "$ADVSNDMNU_SELCONFIG",		"fluid_patchset", "FluidPatchsetMenu"
+	Slider "$ADVSNDMNU_FLUIDGAIN",			"fluid_gain", 0, 10, 0.5, 1
+	Option "$ADVSNDMNU_REVERB", 			"fluid_reverb", "OnOff"
+	Option "$ADVSNDMNU_CHORUS", 			"fluid_chorus", "OnOff"
+	Slider "$ADVSNDMNU_MIDIVOICES", 		"fluid_voices", 16, 4096, 16, 0
+	// other CVARs need to be revieved for usefulness
+ }
+
+
+/*=======================================
+ *
+ * Video mode menu
+ *
+ *=======================================*/
+
+OptionValue ForceRatios
+{
+	0.0, "$OPTVAL_OFF"
+	3.0, "4:3"
+	1.0, "16:9"
+	5.0, "17:10"
+	2.0, "16:10"
+	4.0, "5:4"
+	6.0, "21:9"
+}
+OptionValue Ratios
+{
+	0.0, "4:3"
+	4.0, "5:4"
+	1.0, "16:9"
+	2.0, "16:10"
+	3.0, "17:10"
+	6.0, "21:9"
+	 -1, "$OPTVAL_ALL"
+}
+OptionValue ScaleModes
+{
+	0, "$OPTVAL_NORMAL"
+	6, "320x200"
+	2, "640x400"
+	3, "960x600"
+	4, "1280x800"
+	5, "$OPTVAL_CUSTOM"
+	1, "$OPTVAL_LOWEST"
+}
+OptionValue CropAspect
+{
+	0, "$OPTVAL_STRETCH"
+	1, "$OPTVAL_LETTERBOX"
+}
+
+OptionValue MaxFps
+{
+	0, "$OPTVAL_UNLIMITED"
+	60, "$OPTVAL_60FPS"
+	75, "$OPTVAL_75FPS"
+	90, "$OPTVAL_90FPS"
+	120, "$OPTVAL_120FPS"
+	144, "$OPTVAL_144FPS"
+	200, "$OPTVAL_200FPS"
+}
+
+OptionValue GPUSwitch
+{
+	0.0, "$OPTVAL_DEFAULT"
+	1.0, "$OPTVAL_DEDICATED"
+	2.0, "$OPTVAL_INTEGRATED"
+}
+
+OptionValue PreferBackend
+{
+	0, "$OPTVAL_OPENGL"
+	1, "$OPTVAL_VULKAN"
+	// Enable when HAVE_SOFTPOLY will be defined
+	//2, "$OPTVAL_SOFTPOLY"
+	3, "$OPTVAL_OPENGLES"
+}
+
+OptionMenu VideoModeMenu protected
+{
+	Title "$VIDMNU_TITLE"
+
+	Option "$VIDMNU_PREFERBACKEND",		"vid_preferbackend", "PreferBackend"
+	StaticText " "
+	Option "$VIDMNU_FULLSCREEN",		"vid_fullscreen", "YesNo"
+
+	IfOption(Mac)
+	{
+		Option "$VIDMNU_HIDPI",			"vid_hidpi", "YesNo"
+	}
+	IfOption(Windows)
+	{
+		Option "$DSPLYMNU_GPUSWITCH",			vid_gpuswitch, "GPUSwitch"
+	}
+
+	Option "$VIDMNU_FORCEASPECT",		"vid_aspect", "ForceRatios"
+	Option "$VIDMNU_CROPASPECT",		"vid_cropaspect", "CropAspect"
+	Option "$VIDMNU_SCALEMODE",			"vid_scalemode", "ScaleModes"
+	Slider "$VIDMNU_SCALEFACTOR",		"vid_scalefactor", 0.25, 2.0, 0.25, 2
+
+	StaticText " "
+	Option "$DSPLYMNU_VSYNC",					"vid_vsync", "OnOff"
+	Option "$VIDMNU_MAXFPS",					"vid_maxfps", "MaxFps"
+
+	StaticText ""
+	StaticText "$VIDMNU_CUSTOMRES"
+	TextField "$VIDMNU_CUSTOMX", menu_resolution_custom_width
+	TextField "$VIDMNU_CUSTOMY", menu_resolution_custom_height
+	Option "$VIDMNU_USELINEAR", "vid_scale_linear", "YesNo"
+	StaticText ""
+	Command "$VIDMNU_APPLYW", "menu_resolution_commit_changes 0"
+	Command "$VIDMNU_APPLYFS", "menu_resolution_commit_changes 1"
+	StaticText ""
+
+	SubMenu "$VIDMNU_RESPRESET", CustomResolutionMenu
+}
+
+OptionMenu CustomResolutionMenu protected
+{
+	Title "$VIDMNU_RESPRESETTTL"
+
+	StaticText "$VIDMNU_RESPRESETHEAD"
+	StaticText ""
+	StaticText "$VIDMNU_ASPECT43"
+	Command "640x480", "menu_resolution_set_custom 640 480"
+	Command "1024x768", "menu_resolution_set_custom 1024 768"
+	Command "1280x960", "menu_resolution_set_custom 1280 960"
+	Command "1600x1200", "menu_resolution_set_custom 1600 1200"
+	StaticText ""
+	StaticText "$VIDMNU_ASPECT54"
+	Command "1280x1024", "menu_resolution_set_custom 1280 1024"
+	StaticText ""
+	StaticText "$VIDMNU_ASPECT169"
+	Command "960x540", "menu_resolution_set_custom 960 540"
+	Command "(720p HD)   1280x720", "menu_resolution_set_custom 1280 720"
+	Command "1366x768", "menu_resolution_set_custom 1366 768"
+	Command "(1080p HD) 1920x1080", "menu_resolution_set_custom 1920 1080"
+	Command "(1440p HD) 2560x1440", "menu_resolution_set_custom 2560 1440"
+	Command "(4K UHD) 3840x2160", "menu_resolution_set_custom 3840 2160"
+	StaticText ""
+	StaticText "$VIDMNU_ASPECT1610"
+	Command "960x600", "menu_resolution_set_custom 960 600"
+	Command "1280x800", "menu_resolution_set_custom 1280 800"
+	Command "1440x900", "menu_resolution_set_custom 1440 900"
+	Command "1680x1050", "menu_resolution_set_custom 1680 1050"
+	Command "1920x1200", "menu_resolution_set_custom 1920 1200"
+	StaticText ""
+	StaticText "$VIDMNU_ASPECT219"
+	Command "1920x810", "menu_resolution_set_custom 1920 810"
+	Command "2560x1080", "menu_resolution_set_custom 2560 1080"
+}
+
+
+//-------------------------------------------------------------------------------------------
+//
+// Misc menu
+//
+//-------------------------------------------------------------------------------------------
+
+OptionValue Autosave
+{
+	0,	"$OPTVAL_ALWAYS"
+	1,	"$OPTVAL_SCRIPTSONLY"
+	2,	"$OPTVAL_NEVER"
+}
+
+OptionValue Endoom
+{
+	0.0, "$OPTVAL_OFF"
+	1.0, "$OPTVAL_ON"
+	2.0, "$OPTVAL_ONLYMODIFIED"
+}
+
+
+/*=======================================
+ *
+ * Language menu 
+ * (most languages are still incomplete, only DE, PT and RO are done.)
+ *
+ *=======================================*/
+
+OptionString "LanguageOptions"
+{
+	"auto", "Auto"
+	"default", "English (US)"
+	"eng", "English (UK)"
+	//"cs", "Česky (Czech)"
+	"de", "Deutsch (German)"
+	//"es", "Español (España) (Castilian Spanish)"
+	//"esm", "Español (Latino) (Latin American Spanish)"
+	//"eo", "Esperanto"
+	//"fi", "Suomi (Finnish)"
+	//"fr", "Français (French)"
+	//"it", "Italiano (Italian)"
+	//"jp", "日本語 (Japanese)"
+	//"ko", "한국어 (Korean)"
+	//"nl", "Nederlands (Dutch)"
+	"pl", "Polski (Polish)"
+	//"ptg", "Português (European Portuguese)"
+	"pt", "Português do Brasil (Brazilian Portuguese)"
+	"ro", "Română (Romanian)"
+	//"ru", "Русский (Russian)"
+	//"sr", "Српски (Serbian)"
+}
+
+OptionMenu "MiscOptions" protected
+{
+	Title "$MISCMNU_TITLE"
+	//Indent 220
+	IfOption(Windows)
+	{
+		Option "$MISCMNU_WINFULLSCREENTOGGLE",	"k_allowfullscreentoggle", "OnOff"
+	}
+	IfOption(Mac)
+	{
+		Option "$MISCMNU_MACFULLSCREENTOGGLE",	"k_allowfullscreentoggle", "OnOff"
+	}
+	Option "$MISCMNU_QUERYIWAD",				"queryiwad", "OnOff"
+	StaticText " "
+	//Option "$MISCMNU_ALLCHEATS",				"allcheats", "OnOff"
+	Option "$MISCMNU_ENABLEAUTOSAVES",			"disableautosave", "Autosave"
+	Option "$MISCMNU_SAVELOADCONFIRMATION",			"saveloadconfirmation", "OnOff"
+	Slider "$MISCMNU_AUTOSAVECOUNT",			"autosavecount", 1, 20, 1, 0
+	//Option "$MISCMNU_QUICKSAVEROTATION",			"quicksaverotation", "OnOff"
+	Slider "$MISCMNU_QUICKSAVECOUNT",			"quicksavecount", 1, 20, 1, 0
+	ifgame(ShadowWarrior)
+	{
+		StaticText " "
+		Option "$MISCMNU_DARTS",				"sw_darts", "OnOff"
+		Option "$MISCMNU_NINJA",				"sw_ninjahack", "OnOff"
+	}
+	//StaticText " "
+	Option "$OPTMNU_LANGUAGE", "language", "LanguageOptions"
+	IfOption(Windows)
+	{
+		StaticText " "
+		Option	"$DSPLYMNU_SHOWENDOOM",			"showendoom", "Endoom"
+	}
+
+}
+
+//-------------------------------------------------------------------------------------------
+//
+// Reverb editor
+//
+//-------------------------------------------------------------------------------------------
+
+OptionMenu "ReverbEdit" protected
+{
+	Class "ReverbEdit"
+	Title "$OPTMNU_REVERB"
+	StaticTextSwitchable 	"", "", "EvironmentName", 1
+	StaticTextSwitchable 	"", "", "EvironmentID"
+	StaticText " "
+	Submenu "$REVMNU_SELECT", "ReverbSelect"
+	Option "$REVMNU_TEST", "eaxedit_test", OnOff
+	StaticText " "
+	Submenu "$REVMNU_NEW", "ReverbNew"
+	Submenu "$REVMNU_SAVE", "ReverbSave"
+	Submenu "$REVMNU_EDIT", "ReverbSettings"
+}
+
+OptionMenu "ReverbSelect" protected
+{
+	Class "ReverbSelect"
+	Title "$REVMNU_SELECT"
+	// filled in by code
+}
+
+OptionMenu "ReverbSettings" protected
+{
+	Title "$REVMNU_EDIT"
+	SafeCommand "$REVMNU_REVERT", "revertenvironment"
+	StaticText " "
+	SliderReverbEditOption "$REVMNU_Environment_Size", 1, 100, 0.01, 3, 1
+	SliderReverbEditOption "$REVMNU_Environment_Diffusion", 0, 1, 0.01, 3, 2
+	SliderReverbEditOption "$REVMNU_Room", -10000, 0, 1, 0, 3
+	SliderReverbEditOption "$REVMNU_Room_HF", -10000, 0, 1, 0, 4
+	SliderReverbEditOption "$REVMNU_Room_LF", -10000, 0, 1, 0, 5
+	SliderReverbEditOption "$REVMNU_Decay_Time", 1, 200, 0.01, 3, 6
+	SliderReverbEditOption "$REVMNU_Decay_HF_Ratio", 1, 20, 0.01, 3, 7
+	SliderReverbEditOption "$REVMNU_Decay_LF_Ratio", 1, 20, 0.01, 3, 8
+	SliderReverbEditOption "$REVMNU_Reflections", -10000, 1000, 1, 0, 9
+	SliderReverbEditOption "$REVMNU_Reflections_Delay", 0, 0.3, 1, 3, 10
+	SliderReverbEditOption "$REVMNU_Reflections_Pan_X", -2000, 2000, 1, 3, 11
+	SliderReverbEditOption "$REVMNU_Reflections_Pan_Y", -2000, 2000, 1, 3, 12
+	SliderReverbEditOption "$REVMNU_Reflections_Pan_Z", -2000, 2000, 1, 3, 13
+	SliderReverbEditOption "$REVMNU_Reverb", -10000, 2000, 1, 0, 14
+	SliderReverbEditOption "$REVMNU_Reverb_Delay", 0, 0.1, 0.01, 3, 15
+	SliderReverbEditOption "$REVMNU_Reverb_Pan_X", -2000, 2000, 1, 3, 16
+	SliderReverbEditOption "$REVMNU_Reverb_Pan_Y", -2000, 2000, 1, 3, 17
+	SliderReverbEditOption "$REVMNU_Reverb_Pan_Z", -2000, 2000, 1, 3, 18
+	SliderReverbEditOption "$REVMNU_Echo_Time", 0.075, 0.25, 0.005, 3, 19
+	SliderReverbEditOption "$REVMNU_Echo_Depth", 0, 1, 0.01, 3, 20
+	SliderReverbEditOption "$REVMNU_Modulation_Time", 0.04, 4, 0.01, 3, 21
+	SliderReverbEditOption "$REVMNU_Modulation_Depth",0, 1, 0.01, 3, 22
+	SliderReverbEditOption "$REVMNU_Air_Absorption_HF", -100, 0, 0.01, 3, 23
+	SliderReverbEditOption "$REVMNU_HF_Reference", 10000, 200000, 1, 3, 24
+	SliderReverbEditOption "$REVMNU_LF_Reference",20, 10000, 0.1, 3, 25
+	SliderReverbEditOption "$REVMNU_Room_Rolloff_Factor",0, 10, 0.01, 3, 26
+	SliderReverbEditOption "$REVMNU_Diffusion",0, 100, 0.01, 3, 27
+	SliderReverbEditOption "$REVMNU_Density",0, 100, 0.01, 3, 28
+	StaticText " "
+	ReverbOption "$REVMNU_Reflections_Scale", 29, OnOff
+	ReverbOption "$REVMNU_Reflections_Delay_Scale", 30, OnOff
+	ReverbOption "$REVMNU_Decay_Time_Scale", 31, OnOff
+	ReverbOption "$REVMNU_Decay_HF_Limit", 32, OnOff
+	ReverbOption "$REVMNU_Reverb_Scale", 33, OnOff
+	ReverbOption "$REVMNU_Reverb_Delay_Scale", 34, OnOff
+	ReverbOption "$REVMNU_Echo_Time_Scale", 35, OnOff
+	ReverbOption "$REVMNU_Modulation_Time_Scale", 36, OnOff
+}
+
+OptionMenu "ReverbNew" protected
+{
+	Title "$REVMNU_NEW"
+	ReverbSelect "$REVMNU_Based_on", "ReverbSelect"
+	TextField "$REVMNU_Name", "reverbedit_name"
+	NumberField "$REVMNU_ID_1", "reverbedit_id1", 0, 255
+	NumberField "$REVMNU_ID_2", "reverbedit_id2", 0, 255
+	Command "$REVMNU_Create", "createenvironment", 0, 1
+}
+
+OptionMenu "ReverbSave" protected
+{
+	Class "ReverbSave"
+	Title "$REVMNU_SAVE"
+	Command "$REVMNU_Save", "savereverbs"
+	TextField "$REVMNU_File_name", "reverbsavename"
+	StaticText ""
+	StaticText "$REVMNU_Environments_to_save"
+	// Rest is filled in by code.
+}
+
+/*=======================================
+ *
+ * Option Search menu
+ *
+ *=======================================*/
+
+OptionMenu "os_Menu"
+{
+	Class "os_Menu"
+	Title "$OS_TITLE"
+}
+
+OptionValue "os_isanyof_values"
+{
+	0, "$OS_ALL"
+	1, "$OS_ANY"
+}
+
+//-------------------------------------------------------------------------------------------
+//
+// No multiplayer support for now, but kept for documentation.
+//
+//-------------------------------------------------------------------------------------------
+/*
+LISTMENU "MultiMenu"
+{
+	Size 320, 200
+	ifgame(Duke, Nam, WW2GI)
+	{
+		position 160, 55, 135
+		centermenu
+		fixedspacing 5
+		ifgame(Duke, Nam, WW2GI)
+		{
+			class "Duke.ListMenu"
+		}
+		else
+		{
+			class "Redneck.ListMenu"
+		}
+		animatedtransition
+		NativeTextItem "$MNU_PLAYERSETUP", "p", "PlayerSetupMenu"
+	}
+	ifgame(blood)
+	{
+		position 160, 80, 150
+		class "Blood.ListMenu"
+		centermenu
+		Linespacing 20
+	}
+	ifgame(shadowwarrior)
+	{
+		position 160, 80, 150
+		class "ShadowWarrior.ListMenu"
+		centermenu
+		Linespacing 20
+	}
+
+	Caption "$MNU_NETWORKGAME"
+	NativeTextItem "$MNU_JOINGAME", "j", "JoinGameMenu"
+	NativeTextItem "$MNU_HOSTGAME", "h", "HostGameMenu"
+}
+
+OptionMenu "HostGameMenu"
+{
+	title "$MNU_HOSTGAME"
+	Submenu "$NETMNU_OPTIONS", "MultiOptionsMenu"
+	Command "$NETMNU_LAUNCH", "Launch_MP" // currently a no-op
+}
+
+OptionMenu "JoinGameMenu"
+{
+	TextField "$NETMNU_SERVER", "m_server"
+	TextField "$NETMNU_PORT", "m_netport"
+	SafeCommand "$NETMNU_CONNECT", "MultiConnect"
+}
+
+OptionValue "MultiGameType"
+{
+	0, "$NETMNU_GAMETYPE1"
+	1, "$NETMNU_GAMETYPE2"
+	2, "$NETMNU_GAMETYPE3"
+	3, "$NETMNU_GAMETYPE4"
+	4, "$NETMNU_GAMETYPE5"
+}
+
+OptionValue "MultiEpisode"
+{
+	0, "1"
+	0, "2"
+	0, "3"
+	0, "4"
+	0, "5"
+	0, "6"
+	0, "7"
+}
+
+OptionMenu "MultiOptionsMenu"
+{
+	title "$NETMNU_OPTIONS"
+	Option "$NETMNU_GAMETYPE", "m_coop", "MultiGameType"
+	Option "$NETMNU_EPISODE", "m_episode_number", "MultiEpisode"
+	Option "$NETMNU_LEVEL", "m_level_number", "MultiEpisode"
+	Submenu "$MNU_USERMAP", "MultiUserMap" // todo: fileselect item
+	Option "$NETMNU_MONSTERS", "m_monsters", "OnOff"
+	Option "$NETMNU_MAPEXITS", "m_noexit", "OnOff"
+	Option "$NETMNU_FFIRE", "m_ffire", "OnOff"
+	SafeCommand "$NETMNU_ACCEPT", "MultiAccept"
+}
+*/
+
+OptionMenu "EngineCredits"
+{
+	title "$MNU_CREDITS"
+	Submenu " ---->", "EngineCredits1a"
+	StaticText "Developers", 1
+	StaticText "Christoph Oelckers", 0
+	StaticText "Mitchell Richters", 0
+	StaticText ""
+	StaticText "Additional Developers", 1
+	StaticText "Rachael Alexanderson", 0
+	StaticText "Magnus Norddahl", 0
+	StaticText "Alexey Lysiuk", 0
+	StaticText ""
+	StaticText "The Raze team thanks the following contributors", 1
+	StaticText "Nash Muhandes", 0
+	StaticText "Dynamo", 0
+}
+
+OptionMenu "EngineCredits1a"
+{
+	title "$MNU_CREDITS"
+	Submenu " ---->", "EngineCredits1b"
+	StaticText "Raze QA", 1
+	
+	StaticText "sinisterseed                        ", 0
+	StaticText "Major Cooke       Dynamo            ", 0
+	StaticText "Nash Muhandes     Martin Howe       ", 0
+	StaticText "SanyaWaffles      Nigel Rowand      ", 0
+}
+
+OptionMenu "EngineCredits1b"
+{
+	title "$MNU_CREDITS"
+	Submenu " ---->", "EngineCredits2"
+	StaticText "ZDoom / GZDoom / ZDuke", 1
+	StaticText "Marisa \"Randi\" Heit", 0
+	StaticText "Braden \"Blzut3\" Obrzut", 0
+	StaticText ""
+	StaticText "Sound Engine", 1
+	StaticText "Chris Robinson", 0
+	StaticText ""
+}
+
+
+OptionMenu "EngineCredits2"
+{
+	title "$MNU_CREDITS"
+	Submenu " ---->", "EngineCredits2a"
+	StaticText "EDuke 2.0", 1
+	StaticText "Matt Saettler", 0
+	StaticText ""
+	StaticText "JFDuke / JFSW", 1
+    StaticText "Jonathon \"JonoF\" Fowler", 0
+	StaticText ""
+	StaticText "EDuke32 / VoidSW", 1
+	StaticText "Richard \"TerminX\" Gobeille", 0
+	StaticText "Evan \"Hendricks266\" Ramos", 0
+	StaticText "Alex \"pogokeen\" Dawson", 0
+	StaticText ""
+	StaticText "Retired developers", 1
+	StaticText "Pierre-Loup \"Plagman\" Griffais", 0
+	StaticText "Philipp \"Helixhorned\" Kutin", 0
+}
+
+OptionMenu "EngineCredits2a"
+{
+	title "$MNU_CREDITS"
+	Submenu " ---->", "EngineCredits2b"
+	StaticText "RedNukem / NBlood", 1
+	StaticText "Alexey \"Nuke.YKT\" Skrybykin", 0
+	StaticText ""
+	StaticText "SWP", 1
+	StaticText "Ben \"ProAsm\" Smit", 0
+	StaticText ""
+	StaticText "PCExhumed", 1
+	StaticText "Alexey \"Nuke.YKT\" Skrybykin", 0
+	StaticText "sirlemonhead", 0
+}
+	
+OptionMenu "EngineCredits2b"
+{
+	title "$MNU_CREDITS"
+	Submenu " ---->", "EngineCredits3"
+	StaticText "Widescreen graphics", 1
+	StaticText "James Manning     fgsfds            ", 0
+	StaticText "Dzierzan          Phredreeke        ", 0
+	StaticText "MaxED             Kinsie            ", 0
+	StaticText "Maxi Clouds                         ", 0
+}
+	
+OptionMenu "EngineCredits3"
+{
+	title "$MNU_CREDITS"
+	//Submenu " ---->", "EngineCredits"	// This creates a circular dependency which makes the search tool crash.
+	StaticText "The EDuke32 team thanks the following people", 1
+	StaticText "for their contributions:", 1
+	
+	StaticText "Alexey Skrybykin  Bioman            Brandon Bergren  ", 0
+	StaticText "Charlie Honig     Dan Gaskill       David Koenig     ", 0
+	StaticText "Ed Coolidge       Emile Belanger    Fox              ", 0
+	StaticText "Hunter_rus        James Bentler     Jasper Foreman   ", 0
+	StaticText "Javier Martinez   Jeff Hart         Jonathan Strander", 0
+	StaticText "Jordon Moss       Jose del Castillo Lachlan McDonald ", 0
+	StaticText "LSDNinja          Marcus Herbert    Matthew Palmer   ", 0
+	StaticText "Matt Saettler     NY00123           Ozkan Sezer      ", 0
+	StaticText "Peter Green       Peter Veenstra    Robin Green      ", 0
+	StaticText "Ryan Gordon       Stephen Anthony   tueidj           ", 0
+	StaticText "Pär \"Parkar\" Karlsson", 0
+}
+	

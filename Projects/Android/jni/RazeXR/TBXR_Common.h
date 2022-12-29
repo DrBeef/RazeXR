@@ -16,9 +16,6 @@
 #include <android/native_window_jni.h>
 #include <android/log.h>
 
-#include <stdbool.h>
-#include <pthread.h>
-
 #ifndef NDEBUG
 #define DEBUG 1
 #endif
@@ -38,7 +35,7 @@ enum { ovrMaxLayerCount = 1 };
 enum { ovrMaxNumEyes = 2 };
 
 typedef enum xrButton_ {
-    xrButton_A = 0x00000001, // Set for trigger pulled on the Gear VR and Go Controllers
+    xrButton_A = 0x00000001,
     xrButton_B = 0x00000002,
     xrButton_RThumb = 0x00000004,
     xrButton_RShoulder = 0x00000008,
@@ -55,11 +52,16 @@ typedef enum xrButton_ {
     xrButton_GripTrigger = 0x04000000,
     xrButton_Trigger = 0x20000000,
     xrButton_Joystick = 0x80000000,
+
+    //Define additional controller touch points (not button presses)
+    xrButton_ThumbRest = 0x00000010,
+
     xrButton_EnumSize = 0x7fffffff
 } xrButton;
 
 typedef struct {
     uint32_t Buttons;
+    uint32_t Touches;
     float IndexTrigger;
     float GripTrigger;
     XrVector2f Joystick;
@@ -74,7 +76,7 @@ typedef struct {
 typedef enum control_scheme {
     RIGHT_HANDED_DEFAULT = 0,
     LEFT_HANDED_DEFAULT = 10,
-    WEAPON_ALIGN = 99
+    LEFT_HANDED_ALT = 11
 } control_scheme_t;
 
 typedef struct {
@@ -303,13 +305,13 @@ bool VR_GetVRProjection(int eye, float zNear, float zFar, float* projection);
 void VR_HandleControllerInput();
 void VR_SetHMDOrientation(float pitch, float yaw, float roll );
 void VR_SetHMDPosition(float x, float y, float z );
-void VR_HapticEvent(const char* event, int position, int flags, int intensity, float angle, float yHeight );
+void VR_HapticEvent(const char* event, int position, int intensity, float angle, float yHeight );
 void VR_HapticUpdateEvent(const char* event, int intensity, float angle );
 void VR_HapticEndFrame();
 void VR_HapticStopEvent(const char* event);
 void VR_HapticEnable();
 void VR_HapticDisable();
-void VR_Shutdown();
+extern "C" void VR_Shutdown();
 
 
 //Reusable Team Beef OpenXR stuff (in TBXR_Common.cpp)
@@ -320,6 +322,7 @@ void TBXR_InitialiseOpenXR();
 void TBXR_WaitForSessionActive();
 void TBXR_InitRenderer();
 void TBXR_EnterVR();
+void TBXR_LeaveVR( );
 void TBXR_GetScreenRes(int *width, int *height);
 void TBXR_InitActions( void );
 void TBXR_Vibrate(int duration, int channel, float intensity );

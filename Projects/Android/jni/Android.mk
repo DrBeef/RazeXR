@@ -8,5 +8,5 @@ include $(SUPPORT_LIBS)/libmpg123/Android.mk
 include $(SUPPORT_LIBS)/libsndfile-android/jni/Android.mk
 include $(SUPPORT_LIBS)/android_external_flac/Android.mk
 
-include $(RAZE_DIR)/mobile/Android_src.mk
+include $(RAZE_DIR)/mobile/Android.mk
 
