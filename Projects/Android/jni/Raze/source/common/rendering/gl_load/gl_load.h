@@ -28,25 +28,25 @@
 
 /* BEGINNING OF MANUAL CHANGES, DO NOT REMOVE! */
 #ifndef APIENTRY
-	#if defined(_WIN32)
-		//#include <windows.h>
+#if defined(_WIN32)
+//#include <windows.h>
 		#define APIENTRY __stdcall
-	#else
-		#define APIENTRY
-	#endif
+#else
+#define APIENTRY
+#endif
 #endif /*APIENTRY*/
 
 #ifndef CODEGEN_FUNCPTR
-	#define CODEGEN_REMOVE_FUNCPTR
-	#if defined(_WIN32)
-		#define CODEGEN_FUNCPTR __stdcall
-	#else
-		#define CODEGEN_FUNCPTR
-	#endif
+#define CODEGEN_REMOVE_FUNCPTR
+#if defined(_WIN32)
+#define CODEGEN_FUNCPTR __stdcall
+#else
+#define CODEGEN_FUNCPTR
+#endif
 #endif /*CODEGEN_FUNCPTR*/
 
 #ifndef GLAPI
-	#define GLAPI extern
+#define GLAPI extern
 #endif
 /* END OF MANUAL CHANGES, DO NOT REMOVE! */
 
@@ -61,47 +61,47 @@
 #include <stddef.h>
 #include <stdint.h>
 
-	typedef unsigned int GLenum;
-	typedef unsigned char GLboolean;
-	typedef unsigned int GLbitfield;
-	typedef void GLvoid;
-	typedef signed char GLbyte;
-	typedef short GLshort;
-	typedef int GLint;
-	typedef unsigned char GLubyte;
-	typedef unsigned short GLushort;
-	typedef unsigned int GLuint;
-	typedef int GLsizei;
-	typedef float GLfloat;
-	typedef float GLclampf;
-	typedef double GLdouble;
-	typedef double GLclampd;
-	typedef char GLchar;
-	typedef char GLcharARB;
-	#ifdef __APPLE__
+typedef unsigned int GLenum;
+typedef unsigned char GLboolean;
+typedef unsigned int GLbitfield;
+typedef void GLvoid;
+typedef signed char GLbyte;
+typedef short GLshort;
+typedef int GLint;
+typedef unsigned char GLubyte;
+typedef unsigned short GLushort;
+typedef unsigned int GLuint;
+typedef int GLsizei;
+typedef float GLfloat;
+typedef float GLclampf;
+typedef double GLdouble;
+typedef double GLclampd;
+typedef char GLchar;
+typedef char GLcharARB;
+#ifdef __APPLE__
 typedef void *GLhandleARB;
 #else
 typedef unsigned int GLhandleARB;
 #endif
-		typedef unsigned short GLhalfARB;
-		typedef unsigned short GLhalf;
-		typedef GLint GLfixed;
-		typedef ptrdiff_t GLintptr;
-		typedef ptrdiff_t GLsizeiptr;
-		typedef int64_t GLint64;
-		typedef uint64_t GLuint64;
-		typedef ptrdiff_t GLintptrARB;
-		typedef ptrdiff_t GLsizeiptrARB;
-		typedef int64_t GLint64EXT;
-		typedef uint64_t GLuint64EXT;
-		typedef struct __GLsync *GLsync;
-		struct _cl_context;
-		struct _cl_event;
-		typedef void (APIENTRY *GLDEBUGPROC)(GLenum source,GLenum type,GLuint id,GLenum severity,GLsizei length,const GLchar *message,const void *userParam);
-		typedef void (APIENTRY *GLDEBUGPROCARB)(GLenum source,GLenum type,GLuint id,GLenum severity,GLsizei length,const GLchar *message,const void *userParam);
-		typedef void (APIENTRY *GLDEBUGPROCAMD)(GLuint id,GLenum category,GLenum severity,GLsizei length,const GLchar *message,void *userParam);
-		typedef unsigned short GLhalfNV;
-		typedef GLintptr GLvdpauSurfaceNV;
+typedef unsigned short GLhalfARB;
+typedef unsigned short GLhalf;
+typedef GLint GLfixed;
+typedef ptrdiff_t GLintptr;
+typedef ptrdiff_t GLsizeiptr;
+typedef int64_t GLint64;
+typedef uint64_t GLuint64;
+typedef ptrdiff_t GLintptrARB;
+typedef ptrdiff_t GLsizeiptrARB;
+typedef int64_t GLint64EXT;
+typedef uint64_t GLuint64EXT;
+typedef struct __GLsync *GLsync;
+struct _cl_context;
+struct _cl_event;
+typedef void (APIENTRY *GLDEBUGPROC)(GLenum source,GLenum type,GLuint id,GLenum severity,GLsizei length,const GLchar *message,const void *userParam);
+typedef void (APIENTRY *GLDEBUGPROCARB)(GLenum source,GLenum type,GLuint id,GLenum severity,GLsizei length,const GLchar *message,const void *userParam);
+typedef void (APIENTRY *GLDEBUGPROCAMD)(GLuint id,GLenum category,GLenum severity,GLsizei length,const GLchar *message,void *userParam);
+typedef unsigned short GLhalfNV;
+typedef GLintptr GLvdpauSurfaceNV;
 
 #ifdef __cplusplus
 extern "C" {
@@ -2072,13 +2072,13 @@ extern int ogl_ext_ARB_invalidate_subdata;
 #define GL_ARB_buffer_storage 1
 extern void (CODEGEN_FUNCPTR *_ptrc_glBufferStorage)(GLenum target, GLsizeiptr size, const void * data, GLbitfield flags);
 #define glBufferStorage _ptrc_glBufferStorage
-#endif /*GL_ARB_buffer_storage*/ 
+#endif /*GL_ARB_buffer_storage*/
 
 #ifndef GL_ARB_shader_storage_buffer_object
 #define GL_ARB_shader_storage_buffer_object 1
 extern void (CODEGEN_FUNCPTR *_ptrc_glShaderStorageBlockBinding)(GLuint program, GLuint storageBlockIndex, GLuint storageBlockBinding);
 #define glShaderStorageBlockBinding _ptrc_glShaderStorageBlockBinding
-#endif /*GL_ARB_shader_storage_buffer_object*/ 
+#endif /*GL_ARB_shader_storage_buffer_object*/
 
 #ifndef GL_ARB_texture_compression
 #define GL_ARB_texture_compression 1
@@ -2096,7 +2096,7 @@ extern void (CODEGEN_FUNCPTR *_ptrc_glCompressedTexSubImage3DARB)(GLenum target,
 #define glCompressedTexSubImage3DARB _ptrc_glCompressedTexSubImage3DARB
 extern void (CODEGEN_FUNCPTR *_ptrc_glGetCompressedTexImageARB)(GLenum target, GLint level, void * img);
 #define glGetCompressedTexImageARB _ptrc_glGetCompressedTexImageARB
-#endif /*GL_ARB_texture_compression*/ 
+#endif /*GL_ARB_texture_compression*/
 
 
 #ifndef GL_EXT_framebuffer_object
@@ -2135,7 +2135,7 @@ extern GLboolean (CODEGEN_FUNCPTR *_ptrc_glIsRenderbufferEXT)(GLuint renderbuffe
 #define glIsRenderbufferEXT _ptrc_glIsRenderbufferEXT
 extern void (CODEGEN_FUNCPTR *_ptrc_glRenderbufferStorageEXT)(GLenum target, GLenum internalformat, GLsizei width, GLsizei height);
 #define glRenderbufferStorageEXT _ptrc_glRenderbufferStorageEXT
-#endif /*GL_EXT_framebuffer_object*/ 
+#endif /*GL_EXT_framebuffer_object*/
 
 
 
@@ -2164,7 +2164,7 @@ extern void (CODEGEN_FUNCPTR *_ptrc_glPopDebugGroup)(void);
 #define glPopDebugGroup _ptrc_glPopDebugGroup
 extern void (CODEGEN_FUNCPTR *_ptrc_glPushDebugGroup)(GLenum source, GLuint id, GLsizei length, const GLchar * message);
 #define glPushDebugGroup _ptrc_glPushDebugGroup
-#endif /*GL_KHR_debug*/ 
+#endif /*GL_KHR_debug*/
 
 #ifndef GL_ARB_invalidate_subdata
 #define GL_ARB_invalidate_subdata 1
@@ -2180,7 +2180,7 @@ extern void (CODEGEN_FUNCPTR *_ptrc_glInvalidateTexImage)(GLuint texture, GLint 
 #define glInvalidateTexImage _ptrc_glInvalidateTexImage
 extern void (CODEGEN_FUNCPTR *_ptrc_glInvalidateTexSubImage)(GLuint texture, GLint level, GLint xoffset, GLint yoffset, GLint zoffset, GLsizei width, GLsizei height, GLsizei depth);
 #define glInvalidateTexSubImage _ptrc_glInvalidateTexSubImage
-#endif /*GL_ARB_invalidate_subdata*/ 
+#endif /*GL_ARB_invalidate_subdata*/
 
 extern void (CODEGEN_FUNCPTR *_ptrc_glAccum)(GLenum op, GLfloat value);
 #define glAccum _ptrc_glAccum

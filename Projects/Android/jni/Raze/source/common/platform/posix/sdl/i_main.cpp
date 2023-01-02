@@ -34,7 +34,6 @@
 
 // HEADER FILES ------------------------------------------------------------
 
-#include <SDL.h>
 #include <unistd.h>
 #include <signal.h>
 #include <new>
@@ -142,8 +141,6 @@ void I_DetectOS()
 		Printf("OS: %s\n", operatingSystem.GetChars());
 }
 
-void I_StartupJoysticks();
-
 #ifdef __ANDROID__
 int main_android (int argc, char **argv)
 #else
@@ -168,11 +165,6 @@ int main (int argc, char **argv)
 
 	setlocale (LC_ALL, "C");
 
-	if (SDL_Init (0) < 0)
-	{
-		fprintf (stderr, "Could not initialize SDL:\n%s\n", SDL_GetError());
-		return -1;
-	}
 
 	printf("\n");
 	
@@ -193,11 +185,7 @@ int main (int argc, char **argv)
 		progdir = "./";
 	}
 	
-	I_StartupJoysticks();
-
 	const int result = GameMain();
-
-	SDL_Quit();
 
 #ifdef __ANDROID__
 	usleep(500* 1000);

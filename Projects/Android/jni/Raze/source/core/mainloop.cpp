@@ -62,6 +62,7 @@
 
 #include <chrono>
 #include <thread>
+#include <menustate.h>
 #include "c_cvars.h"
 #include "i_time.h"
 #include "d_net.h"
@@ -119,9 +120,9 @@ FString	savegamefile;
 // 
 //
 //==========================================================================
-#ifdef __MOBILE__
-void Mobile_IN_Move(ControlInfo &input);
-#endif
+
+void VR_GetMove(float *joy_forward, float *joy_side, float *hmd_forward, float *hmd_side, float *up,
+				float *yaw, float *pitch, float *roll);
 
 void G_BuildTiccmd(ticcmd_t* cmd) 
 {
@@ -136,12 +137,15 @@ void G_BuildTiccmd(ticcmd_t* cmd)
 	cmd->ucmd = {};
 	I_GetEvent();
 	auto input = CONTROL_GetInput();
-
-#ifdef __MOBILE__
-	Mobile_IN_Move(input);
-#endif
-
 	gi->GetInput(&input, I_GetInputFrac(SyncInput()), &cmd->ucmd);
+
+	float joyforward=0;
+	float joyside=0;
+	float dummy=0;
+	VR_GetMove(&joyforward, &joyside, &dummy, &dummy, &dummy, &dummy, &dummy, &dummy);
+	cmd->ucmd.fvel += joyforward * gi->playerKeyMove();
+	cmd->ucmd.svel += joyside * gi->playerKeyMove();
+
 	cmd->consistency = consistency[myconnectindex][(maketic / ticdup) % BACKUPTICS];
 }
 
@@ -401,7 +405,7 @@ static void GameTicker()
 // Display
 //
 //==========================================================================
-
+void RazeXR_setUseScreenLayer(bool use);
 void Display()
 {
 	if (screen == nullptr || (!AppActive && (screen->IsFullscreen() || !vid_activeinbackground)))
@@ -419,6 +423,15 @@ void Display()
 	//twod->SetSize(screen->GetWidth(), screen->GetHeight());
 	twod->Begin(screen->GetWidth(), screen->GetHeight());
 	twod->ClearClipRect();
+
+	if (gamestate == GS_LEVEL && menuactive == MENU_Off) {
+		RazeXR_setUseScreenLayer(false);
+	}
+	else {
+		//Ensure we are drawing on virtual screen
+		RazeXR_setUseScreenLayer(true);
+	}
+
 	switch (gamestate)
 	{
 	case GS_MENUSCREEN:

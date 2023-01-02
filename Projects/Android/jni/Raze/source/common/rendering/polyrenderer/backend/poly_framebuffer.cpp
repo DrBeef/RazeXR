@@ -56,7 +56,9 @@ extern FString gpuStatOutput;
 
 PolyFrameBuffer::PolyFrameBuffer(void *hMonitor, bool fullscreen) : Super(hMonitor, fullscreen) 
 {
+#ifdef HAVE_SOFTPOLY
 	I_PolyPresentInit();
+#endif
 }
 
 PolyFrameBuffer::~PolyFrameBuffer()
@@ -80,7 +82,9 @@ PolyFrameBuffer::~PolyFrameBuffer()
 
 	screen = tmp;
 
+#ifdef HAVE_SOFTPOLY
 	I_PolyPresentDeinit();
+#endif
 }
 
 void PolyFrameBuffer::InitializeState()
@@ -172,6 +176,7 @@ void PolyFrameBuffer::Update()
 
 	if (mCanvas)
 	{
+#ifdef HAVE_SOFTPOLY
 		int w = mCanvas->GetWidth();
 		int h = mCanvas->GetHeight();
 		int pixelsize = 4;
@@ -180,21 +185,14 @@ void PolyFrameBuffer::Update()
 		uint8_t *dst = I_PolyPresentLock(w, h, cur_vsync, pitch);
 		if (dst)
 		{
-#if 1
 			// [GEC] with the help of dpJudas a new system of copying and applying gamma in the video buffer
 			auto copyqueue = std::make_shared<DrawerCommandQueue>(&mFrameMemory);
 			copyqueue->Push<CopyAndApplyGammaCommand>(dst, pitch / pixelsize, src, w, h, w, vid_gamma, vid_contrast, vid_brightness, vid_saturation);
 			DrawerThreads::Execute(copyqueue);
-#else
-			for (int y = 0; y < h; y++)
-			{
-				memcpy(dst + y * pitch, src + y * w * pixelsize, w * pixelsize);
-			}
-#endif
-
 			DrawerThreads::WaitForWorkers();
 			I_PolyPresentUnlock(mOutputLetterbox.left, mOutputLetterbox.top, mOutputLetterbox.width, mOutputLetterbox.height);
 		}
+#endif
 		FPSLimit();
 	}
 

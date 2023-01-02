@@ -45,6 +45,11 @@ EXTERN_CVAR(Int, gl_dither_bpc)
 
 void UpdateVRModes(bool considerQuadBuffered = true);
 
+bool TBXR_IsFrameSetup();
+void TBXR_prepareEyeBuffer(int eye );
+void TBXR_finishEyeBuffer(int eye );
+void TBXR_submitFrame();
+
 namespace OpenGLRenderer
 {
 
@@ -339,6 +344,27 @@ bool FGLRenderer::QuadStereoCheckInitialRenderContextState()
 //
 //==========================================================================
 
+void FGLRenderer::PresentOpenXR()
+{
+	if (!TBXR_IsFrameSetup())
+	{
+		return;
+	}
+
+	for (int eye = 0; eye < 2; ++eye)
+	{
+		TBXR_prepareEyeBuffer(eye);
+
+		ClearBorders();
+		mBuffers->BindEyeTexture(eye, 0);
+		DrawPresentTexture(screen->mOutputLetterbox, true);
+
+		TBXR_finishEyeBuffer(eye);
+	}
+
+	TBXR_submitFrame();
+}
+
 void FGLRenderer::PresentQuadStereo()
 {
 	if (QuadStereoCheckInitialRenderContextState())
@@ -416,6 +442,10 @@ void FGLRenderer::PresentStereo()
 
 	case VR_QUADSTEREO:
 		PresentQuadStereo();
+		break;
+
+	case VR_OPENXR:
+		PresentOpenXR();
 		break;
 	}
 }

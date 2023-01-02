@@ -36,7 +36,6 @@ int argc=0;
 
 
 //Define all variables here that were externs in the VrCommon.h
-bool qzdoom_initialised;
 long long global_time;
 float playerYaw;
 bool resetDoomYaw;
@@ -74,12 +73,12 @@ QuestZDoom Stuff
 ================================================================================
 */
 
-void QzDoom_setUseScreenLayer(bool use)
+void RazeXR_setUseScreenLayer(bool use)
 {
 	useVirtualScreen = use;
 }
 
-int QzDoom_SetRefreshRate(int refreshRate)
+int RazeXR_SetRefreshRate(int refreshRate)
 {
 #ifdef META_QUEST
 	OXR(gAppState.pfnRequestDisplayRefreshRate(gAppState.Session, (float)refreshRate));
@@ -89,7 +88,7 @@ int QzDoom_SetRefreshRate(int refreshRate)
 	return 0;
 }
 
-void QzDoom_GetScreenRes(uint32_t *width, uint32_t *height)
+void RazeXR_GetScreenRes(uint32_t *width, uint32_t *height)
 {
 	int iWidth, iHeight;
 	TBXR_GetScreenRes(&iWidth, &iHeight);
@@ -239,10 +238,10 @@ void VR_Init()
 
 	cinemamode = false;
 
-	chdir("/sdcard/QuestZDoom");
+	chdir("/sdcard/RazeXR");
 }
 
-int VR_main( int argc, char* argv[] );
+int raze_main (int argc, char **argv);
 
 void * AppThreadFunction(void * parm ) {
 	gAppThread = (ovrAppThread *) parm;
@@ -281,13 +280,12 @@ void * AppThreadFunction(void * parm ) {
 
 	if (REFRESH != 0)
 	{
-		QzDoom_SetRefreshRate(REFRESH);
+		RazeXR_SetRefreshRate(REFRESH);
 	}
 
-	if (hasIWADs)// && hasLauncher)
-		{
-		//Should now be all set up and ready - start the Doom main loop
-		VR_DoomMain(argc, argv);
+	{
+		//Should now be all set up and ready - start the main loop
+		raze_main(argc, argv);
 	}
 
 	TBXR_LeaveVR();
@@ -377,7 +375,7 @@ void VR_HapticEvent(const char* event, int position, int intensity, float angle,
     jni_haptic_event(buffer, position, intensity, angle, yHeight);
 }
 
-void QzDoom_Vibrate(float duration, int channel, float intensity )
+void RazeXR_Vibrate(float duration, int channel, float intensity )
 {
 	TBXR_Vibrate(duration, channel+1, intensity);
 }
@@ -509,7 +507,7 @@ int JNI_OnLoad(JavaVM* vm, void* reserved)
 	return JNI_VERSION_1_4;
 }
 
-JNIEXPORT jlong JNICALL Java_com_drbeef_questzdoom_GLES3JNILib_onCreate( JNIEnv * env, jclass activityClass, jobject activity,
+JNIEXPORT jlong JNICALL Java_com_drbeef_razexr_GLES3JNILib_onCreate( JNIEnv * env, jclass activityClass, jobject activity,
 																		 jstring commandLineParams, jboolean jHasIWADs, jboolean jHasLauncher)
 {
 	ALOGV( "    GLES3JNILib::onCreate()" );
@@ -575,7 +573,7 @@ JNIEXPORT jlong JNICALL Java_com_drbeef_questzdoom_GLES3JNILib_onCreate( JNIEnv 
 }
 
 
-JNIEXPORT void JNICALL Java_com_drbeef_questzdoom_GLES3JNILib_onStart( JNIEnv * env, jobject obj, jlong handle, jobject obj1)
+JNIEXPORT void JNICALL Java_com_drbeef_razexr_GLES3JNILib_onStart( JNIEnv * env, jobject obj, jlong handle, jobject obj1)
 {
 	ALOGV( "    GLES3JNILib::onStart()" );
 
@@ -596,7 +594,7 @@ JNIEXPORT void JNICALL Java_com_drbeef_questzdoom_GLES3JNILib_onStart( JNIEnv * 
 	surfaceMessageQueue_PostMessage(&appThread->MessageQueue, &message);
 }
 
-JNIEXPORT void JNICALL Java_com_drbeef_questzdoom_GLES3JNILib_onResume( JNIEnv * env, jobject obj, jlong handle )
+JNIEXPORT void JNICALL Java_com_drbeef_razexr_GLES3JNILib_onResume( JNIEnv * env, jobject obj, jlong handle )
 {
 	ALOGV( "    GLES3JNILib::onResume()" );
 	ovrAppThread * appThread = (ovrAppThread *)((size_t)handle);
@@ -605,7 +603,7 @@ JNIEXPORT void JNICALL Java_com_drbeef_questzdoom_GLES3JNILib_onResume( JNIEnv *
 	surfaceMessageQueue_PostMessage(&appThread->MessageQueue, &message);
 }
 
-JNIEXPORT void JNICALL Java_com_drbeef_questzdoom_GLES3JNILib_onPause( JNIEnv * env, jobject obj, jlong handle )
+JNIEXPORT void JNICALL Java_com_drbeef_razexr_GLES3JNILib_onPause( JNIEnv * env, jobject obj, jlong handle )
 {
 	ALOGV( "    GLES3JNILib::onPause()" );
 	ovrAppThread * appThread = (ovrAppThread *)((size_t)handle);
@@ -614,7 +612,7 @@ JNIEXPORT void JNICALL Java_com_drbeef_questzdoom_GLES3JNILib_onPause( JNIEnv * 
 	surfaceMessageQueue_PostMessage(&appThread->MessageQueue, &message);
 }
 
-JNIEXPORT void JNICALL Java_com_drbeef_questzdoom_GLES3JNILib_onStop( JNIEnv * env, jobject obj, jlong handle )
+JNIEXPORT void JNICALL Java_com_drbeef_razexr_GLES3JNILib_onStop( JNIEnv * env, jobject obj, jlong handle )
 {
 	ALOGV( "    GLES3JNILib::onStop()" );
 	ovrAppThread * appThread = (ovrAppThread *)((size_t)handle);
@@ -623,7 +621,7 @@ JNIEXPORT void JNICALL Java_com_drbeef_questzdoom_GLES3JNILib_onStop( JNIEnv * e
 	surfaceMessageQueue_PostMessage(&appThread->MessageQueue, &message);
 }
 
-JNIEXPORT void JNICALL Java_com_drbeef_questzdoom_GLES3JNILib_onDestroy( JNIEnv * env, jobject obj, jlong handle )
+JNIEXPORT void JNICALL Java_com_drbeef_razexr_GLES3JNILib_onDestroy( JNIEnv * env, jobject obj, jlong handle )
 {
 	ALOGV( "    GLES3JNILib::onDestroy()" );
 	ovrAppThread * appThread = (ovrAppThread *)((size_t)handle);
@@ -644,7 +642,7 @@ Surface lifecycle
 ================================================================================
 */
 
-JNIEXPORT void JNICALL Java_com_drbeef_questzdoom_GLES3JNILib_onSurfaceCreated( JNIEnv * env, jobject obj, jlong handle, jobject surface )
+JNIEXPORT void JNICALL Java_com_drbeef_razexr_GLES3JNILib_onSurfaceCreated( JNIEnv * env, jobject obj, jlong handle, jobject surface )
 {
 	ALOGV( "    GLES3JNILib::onSurfaceCreated()" );
 	ovrAppThread * appThread = (ovrAppThread *)((size_t)handle);
@@ -667,7 +665,7 @@ JNIEXPORT void JNICALL Java_com_drbeef_questzdoom_GLES3JNILib_onSurfaceCreated( 
 	surfaceMessageQueue_PostMessage(&appThread->MessageQueue, &message);
 }
 
-JNIEXPORT void JNICALL Java_com_drbeef_questzdoom_GLES3JNILib_onSurfaceChanged( JNIEnv * env, jobject obj, jlong handle, jobject surface )
+JNIEXPORT void JNICALL Java_com_drbeef_razexr_GLES3JNILib_onSurfaceChanged( JNIEnv * env, jobject obj, jlong handle, jobject surface )
 {
 	ALOGV( "    GLES3JNILib::onSurfaceChanged()" );
 	ovrAppThread * appThread = (ovrAppThread *)((size_t)handle);
@@ -709,7 +707,7 @@ JNIEXPORT void JNICALL Java_com_drbeef_questzdoom_GLES3JNILib_onSurfaceChanged( 
 	}
 }
 
-JNIEXPORT void JNICALL Java_com_drbeef_questzdoom_GLES3JNILib_onSurfaceDestroyed( JNIEnv * env, jobject obj, jlong handle )
+JNIEXPORT void JNICALL Java_com_drbeef_razexr_GLES3JNILib_onSurfaceDestroyed( JNIEnv * env, jobject obj, jlong handle )
 {
 	ALOGV( "    GLES3JNILib::onSurfaceDestroyed()" );
 	ovrAppThread * appThread = (ovrAppThread *)((size_t)handle);

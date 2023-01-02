@@ -3,17 +3,26 @@ LOCAL_PATH := $(call my-dir)/../source
 
 include $(CLEAR_VARS)
 
-#LOCAL_SHORT_COMMANDS := true
+
+
+# Uncomment for the correct headset - slight changes required in OpenXR implementation
+OPENXR_HMD = -DMETA_QUEST
+#OPENXR_HMD = -DPICO_XR
+
+
+
+LOCAL_SHORT_COMMANDS := true
+APP_SHORT_COMMANDS := true
 
 LOCAL_MODULE    := raze
 
-LOCAL_CFLAGS   := -funsigned-char  -DHAVE_GLES2 -DUSE_OPENGL -DHAVE_SOFTPOLY -DNO_CLOCK_GETTIME -DUSE_GL_HW_BUFFERS -fvisibility=hidden -frtti  -D__MOBILE__  -DOPNMIDI_DISABLE_GX_EMULATOR -DGZDOOM  -DGZDOOM_GL3 -D__STDINT_LIMITS -DENGINE_NAME=\"gzdoom_dev\"
+LOCAL_CFLAGS   := $(OPENXR_HMD) -funsigned-char  -DHAVE_GLES2 -DUSE_OPENGL -DNO_CLOCK_GETTIME -DUSE_GL_HW_BUFFERS -fvisibility=hidden -frtti  -D__MOBILE__  -DOPNMIDI_DISABLE_GX_EMULATOR -DGZDOOM  -DGZDOOM_GL3 -D__STDINT_LIMITS -DENGINE_NAME=\"gzdoom_dev\"
 #-DNO_PIX_BUFF
 #-DUSE_GL_HW_BUFFERS
 #-DHAVE_VULKAN
 #-DUSE_GL_HW_BUFFERS
 
-LOCAL_CPPFLAGS := -include g_pch.h -DHAVE_FLUIDSYNTH -DHAVE_MPG123 -DHAVE_SNDFILE -std=c++17  -Wno-inconsistent-missing-override -Werror=format-security  -fexceptions -fpermissive -Dstricmp=strcasecmp -Dstrnicmp=strncasecmp -D__forceinline=inline -DNO_GTK -DNO_SSE
+LOCAL_CPPFLAGS := $(OPENXR_HMD) -include g_pch.h -DHAVE_FLUIDSYNTH -DHAVE_MPG123 -DHAVE_SNDFILE -std=c++17  -Wno-inconsistent-missing-override -Werror=format-security  -fexceptions -fpermissive -Dstricmp=strcasecmp -Dstrnicmp=strncasecmp -D__forceinline=inline -DNO_GTK -DNO_SSE
 
 LOCAL_CFLAGS  += -DNO_SEND_STATS
 
@@ -27,6 +36,8 @@ endif
 
 	
 LOCAL_C_INCLUDES := \
+	$(TOP_DIR)/../../../../../3rdParty/khronos/openxr/OpenXR-SDK/include \
+    $(TOP_DIR)/../../../../../OpenXR/Include \
     $(TOP_DIR)/ \
     $(SUPPORT_LIBS)/fluidsynth-lite/include \
     $(GZDOOM_TOP_PATH)/source/ \
@@ -75,7 +86,7 @@ LOCAL_C_INCLUDES := \
 	$(GZDOOM_TOP_PATH)/source/common/scripting/frontend \
 	$(GZDOOM_TOP_PATH)/source/common/scripting/backend \
 	$(GZDOOM_TOP_PATH)/source/common/platform/posix \
-	$(GZDOOM_TOP_PATH)/source/common/platform/posix/sdl \
+	$(GZDOOM_TOP_PATH)/source/common/platform/posix/nosdl \
 	$(GZDOOM_TOP_PATH)/source/core/rendering \
 	$(GZDOOM_TOP_PATH)/source/core/rendering/scene \
 	$(GZDOOM_TOP_PATH)/source/common/thirdparty/libsmackerdec/include \
@@ -91,7 +102,7 @@ LOCAL_C_INCLUDES := \
  $(SUPPORT_LIBS)/openal/include/AL \
  $(SUPPORT_LIBS)/jpeg8d \
  $(SUPPORT_LIBS) \
- $(TOP_DIR)/ZMusic/include  \
+ $(SUPPORT_LIBS)/ZMusic/include  \
  $(GZDOOM_TOP_PATH)/mobile/src/extrafiles  \
  $(GZDOOM_TOP_PATH)/mobile/src
 
@@ -102,8 +113,7 @@ LOCAL_C_INCLUDES := \
 
 
 ANDROID_SRC_FILES = \
-     ../mobile/src/i_specialpaths_android.cpp \
-     ../mobile/src/game_interface.cpp
+     ../mobile/src/i_specialpaths_android.cpp
 
 
 PLAT_POSIX_SOURCES = \
@@ -112,15 +122,15 @@ PLAT_POSIX_SOURCES = \
 
 
 PLAT_SDL_SOURCES = \
-		common/platform/posix/sdl/crashcatcher.c \
-    	common/platform/posix/sdl/hardware.cpp \
-    	common/platform/posix/sdl/i_gui.cpp \
-    	common/platform/posix/sdl/i_input.cpp \
-    	common/platform/posix/sdl/i_joystick.cpp \
-    	common/platform/posix/sdl/i_main.cpp \
-    	common/platform/posix/sdl/i_system.cpp \
-    	common/platform/posix/sdl/sdlglvideo.cpp \
-    	common/platform/posix/sdl/st_start.cpp \
+		common/platform/posix/nosdl/crashcatcher.c \
+    	common/platform/posix/nosdl/hardware.cpp \
+    	common/platform/posix/nosdl/i_gui.cpp \
+    	common/platform/posix/nosdl/i_main.cpp \
+    	common/platform/posix/nosdl/i_system.cpp \
+    	common/platform/posix/nosdl/i_input.cpp \
+    	common/platform/posix/nosdl/i_joystick.cpp \
+    	common/platform/posix/nosdl/glvideo.cpp \
+    	common/platform/posix/nosdl/st_start.cpp \
 
 
 POLYRENDER_SOURCES = \
@@ -440,7 +450,15 @@ PCH_SOURCES = \
 	games/blood/all.cpp \
 	games/sw/all.cpp \
 
-
+RAZEXR_SRC_FILES :=  ${TOP_DIR}/RazeXR/RazeXR_OpenXR.cpp \
+       ${TOP_DIR}/RazeXR/TBXR_Common.cpp \
+       ${TOP_DIR}/RazeXR/VrInputCommon.cpp \
+       ${TOP_DIR}/RazeXR/VrInputDefault.cpp \
+       ${TOP_DIR}/RazeXR/mathlib.c \
+       ${TOP_DIR}/RazeXR/matrixlib.c \
+       ${TOP_DIR}/RazeXR/argtable3.c \
+       ${TOP_DIR}/RazeXR/OpenXRInput_MetaQuest.cpp \
+       ${TOP_DIR}/RazeXR/OpenXRInput_PicoXR.cpp
 
 SYSTEM_SOURCES  = ${PLAT_POSIX_SOURCES} ${PLAT_SDL_SOURCES} ${PLAT_UNIX_SOURCES}
 
@@ -448,6 +466,7 @@ SYSTEM_SOURCES  = ${PLAT_POSIX_SOURCES} ${PLAT_SDL_SOURCES} ${PLAT_UNIX_SOURCES}
 
 LOCAL_SRC_FILES = \
     ${ANDROID_SRC_FILES} \
+    ${RAZEXR_SRC_FILES} \
 	${SYSTEM_SOURCES} \
 	${FASTMATH_SOURCES} \
 	$(POLYBACKEND_SOURCES) \
@@ -478,11 +497,14 @@ LOCAL_SRC_FILES = \
 
 
 
-LOCAL_LDLIBS := -ldl -llog -lOpenSLES
-LOCAL_LDLIBS +=  -lEGL -lGLESv3_CM
+LOCAL_LDLIBS := -ldl -llog -lOpenSLES -landroid
+LOCAL_LDLIBS +=  -lEGL -lGLESv3
 
-LOCAL_STATIC_LIBRARIES :=  SDL2_net zlib_gl3 lzma_gl3 gdtoa_gl3  bzip2_gl3 jpeg vpx
-LOCAL_SHARED_LIBRARIES :=  openal SDL2 zmusic
+LOCAL_STATIC_LIBRARIES :=  zlib_gl3 lzma_gl3 gdtoa_gl3  bzip2_gl3 jpeg vpx
+LOCAL_SHARED_LIBRARIES :=  openxr_loader openal zmusic
 
 include $(BUILD_SHARED_LIBRARY)
+
+
+$(call import-module,OpenXR/Projects/AndroidPrebuilt/jni)
 

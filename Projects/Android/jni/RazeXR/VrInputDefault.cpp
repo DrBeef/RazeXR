@@ -12,7 +12,7 @@ Authors		:	Simon Brown
 
 #include "VrInput.h"
 
-#include "doomkeys.h"
+#include "keydef.h"
 
 extern ovrInputStateTrackedRemote leftTrackedRemoteState_old;
 extern ovrInputStateTrackedRemote leftTrackedRemoteState_new;
@@ -335,7 +335,7 @@ void HandleInput_Default( int control_scheme, ovrInputStateTrackedRemote *pDomin
         Joy_GenerateButtonEvents(
             ((pDominantTrackedRemoteOld->Buttons & xrButton_Trigger) != 0) && !dominantGripPushedOld ? 1 : 0,
             ((pDominantTrackedRemoteNew->Buttons & xrButton_Trigger) != 0) && !dominantGripPushedNew ? 1 : 0,
-            1, KEY_PAD_RTRIGGER);
+            1, KEY_RCTRL);
 
         //"Use" (open door, toggle switch etc)
         Joy_GenerateButtonEvents(

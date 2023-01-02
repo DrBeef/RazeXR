@@ -24,119 +24,91 @@ static void* AppleGLGetProcAddress (const char *name)
 
 static void* PosixGetProcAddress (const GLubyte* name)
 {
-  static void* h = NULL;
-  static void* gpa;
+	static void* h = NULL;
+	static void* gpa;
 
-  if (h == NULL)
-  {
-    if ((h = dlopen(NULL, RTLD_LAZY | RTLD_LOCAL)) == NULL) return NULL;
-    gpa = dlsym(h, "glXGetProcAddress");
-  }
+	if (h == NULL)
+	{
+		if ((h = dlopen(NULL, RTLD_LAZY | RTLD_LOCAL)) == NULL) return NULL;
+		gpa = dlsym(h, "glXGetProcAddress");
+	}
 
-  if (gpa != NULL)
-    return ((void*(*)(const GLubyte*))gpa)(name);
-  else
-    return dlsym(h, (const char*)name);
+	if (gpa != NULL)
+		return ((void*(*)(const GLubyte*))gpa)(name);
+	else
+		return dlsym(h, (const char*)name);
 }
 #endif /* __sgi || __sun || __unix__ */
 
-#if defined(_WIN32)
 
-#ifdef APIENTRY
-#undef APIENTRY
-#endif
-#include <windows.h>
+#if defined(__MOBILE__)
 
+#include <android/log.h>
+#define LOGI(...) ((void)__android_log_print(ANDROID_LOG_INFO,"GZDOOM", __VA_ARGS__))
 
-#ifdef _MSC_VER
-// disable inlining here because it creates an incredible amount of bloat in this file.
-#pragma inline_depth(0)
-#pragma warning(disable: 4055)
-#pragma warning(disable: 4054)
-#pragma warning(disable: 4996)
-#endif
-
-static int TestPointer(const PROC pTest)
+static void CATCH(int a, int b, int c, int d, int e)
 {
-	ptrdiff_t iTest;
-	if(!pTest) return 0;
-	iTest = (ptrdiff_t)pTest;
-	
-	if(iTest == 1 || iTest == 2 || iTest == 3 || iTest == -1) return 0;
-	
-	return 1;
+	LOGI("CAUGHT BAD");
 }
 
-static HMODULE opengl32dll;
-static HGLRC(WINAPI* createcontext)(HDC);
-static BOOL(WINAPI* deletecontext)(HGLRC);
-static BOOL(WINAPI* makecurrent)(HDC, HGLRC);
-static PROC(WINAPI* getprocaddress)(LPCSTR name);
-static void CheckOpenGL(void)
-{
-    if (opengl32dll == 0)
-    {
-        opengl32dll = LoadLibrary(L"OpenGL32.DLL");
-        createcontext = (HGLRC(WINAPI*)(HDC)) GetProcAddress(opengl32dll, "wglCreateContext");
-        deletecontext = (BOOL(WINAPI*)(HGLRC)) GetProcAddress(opengl32dll, "wglDeleteContext");
-        makecurrent = (BOOL(WINAPI*)(HDC, HGLRC)) GetProcAddress(opengl32dll, "wglMakeCurrent");
-        getprocaddress = (PROC(WINAPI*)(LPCSTR)) GetProcAddress(opengl32dll, "wglGetProcAddress");
-    }
-}
+int glesLoad = 3; // TODO fix this!
 
-HGLRC zd_wglCreateContext(HDC dc)
+static void *MOBILE_GetProcAddress(const char* name)
 {
-    CheckOpenGL();
-    return createcontext(dc);
-}
+	static void* h = NULL;
 
-BOOL zd_wglDeleteContext(HGLRC context)
-{
-    CheckOpenGL();
-    return deletecontext(context);
-}
-
-BOOL zd_wglMakeCurrent(HDC dc, HGLRC context)
-{
-    CheckOpenGL();
-    return makecurrent(dc, context);
-}
-
-PROC zd_wglGetProcAddress(LPCSTR name)
-{
-    CheckOpenGL();
-    return getprocaddress(name);
-}
-
-static PROC WinGetProcAddress(const char *name)
-{
-	HMODULE glMod = NULL;
-	PROC pFunc = zd_wglGetProcAddress((LPCSTR)name);
-	if(TestPointer(pFunc))
+	if (h == NULL)
 	{
-		return pFunc;
-	}
-	glMod = GetModuleHandleA("OpenGL32.dll");
-	return (PROC)GetProcAddress(glMod, (LPCSTR)name);
-}
-	
-#define IntGetProcAddress(name) WinGetProcAddress(name)
-#else
-	#if defined(__APPLE__)
-		#define IntGetProcAddress(name) AppleGLGetProcAddress(name)
-	#else
-		#if defined(__sgi) || defined(__sun) || defined(__unix__)
-			void* SDL_GL_GetProcAddress(const char* proc);
-			#define IntGetProcAddress(name) SDL_GL_GetProcAddress((const char*)name)
-			//#define IntGetProcAddress(name) PosixGetProcAddress((const GLubyte*)name)
-/* END OF MANUAL CHANGES, DO NOT REMOVE! */
-		#else /* GLX */
-		    #include <GL/glx.h>
+		if( glesLoad == 1 )
+		{
+			h = dlopen("libjwzgles_shared.so", RTLD_LAZY | RTLD_LOCAL);
+		}
+		else if( glesLoad == 2 )
+		{
+			h = dlopen("libGL4ES.so", RTLD_LAZY | RTLD_LOCAL);
+			void (*initialize_gl4es)( void )  = dlsym(h, "initialize_gl4es");
+			initialize_gl4es();
+		}
+		else if( glesLoad == 3 )
+		{
+			h = dlopen("libGLESv3.so", RTLD_LAZY | RTLD_LOCAL);
+		}
 
-			#define IntGetProcAddress(name) (*glXGetProcAddressARB)((const GLubyte*)name)
-		#endif
-	#endif
+		if (h == NULL)
+		{
+			LOGI("ERROR loading GL SHIM");
+			return NULL;
+		}
+	}
+
+	char newName[64];
+	memset(newName,0,64);
+
+	if( glesLoad == 1 )
+		sprintf(newName,"jwzgles_%s",name);
+	else
+		sprintf(newName,"%s",name);
+	//
+
+	void * ret = 0;
+	ret =  dlsym(h, (const char*)newName);
+
+	if( !ret )
+	{
+		//LOGI("Loading.. %s    FAIL", newName);
+		ret = CATCH;
+	}
+	else
+	{
+		//LOGI("Loading.. %s    OK", newName);
+	}
+
+	return ret;
+}
+
 #endif
+
+#define IntGetProcAddress(name) MOBILE_GetProcAddress((const char*)name)
 
 int ogl_ext_ARB_buffer_storage = ogl_LOAD_FAILED;
 int ogl_ext_ARB_shader_storage_buffer_object = ogl_LOAD_FAILED;
@@ -3344,16 +3316,16 @@ typedef struct ogl_StrToExtMap_s
 } ogl_StrToExtMap;
 
 static ogl_StrToExtMap ExtensionMap[10] = {
-	{"GL_ARB_buffer_storage", &ogl_ext_ARB_buffer_storage, Load_ARB_buffer_storage},
-	{"GL_ARB_shader_storage_buffer_object", &ogl_ext_ARB_shader_storage_buffer_object, Load_ARB_shader_storage_buffer_object},
-	{"GL_ARB_texture_compression", &ogl_ext_ARB_texture_compression, Load_ARB_texture_compression},
-	{"GL_ARB_texture_rectangle", &ogl_ext_ARB_texture_rectangle, NULL},
-	{"GL_EXT_framebuffer_object", &ogl_ext_EXT_framebuffer_object, Load_EXT_framebuffer_object},
-	{"GL_EXT_texture_compression_s3tc", &ogl_ext_EXT_texture_compression_s3tc, NULL},
-	{"GL_EXT_texture_filter_anisotropic", &ogl_ext_EXT_texture_filter_anisotropic, NULL},
-	{"GL_EXT_texture_sRGB", &ogl_ext_EXT_texture_sRGB, NULL},
-	{"GL_KHR_debug", &ogl_ext_KHR_debug, Load_KHR_debug},
-	{"GL_ARB_invalidate_subdata", &ogl_ext_ARB_invalidate_subdata, Load_ARB_invalidate_subdata},
+		{"GL_ARB_buffer_storage", &ogl_ext_ARB_buffer_storage, Load_ARB_buffer_storage},
+		{"GL_ARB_shader_storage_buffer_object", &ogl_ext_ARB_shader_storage_buffer_object, Load_ARB_shader_storage_buffer_object},
+		{"GL_ARB_texture_compression", &ogl_ext_ARB_texture_compression, Load_ARB_texture_compression},
+		{"GL_ARB_texture_rectangle", &ogl_ext_ARB_texture_rectangle, NULL},
+		{"GL_EXT_framebuffer_object", &ogl_ext_EXT_framebuffer_object, Load_EXT_framebuffer_object},
+		{"GL_EXT_texture_compression_s3tc", &ogl_ext_EXT_texture_compression_s3tc, NULL},
+		{"GL_EXT_texture_filter_anisotropic", &ogl_ext_EXT_texture_filter_anisotropic, NULL},
+		{"GL_EXT_texture_sRGB", &ogl_ext_EXT_texture_sRGB, NULL},
+		{"GL_KHR_debug", &ogl_ext_KHR_debug, Load_KHR_debug},
+		{"GL_ARB_invalidate_subdata", &ogl_ext_ARB_invalidate_subdata, Load_ARB_invalidate_subdata},
 };
 
 static int g_extensionMapSize = 10;
@@ -3367,7 +3339,7 @@ static ogl_StrToExtMap *FindExtEntry(const char *extensionName)
 		if(strcmp(extensionName, currLoc->extensionName) == 0)
 			return currLoc;
 	}
-	
+
 	return NULL;
 }
 
@@ -3454,6 +3426,10 @@ static int ProcExtsFromExtList(void)
 
 	if (_ptrc_glGetStringi == NULL) return 0;
 
+#ifdef __MOBILE__
+	if(glesLoad < 3)
+		return 0;
+#endif
 	_ptrc_glGetIntegerv(GL_NUM_EXTENSIONS, &iNumExtensions);
 
 	for(iLoop = 0; iLoop < iNumExtensions; iLoop++)
@@ -3469,7 +3445,7 @@ int ogl_LoadFunctions()
 {
 	int numFailed = 0;
 	ClearExtensionVars();
-	
+
 	_ptrc_glGetIntegerv = (void (CODEGEN_FUNCPTR *)(GLenum, GLint *))IntGetProcAddress("glGetIntegerv");
 	if(!_ptrc_glGetIntegerv) return ogl_LOAD_FAILED;
 	_ptrc_glGetStringi = (const GLubyte * (CODEGEN_FUNCPTR *)(GLenum, GLuint))IntGetProcAddress("glGetStringi");
@@ -3483,7 +3459,7 @@ int ogl_LoadFunctions()
 	}
 
 	numFailed = Load_Version_4_5();
-	
+
 	if(numFailed == 0)
 		return ogl_LOAD_SUCCEEDED;
 	else
@@ -3519,7 +3495,7 @@ int ogl_IsVersionGEQ(int majorVersion, int minorVersion)
 {
 	if(g_major_version == 0)
 		GetGLVersion();
-	
+
 	if(majorVersion < g_major_version) return 1;
 	if(majorVersion > g_major_version) return 0;
 	if(minorVersion <= g_minor_version) return 1;

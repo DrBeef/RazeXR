@@ -176,6 +176,11 @@ void RenderViewpoint(FRenderViewpoint& mainvp, IntRect* bounds, float fov, float
 //
 //===========================================================================
 
+float RazeXR_GetFOV();
+void VR_GetMove(float *joy_forward, float *joy_side, float *hmd_forward, float *hmd_side, float *up,
+				float *yaw, float *pitch, float *roll);
+
+
 FRenderViewpoint SetupViewpoint(spritetype* cam, const vec3_t& position, int sectnum, binangle angle, fixedhoriz horizon, binangle rollang)
 {
 	FRenderViewpoint r_viewpoint{};
@@ -183,10 +188,13 @@ FRenderViewpoint SetupViewpoint(spritetype* cam, const vec3_t& position, int sec
 	r_viewpoint.SectNums = nullptr;
 	r_viewpoint.SectCount = sectnum;
 	r_viewpoint.Pos = { position.x / 16.f, position.y / -16.f, position.z / -256.f };
-	r_viewpoint.HWAngles.Yaw = -90.f + angle.asdeg();
-	r_viewpoint.HWAngles.Pitch = -horizon.aspitch();
-	r_viewpoint.HWAngles.Roll = -rollang.asdeg();
-	r_viewpoint.FieldOfView = (float)r_fov;
+
+	float dummy, yaw, pitch, roll;
+	VR_GetMove(&dummy, &dummy, &dummy, &dummy, &dummy, &yaw, &pitch, &roll);
+	r_viewpoint.HWAngles.Yaw = -90.f - yaw;//angle.asdeg();
+	r_viewpoint.HWAngles.Pitch = pitch;//-horizon.aspitch();
+	r_viewpoint.HWAngles.Roll = roll;//-rollang.asdeg();
+	r_viewpoint.FieldOfView = (float)RazeXR_GetFOV();
 	r_viewpoint.RotAngle = angle.asbam();
 	double FocalTangent = tan(r_viewpoint.FieldOfView.Radians() / 2);
 	DAngle an = 270. - r_viewpoint.HWAngles.Yaw.Degrees;

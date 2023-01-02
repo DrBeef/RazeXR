@@ -22,7 +22,7 @@ EXTERN_CVAR(Bool, vr_crouch_use_button);
 
 #include "mathlib.h"
 
-#define LOG_TAG "QzDoom"
+#define LOG_TAG "RazeXR"
 
 #ifndef NDEBUG
 #define DEBUG 1
@@ -35,8 +35,6 @@ EXTERN_CVAR(Bool, vr_crouch_use_button);
 #else
 #define ALOGV(...)
 #endif
-
-extern bool qzdoom_initialised;
 
 extern bool cinemamode;
 extern float cinemamodeYaw;
@@ -79,7 +77,7 @@ void handleTrackedControllerButton(ovrInputStateTrackedRemote * trackedRemoteSta
 void QuatToYawPitchRoll(XrQuaternionf q, vec3_t rotation, vec3_t out);
 
 //Called from engine code
-void QzDoom_setUseScreenLayer(bool use);
+void RazeXR_setUseScreenLayer(bool use);
 void jni_shutdown();
 
 

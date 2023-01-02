@@ -9,19 +9,8 @@
 #include <android/native_window_jni.h>	// for native window JNI
 #include <android/input.h>
 
-#include "argtable3.h"
-#include "VrInput.h"
-
-#include <EGL/egl.h>
-#include <EGL/eglext.h>
-#include <GLES3/gl3.h>
-#include <GLES3/gl3ext.h>
-#define GL_GLEXT_PROTOTYPES
-
 #include "VrInput.h"
 #include "VrCommon.h"
-#include "../SupportLibs/jpeg8d/jinclude.h"
-#include "../SupportLibs/libpng/pngconf.h"
 
 #if !defined( EGL_OPENGL_ES3_BIT_KHR )
 #define EGL_OPENGL_ES3_BIT_KHR		0x0040
@@ -244,9 +233,9 @@ static void ovrEgl_Clear( ovrEgl * egl )
 	egl->MinorVersion = 0;
 	egl->Display = 0;
 	egl->Config = 0;
-	egl->TinySurface = EGL_NO_SURFACE;
-	egl->MainSurface = EGL_NO_SURFACE;
-	egl->Context = EGL_NO_CONTEXT;
+	egl->TinySurface = 0;
+	egl->MainSurface = 0;
+	egl->Context = 0;
 }
 
 static void ovrEgl_CreateContext( ovrEgl * egl, const ovrEgl * shareEgl )
@@ -256,7 +245,7 @@ static void ovrEgl_CreateContext( ovrEgl * egl, const ovrEgl * shareEgl )
 		return;
 	}
 
-	egl->Display = eglGetDisplay( EGL_DEFAULT_DISPLAY );
+	egl->Display = eglGetDisplay( 0 );
 	ALOGV( "        eglInitialize( Display, &MajorVersion, &MinorVersion )" );
 	eglInitialize( egl->Display, &egl->MajorVersion, &egl->MinorVersion );
 	// Do NOT use eglChooseConfig, because the Android EGL code pushes in multisample
@@ -326,8 +315,8 @@ static void ovrEgl_CreateContext( ovrEgl * egl, const ovrEgl * shareEgl )
 		EGL_NONE
 	};
 	ALOGV( "        Context = eglCreateContext( Display, Config, EGL_NO_CONTEXT, contextAttribs )" );
-	egl->Context = eglCreateContext( egl->Display, egl->Config, ( shareEgl != NULL ) ? shareEgl->Context : EGL_NO_CONTEXT, contextAttribs );
-	if ( egl->Context == EGL_NO_CONTEXT )
+	egl->Context = eglCreateContext( egl->Display, egl->Config, ( shareEgl != NULL ) ? shareEgl->Context : 0, contextAttribs );
+	if ( egl->Context == 0 )
 	{
 		ALOGE( "        eglCreateContext() failed: %s", EglErrorString( eglGetError() ) );
 		return;
@@ -340,11 +329,11 @@ static void ovrEgl_CreateContext( ovrEgl * egl, const ovrEgl * shareEgl )
 	};
 	ALOGV( "        TinySurface = eglCreatePbufferSurface( Display, Config, surfaceAttribs )" );
 	egl->TinySurface = eglCreatePbufferSurface( egl->Display, egl->Config, surfaceAttribs );
-	if ( egl->TinySurface == EGL_NO_SURFACE )
+	if ( egl->TinySurface == 0 )
 	{
 		ALOGE( "        eglCreatePbufferSurface() failed: %s", EglErrorString( eglGetError() ) );
 		eglDestroyContext( egl->Display, egl->Context );
-		egl->Context = EGL_NO_CONTEXT;
+		egl->Context = 0;
 		return;
 	}
 	ALOGV( "        eglMakeCurrent( Display, TinySurface, TinySurface, Context )" );
@@ -353,7 +342,7 @@ static void ovrEgl_CreateContext( ovrEgl * egl, const ovrEgl * shareEgl )
 		ALOGE( "        eglMakeCurrent() failed: %s", EglErrorString( eglGetError() ) );
 		eglDestroySurface( egl->Display, egl->TinySurface );
 		eglDestroyContext( egl->Display, egl->Context );
-		egl->Context = EGL_NO_CONTEXT;
+		egl->Context = 0;
 		return;
 	}
 }
@@ -363,28 +352,28 @@ static void ovrEgl_DestroyContext( ovrEgl * egl )
 	if ( egl->Display != 0 )
 	{
 		ALOGE( "        eglMakeCurrent( Display, EGL_NO_SURFACE, EGL_NO_SURFACE, EGL_NO_CONTEXT )" );
-		if ( eglMakeCurrent( egl->Display, EGL_NO_SURFACE, EGL_NO_SURFACE, EGL_NO_CONTEXT ) == EGL_FALSE )
+		if ( eglMakeCurrent( egl->Display, 0, 0, 0 ) == EGL_FALSE )
 		{
 			ALOGE( "        eglMakeCurrent() failed: %s", EglErrorString( eglGetError() ) );
 		}
 	}
-	if ( egl->Context != EGL_NO_CONTEXT )
+	if ( egl->Context != 0 )
 	{
 		ALOGE( "        eglDestroyContext( Display, Context )" );
 		if ( eglDestroyContext( egl->Display, egl->Context ) == EGL_FALSE )
 		{
 			ALOGE( "        eglDestroyContext() failed: %s", EglErrorString( eglGetError() ) );
 		}
-		egl->Context = EGL_NO_CONTEXT;
+		egl->Context = 0;
 	}
-	if ( egl->TinySurface != EGL_NO_SURFACE )
+	if ( egl->TinySurface != 0 )
 	{
 		ALOGE( "        eglDestroySurface( Display, TinySurface )" );
 		if ( eglDestroySurface( egl->Display, egl->TinySurface ) == EGL_FALSE )
 		{
 			ALOGE( "        eglDestroySurface() failed: %s", EglErrorString( eglGetError() ) );
 		}
-		egl->TinySurface = EGL_NO_SURFACE;
+		egl->TinySurface = 0;
 	}
 	if ( egl->Display != 0 )
 	{
@@ -1752,6 +1741,10 @@ static void TBXR_GetHMDOrientation() {
 	VR_SetHMDOrientation(hmdorientation[0], hmdorientation[1], hmdorientation[2]);
 }
 
+bool TBXR_IsFrameSetup()
+{
+	return gAppState.FrameSetup;
+}
 
 //All the stuff we want to do each frame
 void TBXR_FrameSetup()
@@ -1907,7 +1900,7 @@ void TBXR_updateProjections()
 }
 
 float fov_y = 0;
-float QzDoom_GetFOV()
+float RazeXR_GetFOV()
 {
 	return fov_y;
 }

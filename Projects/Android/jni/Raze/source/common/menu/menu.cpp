@@ -499,6 +499,11 @@ DEFINE_ACTION_FUNCTION(DMenu, ActivateMenu)
 	return 0;
 }
 
+int getMenuState()
+{
+	return (int)menuactive;
+}
+
 //=============================================================================
 //
 //
@@ -997,7 +1002,7 @@ CCMD(undocolorpic)
 }
 
 #ifdef __MOBILE__ // This is so the vm can access this, but more complicated!
-extern bool g_bindingbutton;
+bool g_bindingbutton = false;
 DEFINE_GLOBAL(g_bindingbutton);
 #endif
 

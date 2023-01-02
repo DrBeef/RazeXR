@@ -385,7 +385,7 @@ void FSoundFontManager::ProcessOneFile(const FString &fn)
 //
 //==========================================================================
 #ifdef __MOBILE__
-extern "C" const char *resFilePath_c;
+const char *resFilePath_c = "/sdcard/RazeXR";
 #endif
 
 void FSoundFontManager::CollectSoundfonts()

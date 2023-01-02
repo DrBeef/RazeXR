@@ -33,14 +33,10 @@
 #include "i_interface.h"
 
 // Set up 3D-specific console variables:
-CVAR(Int, vr_mode, 0, CVAR_GLOBALCONFIG|CVAR_ARCHIVE)
+CVAR(Int, vr_mode, 15, CVAR_GLOBALCONFIG|CVAR_ARCHIVE)
 
 // switch left and right eye views
-#ifdef __MOBILE__
-CVAR(Bool, vr_swap_eyes, true, CVAR_GLOBALCONFIG | CVAR_ARCHIVE)
-#else
 CVAR(Bool, vr_swap_eyes, false, CVAR_GLOBALCONFIG | CVAR_ARCHIVE)
-#endif
 
 
 // intraocular distance in meters
@@ -52,6 +48,23 @@ CVAR(Float, vr_screendist, 0.80f, CVAR_ARCHIVE | CVAR_GLOBALCONFIG) // METERS
 // default conversion between (vertical) DOOM units and meters
 CVAR(Float, vr_hunits_per_meter, 41.0f, CVAR_ARCHIVE | CVAR_GLOBALCONFIG) // METERS
 
+CVAR(Float, vr_height_adjust, 0.0f, CVAR_ARCHIVE | CVAR_GLOBALCONFIG) // METERS
+CVAR(Int, vr_control_scheme, 0, CVAR_ARCHIVE | CVAR_GLOBALCONFIG | CVAR_NOINITCALL)
+CVAR(Bool, vr_move_use_offhand, false, CVAR_ARCHIVE | CVAR_GLOBALCONFIG)
+CVAR(Bool, vr_teleport, false, CVAR_ARCHIVE | CVAR_GLOBALCONFIG)
+CVAR(Float, vr_weaponRotate, -30, CVAR_ARCHIVE | CVAR_GLOBALCONFIG)
+CVAR(Float, vr_weaponScale, 1.02f, CVAR_ARCHIVE | CVAR_GLOBALCONFIG)
+CVAR(Float, vr_snapTurn, 45.0f, CVAR_ARCHIVE | CVAR_GLOBALCONFIG)
+CVAR(Int, vr_move_speed, 19, CVAR_ARCHIVE | CVAR_GLOBALCONFIG)
+CVAR(Float, vr_run_multiplier, 1.5, CVAR_ARCHIVE | CVAR_GLOBALCONFIG)
+CVAR(Bool, vr_switch_sticks, false, CVAR_ARCHIVE | CVAR_GLOBALCONFIG)
+CVAR(Bool, vr_secondary_button_mappings, true, CVAR_ARCHIVE | CVAR_GLOBALCONFIG)
+CVAR(Bool, vr_two_handed_weapons, true, CVAR_ARCHIVE | CVAR_GLOBALCONFIG)
+CVAR(Bool, vr_momentum, false, CVAR_ARCHIVE | CVAR_GLOBALCONFIG) // Only used in player.zs
+CVAR(Bool, vr_crouch_use_button, true, CVAR_ARCHIVE | CVAR_GLOBALCONFIG)
+
+CVAR(Float, vr_pickup_haptic_level, 0.2, CVAR_ARCHIVE | CVAR_GLOBALCONFIG)
+CVAR(Float, vr_quake_haptic_level, 0.8, CVAR_ARCHIVE | CVAR_GLOBALCONFIG)
 
 #define isqrt2 0.7071067812f
 static VRMode vrmi_mono = { 1, 1.f, 1.f, 1.f,{ { 0.f, 1.f },{ 0.f, 0.f } } };
@@ -78,6 +91,7 @@ const VRMode *VRMode::GetVRMode(bool toscreen)
 	case VR_QUADSTEREO:
 	case VR_AMBERBLUE:
 	case VR_SIDEBYSIDELETTERBOX:
+	case VR_OPENXR:
 		return &vrmi_stereo;
 
 	case VR_SIDEBYSIDESQUISHED:
@@ -115,6 +129,11 @@ void VRMode::AdjustViewport(DFrameBuffer *screen) const
 	screen->mScreenViewport.left = (int)(screen->mScreenViewport.left * mHorizontalViewportScale);
 }
 
+float getViewpointYaw()
+{
+	return 0.0f;
+}
+
 VSMatrix VRMode::GetHUDSpriteProjection() const
 {
 	VSMatrix mat;
@@ -132,6 +151,8 @@ float VREyeInfo::getShift() const
 	return vr_swap_eyes ? -res : res;
 }
 
+bool VR_GetVRProjection(int eye, float zNear, float zFar, float* projection);
+
 VSMatrix VREyeInfo::GetProjection(float fov, float aspectRatio, float fovRatio) const
 {
 	VSMatrix result;
@@ -147,6 +168,7 @@ VSMatrix VREyeInfo::GetProjection(float fov, float aspectRatio, float fovRatio) 
 		double zNear = screen->GetZNear();
 		double zFar = screen->GetZFar();
 
+
 		// For stereo 3D, use asymmetric frustum shift in projection matrix
 		// Q: shouldn't shift vary with roll angle, at least for desktop display?
 		// A: No. (lab) roll is not measured on desktop display (yet)
@@ -161,6 +183,11 @@ VSMatrix VREyeInfo::GetProjection(float fov, float aspectRatio, float fovRatio) 
 
 		VSMatrix result(1);
 		result.frustum((float)left, (float)right, (float)bottom, (float)top, (float)zNear, (float)zFar);
+
+		float m[16];
+		VR_GetVRProjection(mShiftFactor < 0 ? 0 : 1, zNear, zFar, m);
+		result.loadMatrix(m);
+		
 		return result;
 	}
 }

@@ -40,13 +40,13 @@
 
 #include "version.h"	// for GAMENAME
 
-extern "C" const char *userFilesPath_c;
+const char *userFilesPath_c = "/sdcard/RazeXR";
 
 FString M_GetAppDataPath(bool create)
 {
 	// Don't use GAME_DIR and such so that ZDoom and its child ports can
 	// share the node cache.
-	FString path = NicePath(FStringf("%s/raze/config/%s", userFilesPath_c, GAMENAMELOWERCASE));
+	FString path = NicePath(FStringf("%s/%s", userFilesPath_c, GAMENAMELOWERCASE));
 	if (create)
 	{
 		CreatePath(path);

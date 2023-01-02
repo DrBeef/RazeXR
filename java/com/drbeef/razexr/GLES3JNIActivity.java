@@ -18,6 +18,7 @@ import android.content.pm.PackageManager;
 import android.content.res.AssetManager;
 
 import android.os.Bundle;
+import android.os.RemoteException;
 import android.util.Log;
 import android.view.SurfaceHolder;
 import android.view.SurfaceView;
@@ -27,12 +28,14 @@ import android.view.KeyEvent;
 import android.support.v4.app.ActivityCompat;
 import android.support.v4.content.ContextCompat;
 
+import com.drbeef.externalhapticsservice.HapticServiceClient;
+
 @SuppressLint("SdCardPath") public class GLES3JNIActivity extends Activity implements SurfaceHolder.Callback
 {
 	// Load the gles3jni library right away to make sure JNI_OnLoad() gets called as the very first thing.
 	static
 	{
-		System.loadLibrary( "razexr" );
+		System.loadLibrary( "raze" );
 	}
 
 	private static final String TAG = "RazeXR";
@@ -40,6 +43,8 @@ import android.support.v4.content.ContextCompat;
 	private int permissionCount = 0;
 	private static final int READ_EXTERNAL_STORAGE_PERMISSION_ID = 1;
 	private static final int WRITE_EXTERNAL_STORAGE_PERMISSION_ID = 2;
+
+	private HapticServiceClient externalHapticsServiceClient = null;
 
 	String commandLineParams;
 
@@ -133,9 +138,8 @@ import android.support.v4.content.ContextCompat;
 
 	public void create()
 	{
-		//This will copy the shareware version of raze if user doesn't have anything installed
-		copy_asset("/sdcard/RazeXR/id1", "pak0.pak");
-		copy_asset("/sdcard/RazeXR/id1", "config.cfg");
+		copy_asset("/sdcard/RazeXR", "raze.pk3");
+		//copy_asset("/sdcard/RazeXR/raze", "config.cfg");
 		copy_asset("/sdcard/RazeXR", "commandline.txt");
 
 		//Read these from a file and pass through
@@ -162,6 +166,12 @@ import android.support.v4.content.ContextCompat;
 				e.printStackTrace();
 			}
 		}
+
+		externalHapticsServiceClient = new HapticServiceClient(this, (state, desc) -> {
+			Log.v(TAG, "ExternalHapticsService is:" + desc);
+		});
+
+		externalHapticsServiceClient.bindService();
 
 		mNativeHandle = GLES3JNILib.onCreate( this, commandLineParams );
 	}
@@ -282,6 +292,60 @@ import android.support.v4.content.ContextCompat;
 		{
 			GLES3JNILib.onSurfaceDestroyed( mNativeHandle );
 			mSurfaceHolder = null;
+		}
+	}
+
+	public void haptic_event(String event, int position, int intensity, float angle, float yHeight)  {
+
+		if (externalHapticsServiceClient.hasService()) {
+			try {
+				//QuestZDoom doesn't use repeating patterns - set flags to 0
+				int flags = 0;
+				externalHapticsServiceClient.getHapticsService().hapticEvent(TAG, event, position, flags, intensity, angle, yHeight);
+			}
+			catch (RemoteException r)
+			{
+				Log.v(TAG, r.toString());
+			}
+		}
+	}
+
+	public void haptic_stopevent(String event) {
+
+		if (externalHapticsServiceClient.hasService()) {
+			try {
+				externalHapticsServiceClient.getHapticsService().hapticStopEvent(TAG, event);
+			}
+			catch (RemoteException r)
+			{
+				Log.v(TAG, r.toString());
+			}
+		}
+	}
+
+	public void haptic_enable() {
+
+		if (externalHapticsServiceClient.hasService()) {
+			try {
+				externalHapticsServiceClient.getHapticsService().hapticEnable();
+			}
+			catch (RemoteException r)
+			{
+				Log.v(TAG, r.toString());
+			}
+		}
+	}
+
+	public void haptic_disable() {
+
+		if (externalHapticsServiceClient.hasService()) {
+			try {
+				externalHapticsServiceClient.getHapticsService().hapticDisable();
+			}
+			catch (RemoteException r)
+			{
+				Log.v(TAG, r.toString());
+			}
 		}
 	}
 }

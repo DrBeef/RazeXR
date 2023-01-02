@@ -417,7 +417,7 @@ void D_AddDirectory(TArray<FString>& wadfiles, const char* dir, const char *file
 //
 //==========================================================================
 #ifdef __MOBILE__
-extern "C" const char *resFilePath_c;
+static const char *resFilePath_c = "/sdcard/RazeXR";
 #endif
 const char* BaseFileSearch(const char* file, const char* ext, bool lookfirstinprogdir, FConfigFile* config)
 {

@@ -9,6 +9,7 @@
 #include <GLES3/gl3.h>
 #include <GLES3/gl3ext.h>
 #include <jni.h>
+
 #include <openxr/openxr.h>
 #include <openxr/openxr_platform.h>
 #include <openxr/openxr_oculus_helpers.h>
@@ -328,6 +329,7 @@ void TBXR_InitActions( void );
 void TBXR_Vibrate(int duration, int channel, float intensity );
 void TBXR_ProcessHaptics();
 void TBXR_FrameSetup();
+bool TBXR_IsFrameSetup();
 void TBXR_updateProjections();
 void TBXR_UpdateControllers( );
 void TBXR_prepareEyeBuffer(int eye );
