@@ -31,6 +31,7 @@
 #include "v_video.h"
 #include "version.h"
 #include "i_interface.h"
+#include "RazeXR/mathlib.h"
 
 // Set up 3D-specific console variables:
 CVAR(Int, vr_mode, 15, CVAR_GLOBALCONFIG|CVAR_ARCHIVE)
@@ -46,7 +47,7 @@ CVAR(Float, vr_ipd, 0.062f, CVAR_ARCHIVE|CVAR_GLOBALCONFIG) // METERS
 CVAR(Float, vr_screendist, 0.80f, CVAR_ARCHIVE | CVAR_GLOBALCONFIG) // METERS
 
 // default conversion between (vertical) DOOM units and meters
-CVAR(Float, vr_hunits_per_meter, 41.0f, CVAR_ARCHIVE | CVAR_GLOBALCONFIG) // METERS
+CVAR(Float, vr_hunits_per_meter, 28.0f, CVAR_ARCHIVE | CVAR_GLOBALCONFIG) // METERS
 
 CVAR(Float, vr_height_adjust, 0.0f, CVAR_ARCHIVE | CVAR_GLOBALCONFIG) // METERS
 CVAR(Int, vr_control_scheme, 0, CVAR_ARCHIVE | CVAR_GLOBALCONFIG | CVAR_NOINITCALL)
@@ -147,8 +148,12 @@ VSMatrix VRMode::GetHUDSpriteProjection() const
 
 float VREyeInfo::getShift() const
 {
-	auto res = mShiftFactor * vr_ipd;
-	return vr_swap_eyes ? -res : res;
+	return mShiftFactor * vr_ipd * vr_hunits_per_meter;
+}
+
+int VREyeInfo::getEye() const
+{
+	return mShiftFactor < 0 ? 0 : 1;
 }
 
 bool VR_GetVRProjection(int eye, float zNear, float zFar, float* projection);
@@ -185,17 +190,15 @@ VSMatrix VREyeInfo::GetProjection(float fov, float aspectRatio, float fovRatio) 
 		result.frustum((float)left, (float)right, (float)bottom, (float)top, (float)zNear, (float)zFar);
 
 		float m[16];
-		VR_GetVRProjection(mShiftFactor < 0 ? 0 : 1, zNear, zFar, m);
+		VR_GetVRProjection(getEye(), zNear, zFar, m);
 		result.loadMatrix(m);
-		
+
 		return result;
 	}
 }
 
-
-
 /* virtual */
-DVector3 VREyeInfo::GetViewShift(float yaw) const
+DVector3 VREyeInfo::GetViewShift(FRotator viewAngles) const
 {
 	if (mShiftFactor == 0)
 	{
@@ -204,9 +207,27 @@ DVector3 VREyeInfo::GetViewShift(float yaw) const
 	}
 	else
 	{
-		double dx = -cos(DEG2RAD(yaw)) * vr_hunits_per_meter * getShift();
-		double dy = sin(DEG2RAD(yaw)) * vr_hunits_per_meter * getShift();
-		return { dx, dy, 0 };
+		DVector3 outViewShift;
+		outViewShift[0] = outViewShift[1] = outViewShift[2] = 0;
+
+		vec3_t angles;
+		VectorSet(angles, viewAngles.Pitch.Degrees,  viewAngles.Yaw.Degrees, viewAngles.Roll.Degrees);
+
+		vec3_t v_forward, v_right, v_up;
+		AngleVectors(angles, v_forward, v_right, v_up);
+
+		vec3_t tmp;
+		VectorScale(v_right, getShift(), tmp);
+
+		DVector3 eyeOffset(tmp[0], tmp[1], tmp[2]);
+
+		//eyeOffset[2] += getHmdAdjustedHeightInMapUnit() - getDoomPlayerHeightWithoutCrouch(&player);
+
+		outViewShift[0] = eyeOffset[0];
+		outViewShift[1] = eyeOffset[1];
+		outViewShift[2] = eyeOffset[2];
+
+		return outViewShift;
 	}
 }
 

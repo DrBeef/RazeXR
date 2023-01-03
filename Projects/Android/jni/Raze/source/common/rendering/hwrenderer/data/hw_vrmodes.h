@@ -29,10 +29,10 @@ struct VREyeInfo
 	float mScaleFactor;
 
 	VSMatrix GetProjection(float fov, float aspectRatio, float fovRatio) const;
-	DVector3 GetViewShift(float yaw) const;
+	DVector3 GetViewShift(FRotator angles) const;
 private:
 	float getShift() const;
-
+	int getEye() const;
 };
 
 struct VRMode

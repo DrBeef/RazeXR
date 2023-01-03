@@ -121,8 +121,6 @@ FString	savegamefile;
 //
 //==========================================================================
 
-void VR_GetMove(float *joy_forward, float *joy_side, float *hmd_forward, float *hmd_side, float *up,
-				float *yaw, float *pitch, float *roll);
 
 void G_BuildTiccmd(ticcmd_t* cmd) 
 {
@@ -138,13 +136,6 @@ void G_BuildTiccmd(ticcmd_t* cmd)
 	I_GetEvent();
 	auto input = CONTROL_GetInput();
 	gi->GetInput(&input, I_GetInputFrac(SyncInput()), &cmd->ucmd);
-
-	float joyforward=0;
-	float joyside=0;
-	float dummy=0;
-	VR_GetMove(&joyforward, &joyside, &dummy, &dummy, &dummy, &dummy, &dummy, &dummy);
-	cmd->ucmd.fvel += joyforward * gi->playerKeyMove();
-	cmd->ucmd.svel += joyside * gi->playerKeyMove();
 
 	cmd->consistency = consistency[myconnectindex][(maketic / ticdup) % BACKUPTICS];
 }

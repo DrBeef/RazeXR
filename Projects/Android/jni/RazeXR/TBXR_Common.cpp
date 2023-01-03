@@ -1899,10 +1899,10 @@ void TBXR_updateProjections()
 			gAppState.Projections));
 }
 
-float fov_y = 0;
+float fov_x = 0;
 float RazeXR_GetFOV()
 {
-	return fov_y;
+	return fov_x;
 }
 
 void TBXR_submitFrame()
@@ -1926,7 +1926,7 @@ void TBXR_submitFrame()
         fov.angleDown += gAppState.Projections[eye].fov.angleDown / 2.0f;
 	}
 
-	fov_y = (fabs(fov.angleUp) + fabs(fov.angleDown)) * 180.0f / M_PI;
+	fov_x = (fabs(fov.angleLeft) + fabs(fov.angleRight)) * 180.0f / M_PI;
 
 
 	gAppState.LayerCount = 0;

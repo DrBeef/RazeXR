@@ -92,6 +92,10 @@ void CollectLights(FLevelLocals* Level)
 #endif
 
 
+float RazeXR_GetFOV();
+void VR_GetMove(float *joy_forward, float *joy_side, float *hmd_forward, float *hmd_side, float *up,
+				float *yaw, float *pitch, float *roll);
+
 //-----------------------------------------------------------------------------
 //
 // Renders one viewpoint in a scene
@@ -139,12 +143,12 @@ void RenderViewpoint(FRenderViewpoint& mainvp, IntRect* bounds, float fov, float
 
 		di->Set3DViewport(RenderState);
 		float flash = 1.f;
-		di->Viewpoint.FieldOfView = fov;	// Set the real FOV for the current scene (it's not necessarily the same as the global setting in r_viewpoint)
+		di->Viewpoint.FieldOfView = RazeXR_GetFOV();	// Set the real FOV for the current scene (it's not necessarily the same as the global setting in r_viewpoint)
 
 		// Stereo mode specific perspective projection
 		di->VPUniforms.mProjectionMatrix = eye.GetProjection(fov, ratio, fovratio);
 		// Stereo mode specific viewpoint adjustment
-		vp.Pos += eye.GetViewShift(vp.HWAngles.Yaw.Degrees);
+		vp.Pos += eye.GetViewShift(vp.HWAngles);
 		di->SetupView(RenderState, vp.Pos.X, vp.Pos.Y, vp.Pos.Z, false, false);
 
 		di->ProcessScene(toscreen);
@@ -176,11 +180,6 @@ void RenderViewpoint(FRenderViewpoint& mainvp, IntRect* bounds, float fov, float
 //
 //===========================================================================
 
-float RazeXR_GetFOV();
-void VR_GetMove(float *joy_forward, float *joy_side, float *hmd_forward, float *hmd_side, float *up,
-				float *yaw, float *pitch, float *roll);
-
-
 FRenderViewpoint SetupViewpoint(spritetype* cam, const vec3_t& position, int sectnum, binangle angle, fixedhoriz horizon, binangle rollang)
 {
 	FRenderViewpoint r_viewpoint{};
@@ -191,7 +190,7 @@ FRenderViewpoint SetupViewpoint(spritetype* cam, const vec3_t& position, int sec
 
 	float dummy, yaw, pitch, roll;
 	VR_GetMove(&dummy, &dummy, &dummy, &dummy, &dummy, &yaw, &pitch, &roll);
-	r_viewpoint.HWAngles.Yaw = -90.f - yaw;//angle.asdeg();
+	r_viewpoint.HWAngles.Yaw = -90.f + angle.asdeg();
 	r_viewpoint.HWAngles.Pitch = pitch;//-horizon.aspitch();
 	r_viewpoint.HWAngles.Roll = roll;//-rollang.asdeg();
 	r_viewpoint.FieldOfView = (float)RazeXR_GetFOV();

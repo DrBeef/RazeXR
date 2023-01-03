@@ -138,6 +138,10 @@ enum
 	PREAMBLEBASE = 234,
 };
 
+void VR_GetMove(float *joy_forward, float *joy_side, float *hmd_forward, float *hmd_side, float *up,
+				float *yaw, float *pitch, float *roll);
+
+
 void processMovement(InputPacket* const currInput, InputPacket* const inputBuffer, ControlInfo* const hidInput, double const scaleAdjust, int const drink_amt, bool const allowstrafe, double const turnscale)
 {
 	// set up variables
@@ -163,6 +167,18 @@ void processMovement(InputPacket* const currInput, InputPacket* const inputBuffe
 
 	if (invertmousex)
 		currInput->avel = -currInput->avel;
+
+	float joyforward=0;
+	float joyside=0;
+	float yaw=0;
+	float dummy=0;
+	static float last_yaw = 0;
+	VR_GetMove(&joyforward, &joyside, &dummy, &dummy, &dummy, &yaw, &dummy, &dummy);
+	currInput->fvel += joyforward * keymove;
+	currInput->svel += -joyside * keymove;
+	currInput->avel -= (AngleToFloat(buildfang(-last_yaw).signedbam()) / BAngToDegree);
+	currInput->avel += (AngleToFloat(buildfang(-yaw).signedbam()) / BAngToDegree);
+	last_yaw = yaw;
 
 	// process remaining controller input.
 	currInput->horz -= float(scaleAdjust * hidInput->dpitch * hidspeed);

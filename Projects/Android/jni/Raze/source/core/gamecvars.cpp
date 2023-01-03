@@ -125,7 +125,7 @@ CUSTOM_CVARD(Int, snd_speech, 1, CVAR_ARCHIVE, "enables/disables player speech")
 
 // HUD
 
-CUSTOM_CVARD(Int, hud_size, Hud_Stbar, CVAR_ARCHIVE, "Defines the HUD size and style")
+CUSTOM_CVARD(Int, hud_size, Hud_Nothing, CVAR_ARCHIVE, "Defines the HUD size and style")
 {
 	if (self < 0) self = 0;
 	else if (self > Hud_Nothing) self = Hud_Nothing;

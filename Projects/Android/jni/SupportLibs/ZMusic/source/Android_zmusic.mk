@@ -7,7 +7,7 @@ include $(CLEAR_VARS)
 
 LOCAL_MODULE    := zmusic
 
-LOCAL_CPPFLAGS := -DHAVE_SNDFILE -DDYN_SNDFILE -DHAVE_FLUIDSYNTH -DDYN_FLUIDSYNTH -DHAVE_MPG123 -DDYN_MPG123 -fexceptions -std=c++11 -Dstricmp=strcasecmp -Dstrnicmp=strncasecmp  -fsigned-char
+LOCAL_CPPFLAGS := -DHAVE_SNDFILE -DHAVE_FLUIDSYNTH -DHAVE_MPG123 -fexceptions -std=c++11 -Dstricmp=strcasecmp -Dstrnicmp=strncasecmp  -fsigned-char
 
 LOCAL_C_INCLUDES :=  \
 $(LOCAL_PATH) \
@@ -22,9 +22,9 @@ $(LOCAL_PATH)/../thirdparty/timidity \
 $(LOCAL_PATH)/../thirdparty/timidityplus \
 $(LOCAL_PATH)/../thirdparty/wildmidi \
 $(LOCAL_PATH)/../thirdparty/game-music-emu \
-$(TOP_DIR)/AudioLibs_OpenTouch/fluidsynth-lite/include \
-$(TOP_DIR)/AudioLibs_OpenTouch/libsndfile-android/jni/ \
-$(TOP_DIR)/AudioLibs_OpenTouch/libmpg123 \
+$(LOCAL_PATH)/../../fluidsynth-lite/include \
+$(LOCAL_PATH)/../../libsndfile-android/jni/ \
+$(LOCAL_PATH)/../../libmpg123 \
 
 
 LOCAL_SRC_FILES =  	\

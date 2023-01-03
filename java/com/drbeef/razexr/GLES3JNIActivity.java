@@ -139,7 +139,7 @@ import com.drbeef.externalhapticsservice.HapticServiceClient;
 	public void create()
 	{
 		copy_asset("/sdcard/RazeXR", "raze.pk3");
-		//copy_asset("/sdcard/RazeXR/raze", "config.cfg");
+		copy_asset("/sdcard/RazeXR", "raze.sf2");
 		copy_asset("/sdcard/RazeXR", "commandline.txt");
 
 		//Read these from a file and pass through
