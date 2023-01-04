@@ -36,7 +36,7 @@ enum
 
 
 	FSMode_Max,
-	
+
 	// These all use ScaleToFit43, their purpose is to cut down on verbosity because they imply the virtual screen size.
 	FSMode_Predefined = 1000,
 	FSMode_Fit320x200 = 1000,
@@ -259,7 +259,7 @@ inline int active_con_scale(F2DDrawer *drawer)
 #endif
 
 template<class T>
-bool ParseDrawTextureTags(F2DDrawer *drawer, FGameTexture* img, double x, double y, uint32_t tag, T& tags, DrawParms* parms, bool fortext);
+bool ParseDrawTextureTags(F2DDrawer *drawer, FGameTexture* img, double x, double y, uint32_t tag, T& tags, DrawParms* parms, bool fortext, bool checkimage = true);
 
 template<class T>
 void DrawTextCommon(F2DDrawer *drawer, FFont* font, int normalcolor, double x, double y, const T* string, DrawParms& parms);
@@ -272,6 +272,7 @@ void DrawText(F2DDrawer* drawer, FFont* font, int normalcolor, double x, double 
 void DrawChar(F2DDrawer* drawer, FFont* font, int normalcolor, double x, double y, int character, int tag_first, ...);
 
 void DrawTexture(F2DDrawer* drawer, FGameTexture* img, double x, double y, int tags_first, ...);
+void DrawTexture(F2DDrawer *drawer, FTextureID texid, bool animate, double x, double y, int tags_first, ...);
 
 void DoDim(F2DDrawer* drawer, PalEntry color, float amount, int x1, int y1, int w, int h, FRenderStyle* style = nullptr);
 void Dim(F2DDrawer* drawer, PalEntry color, float damount, int x1, int y1, int w, int h, FRenderStyle* style = nullptr);
@@ -325,3 +326,5 @@ public:
 		CleanHeight = savedheight;
 	}
 };
+
+void Draw2D(F2DDrawer* drawer, FRenderState& state);

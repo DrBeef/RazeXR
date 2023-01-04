@@ -44,9 +44,9 @@
 #include "mapinfo.h"
 #include "gamecontrol.h"
 #include "hw_sections.h"
+#include "coreactor.h"
 
-extern TArray<int> blockingpairs[MAXWALLS];
-
+//#define DEBUG_CLIPPER
 //==========================================================================
 //
 //
@@ -60,22 +60,24 @@ void BunchDrawer::Init(HWDrawInfo *_di, Clipper* c, vec2_t& view, binangle a1, b
 	angrange = ang2 - ang1;
 	di = _di;
 	clipper = c;
-	viewx = view.x * (1/ 16.f);
-	viewy = view.y * -(1/ 16.f);
+	viewx = view.X * (1/ 16.f);
+	viewy = view.Y * -(1/ 16.f);
+	viewz = (float)di->Viewpoint.Pos.Z;
 	iview = view;
 	StartScene();
-	clipper->SetViewpoint(view);
 
 	gcosang = bamang(di->Viewpoint.RotAngle).fcos();
 	gsinang = bamang(di->Viewpoint.RotAngle).fsin();
 
-	for (int i = 0; i < numwalls; i++)
+	for (auto& w : wall)
 	{
 		// Precalculate the clip angles to avoid doing this repeatedly during level traversal.
-		wall[i].clipangle = clipper->PointToAngle(wall[i].pos);
+		auto vv = w.wall_int_pos() - view;
+		w.clipangle = bvectangbam(vv.X, vv.Y);
 	}
-	memset(sectionstartang, -1, sizeof(sectionstartang));
-	memset(sectionendang, -1, sizeof(sectionendang));
+	memset(sectionstartang.Data(), -1, sectionstartang.Size() * sizeof(sectionstartang[0]));
+	memset(sectionendang.Data(), -1, sectionendang.Size() * sizeof(sectionendang[0]));
+	//blockwall.Resize(wall.Size());
 }
 
 //==========================================================================
@@ -86,14 +88,20 @@ void BunchDrawer::Init(HWDrawInfo *_di, Clipper* c, vec2_t& view, binangle a1, b
 
 void BunchDrawer::StartScene()
 {
+	unsigned numsections = sections.Size();
 	LastBunch = 0;
 	StartTime = I_msTime();
 	Bunches.Clear();
 	CompareData.Clear();
+	gotsector.Resize(sector.Size());
 	gotsector.Zero();
+	gotsection2.Resize(numsections);
 	gotsection2.Zero();
+	gotwall.Resize(wall.Size());
 	gotwall.Zero();
-	blockwall.Zero();
+	sectionstartang.Resize(numsections);
+	sectionendang.Resize(numsections);
+	//blockwall.Zero();
 }
 
 //==========================================================================
@@ -106,12 +114,12 @@ bool BunchDrawer::StartBunch(int sectnum, int linenum, binangle startan, binangl
 {
 	FBunch* bunch = &Bunches[LastBunch = Bunches.Reserve(1)];
 
-	bunch->sectnum = sectnum;
+	bunch->sectornum = sectnum;
 	bunch->startline = bunch->endline = linenum;
 	bunch->startangle = startan;
 	bunch->endangle = endan;
 	bunch->portal = portal;
-	assert(bunch->endangle.asbam() > bunch->startangle.asbam());
+	assert(bunch->endangle.asbam() >= bunch->startangle.asbam());
 	return bunch->endangle != angrange;
 }
 
@@ -142,15 +150,11 @@ void BunchDrawer::DeleteBunch(int index)
 	Bunches.Pop();
 }
 
-bool BunchDrawer::CheckClip(walltype* wal)
+bool BunchDrawer::CheckClip(walltype* wal, float* topclip, float* bottomclip)
 {
-	auto pt2 = &wall[wal->point2];
-	sectortype* backsector = &sector[wal->nextsector];
-	sectortype* frontsector = &sector[wall[wal->nextwall].nextsector];
-
-	// if one plane is sky on both sides, the line must not clip.
-	if (frontsector->ceilingstat & backsector->ceilingstat & CSTAT_SECTOR_SKY) return false;
-	if (frontsector->floorstat & backsector->floorstat & CSTAT_SECTOR_SKY) return false;
+	auto pt2 = wal->point2Wall();
+	sectortype* backsector = wal->nextSector();
+	sectortype* frontsector = wal->sectorp();
 
 	float bs_floorheight1;
 	float bs_floorheight2;
@@ -164,13 +168,31 @@ bool BunchDrawer::CheckClip(walltype* wal)
 	// Mirrors and horizons always block the view
 	//if (linedef->special==Line_Mirror || linedef->special==Line_Horizon) return true;
 
-	PlanesAtPoint(frontsector, wal->x, wal->y, &fs_ceilingheight1, &fs_floorheight1);
-	PlanesAtPoint(frontsector, pt2->x, pt2->y, &fs_ceilingheight2, &fs_floorheight2);
+	PlanesAtPoint(frontsector, wal->pos.X, wal->pos.Y, &fs_ceilingheight1, &fs_floorheight1);
+	PlanesAtPoint(frontsector, pt2->pos.X, pt2->pos.Y, &fs_ceilingheight2, &fs_floorheight2);
 
-	PlanesAtPoint(backsector, wal->x, wal->y, &bs_ceilingheight1, &bs_floorheight1);
-	PlanesAtPoint(backsector, pt2->x, pt2->y, &bs_ceilingheight2, &bs_floorheight2);
+	PlanesAtPoint(backsector, wal->pos.X, wal->pos.Y, &bs_ceilingheight1, &bs_floorheight1);
+	PlanesAtPoint(backsector, pt2->pos.X, pt2->pos.Y, &bs_ceilingheight2, &bs_floorheight2);
 
-	// now check for closed sectors! No idea if we really need the sky checks. We'll see.
+	*bottomclip = max(min(bs_floorheight1, bs_floorheight2), min(fs_floorheight1, fs_floorheight2));
+
+	// if one plane is sky on both sides, the line must not clip.
+	if (frontsector->ceilingstat & backsector->ceilingstat & CSTAT_SECTOR_SKY)
+	{
+		// save some processing with outside areas - no need to add to the clipper if back sector is higher.
+		/*if (fs_ceilingheight1 <= bs_floorheight1 && fs_ceilingheight2 <= bs_floorheight2)*/ *bottomclip = -FLT_MAX;
+		*topclip = FLT_MAX;
+		return false;
+	}
+	*topclip = min(max(bs_ceilingheight1, bs_ceilingheight2), max(fs_ceilingheight1, fs_ceilingheight2));
+
+	if (frontsector->floorstat & backsector->floorstat & CSTAT_SECTOR_SKY)
+	{
+		*bottomclip = -FLT_MAX;
+		return false;
+	}
+
+	// now check for closed sectors.
 	if (bs_ceilingheight1 <= fs_floorheight1 && bs_ceilingheight2 <= fs_floorheight2)
 	{
 		// backsector's ceiling is below frontsector's floor.
@@ -213,8 +235,7 @@ int BunchDrawer::ClipLine(int aline, bool portal)
 	{
 		return CL_Skip;
 	}
-	if (line >= 0 && blockwall[line]) return CL_Draw;
-	auto wal = &wall[line];
+	//if (line >= 0 && blockwall[line]) return CL_Draw;
 
 	// convert to clipper coordinates and clamp to valid range.
 	int startAngle = startAngleBam.asbam();
@@ -229,10 +250,11 @@ int BunchDrawer::ClipLine(int aline, bool portal)
 	// check against the maximum possible viewing range of the sector.
 	// Todo: check if this is sufficient or if we really have to do a more costly check against the single visible segments.
 	// Note: These walls may be excluded from the clipper, but not from being drawn!
+	// if sectors got dragged around there may be overlaps which this code does not handle well do it may not run on such sectors.
 	bool dontclip = false;
-	if (sectStartAngle != -1)
+	if (sectStartAngle != -1 && !(sector[sections[section].sector].exflags & SECTOREX_DRAGGED)) 
 	{
-		if (sectStartAngle > endAngle || sectEndAngle < startAngle)
+		if ((sectStartAngle > endAngle || sectEndAngle < startAngle))
 		{
 			dontclip = true;
 		}
@@ -249,15 +271,33 @@ int BunchDrawer::ClipLine(int aline, bool portal)
 		return CL_Skip;
 	}
 
-	if (cline->partner == -1 || (wal->cstat & CSTAT_WALL_1WAY) || CheckClip(wal))
+	if (line < 0)
+		return CL_Pass;
+
+	float topclip = 0, bottomclip = 0;
+	if (cline->partner == -1 || (wall[line].cstat & CSTAT_WALL_1WAY) || CheckClip(&wall[line], &topclip, &bottomclip))
 	{
 		// one-sided
-		if (!portal && !dontclip) clipper->AddClipRange(startAngle, endAngle);
+		if (!portal && !dontclip && !(sector[sections[section].sector].exflags & SECTOREX_DONTCLIP))
+		{
+			clipper->AddClipRange(startAngle, endAngle);
+			//Printf("\nWall %d from %2.3f - %2.3f (blocking)\n", line, bamang(startAngle).asdeg(), bamang(endAngle).asdeg());
+			//clipper->DumpClipper();
+		}
 		return CL_Draw;
 	}
 	else
 	{
 		if (portal) clipper->RemoveClipRange(startAngle, endAngle);
+		else
+		{
+			if ((topclip < FLT_MAX || bottomclip > -FLT_MAX) && !dontclip)
+			{
+				clipper->AddWindowRange(startAngle, endAngle, topclip, bottomclip, viewz);
+				//Printf("\nWall %d from %2.3f - %2.3f, (%2.3f, %2.3f) (passing)\n", line, bamang(startAngle).asdeg(), bamang(endAngle).asdeg(), topclip, bottomclip);
+				//clipper->DumpClipper();
+			}
+		}
 
 		// set potentially visible viewing range for this line's back sector.
 		int nsection = cline->partnersection;
@@ -272,7 +312,7 @@ int BunchDrawer::ClipLine(int aline, bool portal)
 			if (endAngle > sectionendang[nsection]) sectionendang[nsection] = endAngle;
 		}
 
-		return CL_Draw | CL_Pass;
+		return dontclip? CL_Draw : CL_Draw | CL_Pass;
 	}
 }
 
@@ -299,7 +339,6 @@ void BunchDrawer::ProcessBunch(int bnch)
 			int ww = sectionLines[i].wall;
 			if (ww != -1)
 			{
-				for (auto p : blockingpairs[ww]) blockwall.Set(sectionLines[p].wall);
 				show2dwall.Set(ww);
 
 				if (!gotwall[i])
@@ -310,8 +349,7 @@ void BunchDrawer::ProcessBunch(int bnch)
 					SetupWall.Clock();
 
 					HWWall hwwall;
-					hwwall.Process(di, &wall[ww], &sector[bunch->sectnum], wall[ww].nextsector < 0 ? nullptr : &sector[wall[ww].nextsector]);
-					rendered_lines++;
+					hwwall.Process(di, &wall[ww], &sector[bunch->sectornum], wall[ww].nextsector < 0 ? nullptr : &sector[wall[ww].nextsector]);
 
 					SetupWall.Unclock();
 					Bsp.Clock();
@@ -352,40 +390,107 @@ int BunchDrawer::WallInFront(int line1, int line2)
 	double x2e = WallStartX(wall2e);
 	double y2e = WallStartY(wall2e);
 
-	double dx = x1e - x1s;
-	double dy = y1e - y1s;
+retry:
+	double dx1 = x1e - x1s;
+	double dy1 = y1e - y1s;
 
-	double t1 = PointOnLineSide(x2s, y2s, x1s, y1s, dx, dy);
-	double t2 = PointOnLineSide(x2e, y2e, x1s, y1s, dx, dy);
+	double t1 = PointOnLineSide(x2s, y2s, x1s, y1s, dx1, dy1);
+	double t2 = PointOnLineSide(x2e, y2e, x1s, y1s, dx1, dy1);
 	if (t1 == 0)
 	{
-		if (t2 == 0) return(-1);
+		if (t2 == 0) return -1;
 		t1 = t2;
 	}
 	if (t2 == 0) t2 = t1;
 
 	if ((t1 * t2) >= 0)
 	{
-		t2 = PointOnLineSide(viewx, viewy, x1s, y1s, dx, dy);
+		t2 = PointOnLineSide(viewx, viewy, x1s, y1s, dx1, dy1);
+		return (t2 * t1) <= 0;
+	}
+
+	double dx2 = x2e - x2s;
+	double dy2 = y2e - y2s;
+	double t3 = PointOnLineSide(x1s, y1s, x2s, y2s, dx2, dy2);
+	double t4 = PointOnLineSide(x1e, y1e, x2s, y2s, dx2, dy2);
+	if (t3 == 0)
+	{
+		if (t4 == 0) return -1;
+		t3 = t4;
+	}
+	if (t4 == 0) t4 = t3;
+	if ((t3 * t4) >= 0)
+	{
+		t4 = PointOnLineSide(viewx, viewy, x2s, y2s, dx2, dy2);
+		return (t4 * t3) > 0;
+	}
+
+	// If we got here the walls intersect. Most of the time this is just a tiny sliver intruding into the other wall.
+	// If that is the case we can ignore that sliver and pretend it is completely on the other side.
+
+	const double max_dist = 3;
+	const double side_threshold = (max_dist * max_dist) / (16. * 16.);	// we are operating in render coordinate space but want 3 map units tolerance.
+
+	double d1 = SquareDistToLine(x2s, y2s, x1s, y1s, x1e, y1e);
+	if (d1 < side_threshold) t1 = t2; 
+	double d2 = SquareDistToLine(x2e, y2e, x1s, y1s, x1e, y1e);
+	if (d2 < side_threshold) t2 = t1;
+	if ((fabs(d1) < side_threshold) ^ (fabs(d2) < side_threshold)) // only acceptable if only one end of the wall got adjusted.
+	{
+		t2 = PointOnLineSide(viewx, viewy, x1s, y1s, dx1, dy1);
 		return((t2 * t1) <= 0);
 	}
 
-	dx = x2e - x2s;
-	dy = y2e - y2s;
-	t1 = PointOnLineSide(x1s, y1s, x2s, y2s, dx, dy);
-	t2 = PointOnLineSide(x1e, y1e, x2s, y2s, dx, dy);
-	if (t1 == 0)
+	double d3 = SquareDistToLine(x1s, y1s, x2s, y2s, x2e, y2e);
+	if (d3 < side_threshold) t1 = t2;
+	double d4 = SquareDistToLine(x1e, y1e, x2s, y2s, x2e, y2e);
+	if (d4 < side_threshold) t2 = t1;
+	if ((fabs(d3) < side_threshold) ^ (fabs(d4) < side_threshold)) // only acceptable if only one end of the wall got adjusted.
 	{
-		if (t2 == 0) return(-1);
-		t1 = t2;
+		t2 = PointOnLineSide(viewx, viewy, x2s, y2s, dx2, dy2);
+		return((t2 * t1) <= 0);
 	}
-	if (t2 == 0) t2 = t1;
-	if ((t1 * t2) >= 0)
+
+	// let's try some last ditch effort here: compare the longer sections of the two walls from the intersection point.
+	// Only do this if the distance of the smaller one is not too large.
+
+	const double max_overlap = 2 * 2;
+
+	if (max(min(d1, d2), min(d3, d4)) < max_overlap)
 	{
-		t2 = PointOnLineSide(viewx, viewy, x2s, y2s, dx, dy);
-		return((t2 * t1) > 0);
+		// if one of the walls is too short, let colinearBunchInFront decide. This case normally only happens with doors where this will yield the correct result.
+		if ((d1 < max_overlap && d2 < max_overlap) || (d3 < max_overlap && d4 < max_overlap))
+			return -1;
+
+		DVector2 intersect;
+		SquareDistToWall(x1s, -y1s, &wall[line2], &intersect);
+		intersect.Y = -intersect.Y;
+
+		if (d3 < max_overlap)
+		{
+			x1s = intersect.X;
+			y1s = intersect.Y;
+		}
+		else
+		{
+			x1e = intersect.X;
+			y1e = intersect.Y;
+		}
+
+		if (d1 < max_overlap)
+		{
+			x2s = intersect.X;
+			y2s = intersect.Y;
+		}
+		else
+		{
+			x2e = intersect.X;
+			y2e = intersect.Y;
+		}
+		goto retry;
 	}
-	return(-2);
+
+	return -2;
 }
 
 //==========================================================================
@@ -407,14 +512,12 @@ int BunchDrawer::ColinearBunchInFront(FBunch* b1, FBunch* b2)
 		if (wall1s == -1) continue;
 		int sect1 = wall[wall1s].sector;
 		int nsect1 = wall[wall1s].nextsector;
-		if (nsect1 < 0) continue;
 		for (int j = b2->startline; j <= b2->endline; j++)
 		{
 			int wall2s = sectionLines[j].wall;
 			if (wall2s == -1) continue;
 			int sect2 = wall[wall2s].sector;
 			int nsect2 = wall[wall2s].nextsector;
-			if (nsect2 < 0) continue;
 			if (sect1 == nsect2) return 1; // bunch 2 is in front
 			if (sect2 == nsect1) return 0; // bunch 1 is in front
 		}
@@ -435,7 +538,7 @@ int BunchDrawer::BunchInFront(FBunch* b1, FBunch* b2)
 		// Find the wall in b1 that overlaps b2->startangle
 		for (int i = b1->startline; i <= b1->endline; i++)
 		{
-			endang = ClipAngle(wall[i].point2);
+			endang = ClipAngle(sectionLines[i].endpoint);
 			if (endang.asbam() > anglecheck.asbam())
 			{
 				// found a line
@@ -461,7 +564,7 @@ int BunchDrawer::BunchInFront(FBunch* b1, FBunch* b2)
 		// Find the wall in b2 that overlaps b1->startangle
 		for (int i = b2->startline; i <= b2->endline; i++)
 		{
-			endang = ClipAngle(wall[i].point2);
+			endang = ClipAngle(sectionLines[i].endpoint);
 			if (endang.asbam() > anglecheck.asbam())
 			{
 				// found a line
@@ -481,8 +584,7 @@ int BunchDrawer::BunchInFront(FBunch* b1, FBunch* b2)
 	}
 	if (colinear)
 	{
-		// This should never happen.
-		assert(true);
+		return -2;
 	}
 	// we have no overlap
 	return -1;
@@ -539,7 +641,12 @@ int BunchDrawer::FindClosestBunch()
 
 		}
 	}
-	//Printf("picked bunch starting at %d\n", Bunches[closest].startline);
+	/*
+	int nsection = sectionLines[Bunches[closest].startline].section;
+	Printf("\n=====================================\npicked bunch starting at sector %d, wall %d - Range at (%2.3f - %2.3f)\n",
+		sections[nsection].sector, Bunches[closest].startline,
+		bamang(sectionstartang[nsection]).asdeg(), bamang(sectionendang[nsection]).asdeg());
+	*/
 	return closest;
 }
 
@@ -556,47 +663,49 @@ void BunchDrawer::ProcessSection(int sectionnum, bool portal)
 
 	bool inbunch;
 
-	SetupSprite.Clock();
 
-	int z;
 	int sectnum = sections[sectionnum].sector;
 	if (!gotsector[sectnum])
 	{
+		Bsp.Unclock();
+		SetupSprite.Clock();
 		gotsector.Set(sectnum);
-		SectIterator it(sectnum);
-		while ((z = it.NextIndex()) >= 0)
+		CoreSectIterator it(sectnum);
+		while (auto actor = it.Next())
 		{
-			auto const spr = (uspriteptr_t)&sprite[z];
-
-			if ((spr->cstat & CSTAT_SPRITE_INVISIBLE) || spr->xrepeat == 0 || spr->yrepeat == 0) // skip invisible sprites
+			if ((actor->spr.cstat & CSTAT_SPRITE_INVISIBLE) || actor->spr.xrepeat == 0 || actor->spr.yrepeat == 0) // skip invisible sprites
 				continue;
 
-			int sx = spr->x - iview.x, sy = spr->y - int(iview.y);
+			int sx = actor->spr.pos.X - iview.X, sy = actor->spr.pos.Y - int(iview.Y);
 
 			// this checks if the sprite is it behind the camera, which will not work if the pitch is high enough to necessitate a FOV of more than 180°.
-			//if ((spr->cstat & CSTAT_SPRITE_ALIGNMENT_MASK) || (hw_models && tile2model[spr->picnum].modelid >= 0) || ((sx * gcosang) + (sy * gsinang) > 0)) 
+			//if ((actor->spr.cstat & CSTAT_SPRITE_ALIGNMENT_MASK) || (hw_models && tile2model[actor->spr.picnum].modelid >= 0) || ((sx * gcosang) + (sy * gsinang) > 0)) 
 			{
-				if ((spr->cstat & (CSTAT_SPRITE_ONE_SIDED | CSTAT_SPRITE_ALIGNMENT_MASK)) != (CSTAT_SPRITE_ONE_SIDED | CSTAT_SPRITE_ALIGNMENT_WALL) ||
-					(r_voxels && tiletovox[spr->picnum] >= 0 && voxmodels[tiletovox[spr->picnum]]) ||
-					(r_voxels && gi->Voxelize(spr->picnum) > -1) ||
-					DMulScale(bcos(spr->ang), -sx, bsin(spr->ang), -sy, 6) > 0)
-					if (renderAddTsprite(di->tsprite, di->spritesortcnt, z, sectnum))
+				if ((actor->spr.cstat & (CSTAT_SPRITE_ONE_SIDE | CSTAT_SPRITE_ALIGNMENT_MASK)) != (CSTAT_SPRITE_ONE_SIDE | CSTAT_SPRITE_ALIGNMENT_WALL) ||
+					(r_voxels && tiletovox[actor->spr.picnum] >= 0 && voxmodels[tiletovox[actor->spr.picnum]]) ||
+					(r_voxels && gi->Voxelize(actor->spr.picnum) > -1) ||
+					DMulScale(bcos(actor->spr.ang), -sx, bsin(actor->spr.ang), -sy, 6) > 0)
+					if (!renderAddTsprite(di->tsprite, di->spritesortcnt, actor))
 						break;
 			}
 		}
 		SetupSprite.Unclock();
+		Bsp.Clock();
 	}
 
 	if (automapping)
 		show2dsector.Set(sectnum);
 
+	Bsp.Unclock();
 	SetupFlat.Clock();
 	HWFlat flat;
 	flat.ProcessSector(di, &sector[sectnum], sectionnum);
 	SetupFlat.Unclock();
+	Bsp.Clock();
 
 	//Todo: process subsectors
 	inbunch = false;
+
 	auto section = &sections[sectionnum];
 	for (unsigned i = 0; i < section->lines.Size(); i++)
 	{
@@ -615,9 +724,10 @@ void BunchDrawer::ProcessSection(int sectionnum, bool portal)
 		{
 			if (walang1.asbam() >= angrange.asbam()) { walang1 = bamang(0); inbunch = false; }
 			if (walang2.asbam() >= angrange.asbam()) walang2 = angrange;
+			if (section->lines[i] >= (int)wall.Size()) inbunch = false;
 			if (!inbunch)
 			{
-				//Printf("Starting bunch:\n\tWall %d\n", section->lines[i]);
+				//Printf("Starting bunch, Sector %d\n\tWall %d\n", section->sector, section->lines[i]);
 				inbunch = StartBunch(sectnum, section->lines[i], walang1, walang2, portal);
 			}
 			else
@@ -638,14 +748,14 @@ void BunchDrawer::ProcessSection(int sectionnum, bool portal)
 
 void BunchDrawer::RenderScene(const int* viewsectors, unsigned sectcount, bool portal)
 {
-	//Printf("----------------------------------------- \nstart at sector %d\n", viewsectors[0]);
+	//Printf("----------------------------------------- \nstart at sector %d, z = %2.3f\n", viewsectors[0], viewz);
 	auto process = [&]()
 	{
 		clipper->Clear(ang1);
 
 		for (unsigned i = 0; i < sectcount; i++)
 		{
-			for (auto j : sectionspersector[viewsectors[i]])
+			for (auto j : sectionsPerSector[viewsectors[i]])
 			{
 				sectionstartang[j] = 0;
 				sectionendang[j] = int(angrange.asbam());
@@ -653,7 +763,7 @@ void BunchDrawer::RenderScene(const int* viewsectors, unsigned sectcount, bool p
 		}
 		for (unsigned i = 0; i < sectcount; i++)
 		{
-			for (auto j : sectionspersector[viewsectors[i]])
+			for (auto j : sectionsPerSector[viewsectors[i]])
 			{
 				ProcessSection(j, portal);
 			}

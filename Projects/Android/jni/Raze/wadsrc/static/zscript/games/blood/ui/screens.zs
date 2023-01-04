@@ -41,7 +41,7 @@ class BloodIntroImage : ImageScreen
 	}
 }
 
-struct BloodScreen
+struct BloodScreen ui
 {
 	enum EConstants
 	{
@@ -273,7 +273,7 @@ class BloodLoadScreen : ScreenJob
 	{
 		if (fadestate == visible) jobstate = finished;
 	}
-	
+
 	override void Draw(double sr) 
 	{
 		BloodScreen.DrawBackground();
@@ -289,7 +289,7 @@ class BloodLoadScreen : ScreenJob
 //
 //---------------------------------------------------------------------------
 
-class BloodCutscenes
+class BloodCutscenes ui
 {
 	static void BuildIntro(ScreenJobRunner runner)
 	{

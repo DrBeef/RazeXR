@@ -35,7 +35,6 @@ source as it is released.
 
 #include "ns.h"	// Must come before everything else!
 
-#include "compat.h"
 #include "g_input.h"
 
 #include "duke3d.h"
@@ -55,21 +54,7 @@ CVAR(Bool, wt_commentary, false, CVAR_ARCHIVE | CVAR_GLOBALCONFIG)
 
 BEGIN_DUKE_NS
 
-// These are needed until real objects can be used for actors.
-inline void* sndActor(DDukeActor* actor)
-{
-	return actor ? actor->s : nullptr;
-}
-
-inline DDukeActor* getSndActor(const void* source)
-{
-	// transitional conversation voodoo
-	return source ? &hittype[((spritetype*)source) - sprite] : nullptr;
-}
-
 static FSoundID currentCommentarySound;
-static DDukeActor* currentCommentarySprite; // todo: GC this once actors become objects
-
 
 void UnmuteSounds()
 {
@@ -93,7 +78,7 @@ void MuteSounds()
 		});
 }
 
-class DukeSoundEngine : public SoundEngine
+class DukeSoundEngine : public RazeSoundEngine
 {
 	// client specific parts of the sound engine go in this class.
 	void CalcPosVel(int type, const void* source, const float pt[3], int channum, int chanflags, FSoundID chanSound, FVector3* pos, FVector3* vel, FSoundChan* chan) override;
@@ -126,7 +111,7 @@ public:
 		{
 			UnloadSound(schan->SoundID);
 			currentCommentarySound = 0;
-			currentCommentarySprite->s->picnum = DEVELOPERCOMMENTARY;
+			if (currentCommentarySprite) currentCommentarySprite->spr.picnum = DEVELOPERCOMMENTARY;
 			I_SetRelativeVolume(1.0f);
 			UnmuteSounds();
 		}
@@ -248,7 +233,7 @@ int S_DefineSound(unsigned index, const char *filename, int minpitch, int maxpit
 	sndinf[kVolAdjust] = clamp<int>(distance, INT16_MIN, INT16_MAX);
 	sndinf[kWorldTourMapping] = 0;
 	sfx->Volume = volume;
-	sfx->NearLimit = 6;
+	sfx->NearLimit = index == TELEPORTER + 1? 6 : 0; // the teleporter sound cannot be unlimited due to how it gets used.
 	sfx->bTentative = false;
 	sfx->name = std::move(fn);
 	return 0;
@@ -257,7 +242,7 @@ int S_DefineSound(unsigned index, const char *filename, int minpitch, int maxpit
 
 inline bool S_IsAmbientSFX(DDukeActor* actor)
 {
-	return (actor->s->picnum == MUSICANDSFX && actor->s->lotag < 999);
+	return (actor->spr.picnum == MUSICANDSFX && actor->spr.lotag < 999);
 }
 
 //==========================================================================
@@ -266,13 +251,12 @@ inline bool S_IsAmbientSFX(DDukeActor* actor)
 //
 //==========================================================================
 
-static int GetPositionInfo(DDukeActor* actor, int soundNum, int sectNum,
+static int GetPositionInfo(DDukeActor* actor, int soundNum, sectortype* sect,
 							 const vec3_t *cam, const vec3_t *pos, int *distPtr, FVector3 *sndPos)
 {
 	// There's a lot of hackery going on here that could be mapped to rolloff and attenuation parameters.
 	// However, ultimately rolloff would also just reposition the sound source so this can remain as it is.
 
-	auto sp = actor->s;
 	int orgsndist = 0, sndist = 0;
 	auto const* snd = soundEngine->GetUserData(soundNum + 1);
 	int userflags = snd ? snd[kFlags] : 0;
@@ -281,18 +265,18 @@ static int GetPositionInfo(DDukeActor* actor, int soundNum, int sectNum,
 	FVector3 sndorg = GetSoundPos(pos);
 	FVector3 campos = GetSoundPos(cam);
 
-	if (sp->picnum != TILE_APLAYER || sp->yvel != screenpeek)
+	if (!actor->isPlayer() || actor->spr.yvel != screenpeek)
 	{
 		orgsndist = sndist = int(16 * (sndorg - campos).Length());
 
-		if ((userflags & (SF_GLOBAL | SF_DTAG)) != SF_GLOBAL && sp->picnum == MUSICANDSFX && sp->lotag < 999 && (sp->sector()->lotag & 0xff) < ST_9_SLIDING_ST_DOOR)
-			sndist = DivScale(sndist, sp->hitag + 1, 14);
+		if ((userflags & (SF_GLOBAL | SF_DTAG)) != SF_GLOBAL && actor->spr.picnum == MUSICANDSFX && actor->spr.lotag < 999 && (actor->sector()->lotag & 0xff) < ST_9_SLIDING_ST_DOOR)
+			sndist = DivScale(sndist, actor->spr.hitag + 1, 14);
 	}
 
 	sndist += dist_adjust;
 	if (sndist < 0) sndist = 0;
 
-	if (sectNum > -1 && sndist && sp->picnum != MUSICANDSFX && !cansee(cam->x, cam->y, cam->z - (24 << 8), sectNum, sp->x, sp->y, sp->z - (24 << 8), sp->sectnum))
+	if (sect!= nullptr && sndist && actor->spr.picnum != MUSICANDSFX && !cansee(cam->X, cam->Y, cam->Z - (24 << 8), sect, actor->spr.pos.X, actor->spr.pos.Y, actor->spr.pos.Z - (24 << 8), actor->sector()))
 		sndist += sndist >> (isRR() ? 2 : 5);
 
 	// Here the sound distance was clamped to a minimum of 144*4. 
@@ -326,20 +310,20 @@ static int GetPositionInfo(DDukeActor* actor, int soundNum, int sectNum,
 //
 //==========================================================================
 
-void S_GetCamera(vec3_t** c, int32_t* ca, int32_t* cs)
+void S_GetCamera(vec3_t** c, int32_t* ca, sectortype** cs)
 {
 	if (ud.cameraactor == nullptr)
 	{
 		auto p = &ps[screenpeek];
 		if (c) *c = &p->pos;
-		if (cs) *cs = p->cursectnum;
+		if (cs) *cs = p->cursector;
 		if (ca) *ca = p->angle.ang.asbuild();
 	}
 	else
 	{
-		if (c) *c =  &ud.cameraactor->s->pos;
-		if (cs) *cs = ud.cameraactor->s->sectnum;
-		if (ca) *ca = ud.cameraactor->s->ang;
+		if (c) *c =  &ud.cameraactor->spr.pos;
+		if (cs) *cs = ud.cameraactor->sector();
+		if (ca) *ca = ud.cameraactor->spr.ang;
 	}
 }
 
@@ -356,7 +340,7 @@ void DukeSoundEngine::CalcPosVel(int type, const void* source, const float pt[3]
 	if (pos != nullptr)
 	{
 		vec3_t* campos;
-		int32_t camsect;
+		sectortype* camsect;
 
 		S_GetCamera(&campos, nullptr, &camsect);
 		if (vel) vel->Zero();
@@ -369,12 +353,10 @@ void DukeSoundEngine::CalcPosVel(int type, const void* source, const float pt[3]
 		}
 		else if (type == SOURCE_Actor)
 		{
-			auto aactor = getSndActor(source);
-			auto aspr = aactor ? aactor->s : nullptr;
-			assert(aspr != nullptr);
-			if (aspr != nullptr)
+			auto aactor = (DDukeActor*)source;
+			if (aactor != nullptr)
 			{
-				GetPositionInfo(aactor, chanSound - 1, camsect, campos, &aspr->pos, nullptr, pos);
+				GetPositionInfo(aactor, chanSound - 1, camsect, campos, &aactor->spr.pos, nullptr, pos);
 				/*
 				if (vel) // DN3D does not properly maintain this.
 				{
@@ -387,7 +369,7 @@ void DukeSoundEngine::CalcPosVel(int type, const void* source, const float pt[3]
 		}
 		if ((chanflags & CHANF_LISTENERZ) && campos != nullptr && type != SOURCE_None)
 		{
-			pos->Y = campos->z / 256.f;
+			pos->Y = campos->Z / 256.f;
 		}
 	}
 }
@@ -403,8 +385,9 @@ void GameInterface::UpdateSounds(void)
 {
 	SoundListener listener;
 	vec3_t* c;
-	int32_t ca, cs;
-	
+	int32_t ca;
+	sectortype* cs;
+
 	if (isRR() && !Mus_IsPlaying() && !paused && gamestate == GS_LEVEL)
 		S_PlayRRMusic(); 
 
@@ -431,7 +414,7 @@ void GameInterface::UpdateSounds(void)
 		listener.Environment = nullptr;
 		listener.valid = false;
 	}
-	listener.ListenerObject = ud.cameraactor == nullptr ? nullptr : ud.cameraactor->s;
+	listener.ListenerObject = ud.cameraactor == nullptr ? nullptr : ud.cameraactor.Get();
 	soundEngine->SetListener(listener);
 }
 
@@ -459,7 +442,7 @@ int S_PlaySound3D(int sndnum, DDukeActor* actor, const vec3_t* pos, int channel,
 
 	if (userflags & SF_TALK)
 	{
-		if (snd_speech == 0 || (ud.multimode > 1 && actor->s->picnum == TILE_APLAYER && actor->s->yvel != screenpeek && ud.coop != 1)) return -1;
+		if (snd_speech == 0 || (ud.multimode > 1 && actor->isPlayer() && actor->spr.yvel != screenpeek && ud.coop != 1)) return -1;
 		bool foundone =  soundEngine->EnumerateChannels([&](FSoundChan* chan)
 			{
 				auto sid = chan->OrgID;
@@ -481,7 +464,7 @@ int S_PlaySound3D(int sndnum, DDukeActor* actor, const vec3_t* pos, int channel,
 	FVector3 sndpos;    // this is in sound engine space.
 
 	vec3_t* campos;
-	int32_t camsect;
+	sectortype* camsect;
 
 	S_GetCamera(&campos, nullptr, &camsect);
 	GetPositionInfo(actor, sndnum, camsect, campos, pos, &sndist, &sndpos);
@@ -489,7 +472,7 @@ int S_PlaySound3D(int sndnum, DDukeActor* actor, const vec3_t* pos, int channel,
 
 	bool explosion = ((userflags & (SF_GLOBAL | SF_DTAG)) == (SF_GLOBAL | SF_DTAG)) || ((sndnum == PIPEBOMB_EXPLODE || sndnum == LASERTRIP_EXPLODE || sndnum == RPG_EXPLODE));
 
-	bool underwater = ps[screenpeek].cursectnum > -1 && ps[screenpeek].cursector()->lotag == ST_2_UNDERWATER;
+	bool underwater = ps[screenpeek].insector() && ps[screenpeek].cursector->lotag == ST_2_UNDERWATER;
 	if (explosion)
 	{
 		if (underwater)
@@ -497,7 +480,7 @@ int S_PlaySound3D(int sndnum, DDukeActor* actor, const vec3_t* pos, int channel,
 	}
 	else
 	{
-		if (sndist > 32767 && actor->s->picnum != MUSICANDSFX && (userflags & (SF_LOOP | SF_MSFX)) == 0)
+		if (sndist > 32767 && actor->spr.picnum != MUSICANDSFX && (userflags & (SF_LOOP | SF_MSFX)) == 0)
 			return -1;
 
 		if (underwater && (userflags & SF_TALK) == 0)
@@ -505,7 +488,7 @@ int S_PlaySound3D(int sndnum, DDukeActor* actor, const vec3_t* pos, int channel,
 	}
 
 	bool is_playing = soundEngine->GetSoundPlayingInfo(SOURCE_Any, nullptr, sndnum+1);
-	if (is_playing && actor->s->picnum != MUSICANDSFX)
+	if (is_playing && actor->spr.picnum != MUSICANDSFX)
 		S_StopSound(sndnum, actor);
 
 	int const repeatp = (userflags & SF_LOOP);
@@ -525,7 +508,7 @@ int S_PlaySound3D(int sndnum, DDukeActor* actor, const vec3_t* pos, int channel,
 	if (userflags & SF_LOOP) flags |= CHANF_LOOP;
 	float vol = attenuation == ATTN_NONE ? 0.8f : 1.f;
 	if (currentCommentarySound != 0) vol *= 0.25f;
-	auto chan = soundEngine->StartSound(SOURCE_Actor, sndActor(actor), &sndpos, CHAN_AUTO, flags, sndnum+1, vol, attenuation, nullptr, S_ConvertPitch(pitch));
+	auto chan = soundEngine->StartSound(SOURCE_Actor, actor, &sndpos, CHAN_AUTO, flags, sndnum+1, vol, attenuation, nullptr, S_ConvertPitch(pitch));
 	if (chan) chan->UserData = (currentCommentarySound != 0);
 	return chan ? 0 : -1;
 }
@@ -539,7 +522,7 @@ int S_PlaySound3D(int sndnum, DDukeActor* actor, const vec3_t* pos, int channel,
 int S_PlaySound(int sndnum, int channel, EChanFlags flags, float vol)
 {
 	if (!soundEngine->isValidSoundId(sndnum+1) || !SoundEnabled()) return -1;
-	
+
 	sndnum = GetReplacementSound(sndnum);
 
 	int userflags = S_GetUserFlags(sndnum);
@@ -564,13 +547,7 @@ int S_PlaySound(int sndnum, int channel, EChanFlags flags, float vol)
 int S_PlayActorSound(int soundNum, DDukeActor* actor, int channel, EChanFlags flags)
 {
 	return (actor == nullptr ? S_PlaySound(soundNum, channel, flags) :
-		S_PlaySound3D(soundNum, actor, &actor->s->pos, channel, flags));
-}
-
-void S_RelinkActorSound(DDukeActor* from, DDukeActor* to)
-{
-	FVector3 pos = GetSoundPos(&from->s->pos);
-	soundEngine->RelinkSound(SOURCE_Actor, sndActor(from), sndActor(to), &pos);
+		S_PlaySound3D(soundNum, actor, &actor->spr.pos, channel, flags));
 }
 
 void S_StopSound(int sndNum, DDukeActor* actor, int channel)
@@ -580,11 +557,11 @@ void S_StopSound(int sndNum, DDukeActor* actor, int channel)
 	if (!actor) soundEngine->StopSoundID(sndNum+1);
 	else
 	{
-		if (channel == -1) soundEngine->StopSound(SOURCE_Actor, sndActor(actor), -1, sndNum + 1);
+		if (channel == -1) soundEngine->StopSound(SOURCE_Actor, actor, -1, sndNum + 1);
 		else soundEngine->StopSound(SOURCE_Actor, actor, channel, -1);
 
 		// StopSound kills the actor reference so this cannot be delayed until ChannelEnded gets called. At that point the actor may also not be valid anymore.
-		if (S_IsAmbientSFX(actor) && actor->s->sector()->lotag < 3)  // ST_2_UNDERWATER
+		if (S_IsAmbientSFX(actor) && actor->sector()->lotag < 3)  // ST_2_UNDERWATER
 			actor->temp_data[0] = 0;
 	}
 }
@@ -600,7 +577,7 @@ void S_ChangeSoundPitch(int soundNum, DDukeActor* actor, int pitchoffset)
 	}
 	else
 	{
-		soundEngine->ChangeSoundPitch(SOURCE_Actor, sndActor(actor), CHAN_AUTO, expitch, soundNum+1);
+		soundEngine->ChangeSoundPitch(SOURCE_Actor, actor, CHAN_AUTO, expitch, soundNum+1);
 	}
 }
 
@@ -615,14 +592,14 @@ int S_CheckActorSoundPlaying(DDukeActor* actor, int soundNum, int channel)
 	soundNum = GetReplacementSound(soundNum);
 
 	if (actor == nullptr) return soundEngine->GetSoundPlayingInfo(SOURCE_Any, nullptr, soundNum+1);
-	return soundEngine->IsSourcePlayingSomething(SOURCE_Actor, sndActor(actor), channel, soundNum+1);
+	return soundEngine->IsSourcePlayingSomething(SOURCE_Actor, actor, channel, soundNum+1);
 }
 
 // Check if actor <i> is playing any sound.
 int S_CheckAnyActorSoundPlaying(DDukeActor* actor)
 {
 	if (!actor) return false;
-	return soundEngine->IsSourcePlayingSomething(SOURCE_Actor, sndActor(actor), CHAN_AUTO, 0);
+	return soundEngine->IsSourcePlayingSomething(SOURCE_Actor, actor, CHAN_AUTO, 0);
 }
 
 int S_CheckSoundPlaying(int soundNum)
@@ -869,50 +846,6 @@ bool StartCommentary(int tag, DDukeActor* actor)
 		return true;
 	}
 	return false;
-}
-
-
-DEFINE_ACTION_FUNCTION_NATIVE(_Duke, PlaySpecialMusic, S_PlaySpecialMusic)
-{
-	PARAM_PROLOGUE;
-	PARAM_INT(song);
-	S_PlaySpecialMusic(song);
-	return 0;
-}
-
-static int PlaySound(int num, int chan, int flags, double vol)
-{
-	return S_PlaySound(num, chan, EChanFlags::FromInt(flags), float(vol));
-}
-
-DEFINE_ACTION_FUNCTION_NATIVE(_Duke, PlaySound, PlaySound)
-{
-	PARAM_PROLOGUE;
-	PARAM_INT(snd);
-	PARAM_INT(chan);
-	PARAM_INT(flags);
-	PARAM_FLOAT(vol);
-	ACTION_RETURN_INT(PlaySound(snd, chan, flags, vol));
-}
-static void StopSound(int num)
-{
-	S_StopSound(num);
-}
-
-
-DEFINE_ACTION_FUNCTION_NATIVE(_Duke, StopSound, StopSound)
-{
-	PARAM_PROLOGUE;
-	PARAM_INT(snd);
-	StopSound(snd);
-	return 0;
-}
-
-DEFINE_ACTION_FUNCTION_NATIVE(_Duke, CheckSoundPlaying, S_CheckSoundPlaying)
-{
-	PARAM_PROLOGUE;
-	PARAM_INT(snd);
-	ACTION_RETURN_INT(S_CheckSoundPlaying(snd));
 }
 
 END_DUKE_NS

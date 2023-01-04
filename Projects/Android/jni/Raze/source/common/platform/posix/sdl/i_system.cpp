@@ -47,6 +47,15 @@
 #include <unistd.h>
 #include <sys/ioctl.h>
 
+#ifdef __linux__
+#include <asm/unistd.h>
+#include <linux/perf_event.h>
+#include <sys/mman.h>
+#include "printf.h"
+#endif
+
+#include <SDL.h>
+
 #include "version.h"
 #include "cmdlib.h"
 #include "m_argv.h"
@@ -70,7 +79,7 @@ double PerfToSec, PerfToMillisec;
 CVAR(Bool, con_printansi, true, CVAR_GLOBALCONFIG|CVAR_ARCHIVE);
 CVAR(Bool, con_4bitansi, false, CVAR_GLOBALCONFIG|CVAR_ARCHIVE);
 
-extern FStartupScreen *StartScreen;
+extern FStartupScreen *StartWindow;
 
 void I_SetIWADInfo()
 {
@@ -87,6 +96,9 @@ void Mac_I_FatalError(const char* errortext);
 #ifdef __unix__
 void Unix_I_FatalError(const char* errortext)
 {
+	// Close window or exit fullscreen and release mouse capture
+	SDL_QuitSubSystem(SDL_INIT_VIDEO);
+
 	const char *str;
 	if((str=getenv("KDE_FULL_SESSION")) && strcmp(str, "true") == 0)
 	{
@@ -107,8 +119,9 @@ void Unix_I_FatalError(const char* errortext)
 		title << GAMENAME " " << GetVersionString();
 #ifdef __ANDROID__
         LOGI("FATAL ERROR: %s", errortext);
+        LogWritter_Write(errortext);
 #endif
-//		if (SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR, title, errortext, NULL) < 0)
+		if (SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR, title, errortext, NULL) < 0)
 		{
 			printf("\n%s\n", errortext);
 		}
@@ -121,6 +134,7 @@ void I_ShowFatalError(const char *message)
 {
 #ifdef __ANDROID__
         LOGI("ERROR: %s", message);
+        LogWritter_Write(message);
 #endif
 
 #ifdef __APPLE__
@@ -132,8 +146,54 @@ void I_ShowFatalError(const char *message)
 #endif
 }
 
+bool PerfAvailable;
+
 void CalculateCPUSpeed()
 {
+	PerfAvailable = false;
+	PerfToMillisec = PerfToSec = 0.;
+#ifdef __aarch64__
+	// [MK] on aarch64 rather than having to calculate cpu speed, there is
+	// already an independent frequency for the perf timer
+	uint64_t frq;
+	asm volatile("mrs %0, cntfrq_el0":"=r"(frq));
+	PerfAvailable = true;
+	PerfToSec = 1./frq;
+	PerfToMillisec = PerfToSec*1000.;
+#elif defined(__linux__)
+	// [MK] read from perf values if we can
+	struct perf_event_attr pe;
+	memset(&pe,0,sizeof(struct perf_event_attr));
+	pe.type = PERF_TYPE_HARDWARE;
+	pe.size = sizeof(struct perf_event_attr);
+	pe.config = PERF_COUNT_HW_INSTRUCTIONS;
+	pe.disabled = 1;
+	pe.exclude_kernel = 1;
+	pe.exclude_hv = 1;
+	int fd = syscall(__NR_perf_event_open, &pe, 0, -1, -1, 0);
+	if (fd == -1)
+	{
+		return;
+	}
+	void *addr = mmap(nullptr, 4096, PROT_READ, MAP_SHARED, fd, 0);
+	if (addr == nullptr)
+	{
+		close(fd);
+		return;
+	}
+	struct perf_event_mmap_page *pc = (struct perf_event_mmap_page *)addr;
+	if (pc->cap_user_time != 1)
+	{
+		close(fd);
+		return;
+	}
+	double mhz = (1000LU << pc->time_shift) / (double)pc->time_mult;
+	PerfAvailable = true;
+	PerfToSec = .000001/mhz;
+	PerfToMillisec = PerfToSec*1000.;
+	if (!batchrun) Printf("CPU speed: %.0f MHz\n", mhz);
+	close(fd);
+#endif
 }
 
 void CleanProgressBar()
@@ -160,7 +220,7 @@ void RedrawProgressBar(int CurPos, int MaxPos)
 	memset(progressBuffer,'.',512);
 	progressBuffer[sizeOfWindow.ws_col - 1] = 0;
 	int lengthOfStr = 0;
-	
+
 	while (curProgVal-- > 0)
 	{
 		progressBuffer[lengthOfStr++] = '=';
@@ -209,7 +269,7 @@ void I_PrintStr(const char *cp)
 						else if (v < 0.90) attrib = 0x7;
 						else			   attrib = 0xF;
 					}
-					
+
 					printData.AppendFormat("\033[%um",((attrib & 0x8) ? 90 : 30) + (attrib & 0x7));
 				}
 				else printData.AppendFormat("\033[38;2;%u;%u;%um",color.r,color.g,color.b);
@@ -225,11 +285,11 @@ void I_PrintStr(const char *cp)
 			else break;
 		}
 	}
-	
-	if (StartScreen) CleanProgressBar();
+
+	if (StartWindow) CleanProgressBar();
 	fputs(printData.GetChars(),stdout);
 	if (terminal) fputs("\033[0m",stdout);
-	if (StartScreen) RedrawProgressBar(ProgressBarCurPos,ProgressBarMaxPos);
+	if (StartWindow) RedrawProgressBar(ProgressBarCurPos,ProgressBarMaxPos);
 }
 
 int I_PickIWad (WadStuff *wads, int numwads, bool showwin, int defaultiwad)
@@ -304,7 +364,7 @@ int I_PickIWad (WadStuff *wads, int numwads, bool showwin, int defaultiwad)
 #ifdef __APPLE__
 	return I_PickIWad_Cocoa (wads, numwads, showwin, defaultiwad);
 #endif
-	
+
 	if (!isatty(fileno(stdin)))
 	{
 		return defaultiwad;
@@ -328,10 +388,17 @@ int I_PickIWad (WadStuff *wads, int numwads, bool showwin, int defaultiwad)
 
 void I_PutInClipboard (const char *str)
 {
+	SDL_SetClipboardText(str);
 }
 
 FString I_GetFromClipboard (bool use_primary_selection)
 {
+	if(char *ret = SDL_GetClipboardText())
+	{
+		FString text(ret);
+		SDL_free(ret);
+		return text;
+	}
 	return "";
 }
 

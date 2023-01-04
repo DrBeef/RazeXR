@@ -23,7 +23,6 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 
 #include "ns.h"	// Must come before everything else!
 
-#include "compat.h"
 #include "build.h"
 
 #include "blood.h"
@@ -61,21 +60,19 @@ AISTATE zombie13AC2C = { kAiStateOther, 11, nStandClient, 0, entryEZombie, NULL,
 
 void HackSeqCallback(int, DBloodActor* actor)
 {
-	XSPRITE* pXSprite = &actor->x();
-	spritetype* pSprite = &actor->s();
 	if (!actor->ValidateTarget(__FUNCTION__)) return;
-	spritetype* pTarget = &actor->GetTarget()->s();
-	DUDEINFO* pDudeInfo = getDudeInfo(pSprite->type);
-	DUDEINFO* pDudeInfoT = getDudeInfo(pTarget->type);
-	int tx = pXSprite->targetX - pSprite->x;
-	int ty = pXSprite->targetY - pSprite->y;
+	auto target = actor->GetTarget();
+	DUDEINFO* pDudeInfo = getDudeInfo(actor->spr.type);
+	DUDEINFO* pDudeInfoT = getDudeInfo(target->spr.type);
+	int tx = actor->xspr.TargetPos.X - actor->spr.pos.X;
+	int ty = actor->xspr.TargetPos.Y - actor->spr.pos.Y;
 	int nAngle = getangle(tx, ty);
-	int height = (pSprite->yrepeat * pDudeInfo->eyeHeight) << 2;
-	int height2 = (pTarget->yrepeat * pDudeInfoT->eyeHeight) << 2;
+	int height = (actor->spr.yrepeat * pDudeInfo->eyeHeight) << 2;
+	int height2 = (target->spr.yrepeat * pDudeInfoT->eyeHeight) << 2;
 	int dz = height - height2;
 	int dx = bcos(nAngle);
 	int dy = bsin(nAngle);
-	sfxPlay3DSound(pSprite, 1101, 1, 0);
+	sfxPlay3DSound(actor, 1101, 1, 0);
 	actFireVector(actor, 0, 0, dx, dy, dz, kVectorAxe);
 }
 
@@ -86,63 +83,59 @@ void StandSeqCallback(int, DBloodActor* actor)
 
 static void zombaThinkSearch(DBloodActor* actor)
 {
-	auto pXSprite = &actor->x();
-	aiChooseDirection(actor, pXSprite->goalAng);
+	aiChooseDirection(actor, actor->xspr.goalAng);
 	aiLookForTarget(actor);
 }
 
 static void zombaThinkGoto(DBloodActor* actor)
 {
-	auto pXSprite = &actor->x();
-	auto pSprite = &actor->s();
-	assert(pSprite->type >= kDudeBase && pSprite->type < kDudeMax);
-	DUDEINFO* pDudeInfo = getDudeInfo(pSprite->type);
-	int dx = pXSprite->targetX - pSprite->x;
-	int dy = pXSprite->targetY - pSprite->y;
+	assert(actor->spr.type >= kDudeBase && actor->spr.type < kDudeMax);
+	DUDEINFO* pDudeInfo = getDudeInfo(actor->spr.type);
+	int dx = actor->xspr.TargetPos.X - actor->spr.pos.X;
+	int dy = actor->xspr.TargetPos.Y - actor->spr.pos.Y;
 	int nAngle = getangle(dx, dy);
 	int nDist = approxDist(dx, dy);
 	aiChooseDirection(actor, nAngle);
-	if (nDist < 921 && abs(pSprite->ang - nAngle) < pDudeInfo->periphery)
+	if (nDist < 921 && abs(actor->spr.ang - nAngle) < pDudeInfo->periphery)
 		aiNewState(actor, &zombieASearch);
 	aiThinkTarget(actor);
 }
 
 static void zombaThinkChase(DBloodActor* actor)
 {
-	auto pSprite = &actor->s();
 	if (actor->GetTarget() == nullptr)
 	{
 		aiNewState(actor, &zombieASearch);
 		return;
 	}
-	assert(pSprite->type >= kDudeBase && pSprite->type < kDudeMax);
-	DUDEINFO* pDudeInfo = getDudeInfo(pSprite->type);
+	assert(actor->spr.type >= kDudeBase && actor->spr.type < kDudeMax);
+	DUDEINFO* pDudeInfo = getDudeInfo(actor->spr.type);
 	if (!actor->ValidateTarget(__FUNCTION__)) return;
-	spritetype* pTarget = &actor->GetTarget()->s();
-	XSPRITE* pXTarget = &actor->GetTarget()->x();
-	int dx = pTarget->x - pSprite->x;
-	int dy = pTarget->y - pSprite->y;
+	auto target = actor->GetTarget();
+
+	int dx = target->spr.pos.X - actor->spr.pos.X;
+	int dy = target->spr.pos.Y - actor->spr.pos.Y;
 	aiChooseDirection(actor, getangle(dx, dy));
-	if (pXTarget->health == 0)
+	if (target->xspr.health == 0)
 	{
 		aiNewState(actor, &zombieASearch);
 		return;
 	}
-	if (IsPlayerSprite(pTarget) && (powerupCheck(&gPlayer[pTarget->type - kDudePlayer1], kPwUpShadowCloak) > 0 || powerupCheck(&gPlayer[pTarget->type - kDudePlayer1], kPwUpDeathMaskUseless) > 0))
+	if (target->IsPlayerActor() && (powerupCheck(&gPlayer[target->spr.type - kDudePlayer1], kPwUpShadowCloak) > 0 || powerupCheck(&gPlayer[target->spr.type - kDudePlayer1], kPwUpDeathMaskUseless) > 0))
 	{
 		aiNewState(actor, &zombieAGoto);
 		return;
 	}
 	// If the zombie gets whacked while rising from the grave it never executes this change and if it isn't done here at the very latest, will just aimlessly run around.
-	if (!VanillaMode() && pSprite->type == kDudeZombieAxeBuried)
-		pSprite->type = kDudeZombieAxeNormal;
+	if (!VanillaMode() && actor->spr.type == kDudeZombieAxeBuried)
+		actor->spr.type = kDudeZombieAxeNormal;
 
 	int nDist = approxDist(dx, dy);
 	if (nDist <= pDudeInfo->seeDist)
 	{
-		int nDeltaAngle = ((getangle(dx, dy) + 1024 - pSprite->ang) & 2047) - 1024;
-		int height = (pDudeInfo->eyeHeight * pSprite->yrepeat) << 2;
-		if (cansee(pTarget->x, pTarget->y, pTarget->z, pTarget->sectnum, pSprite->x, pSprite->y, pSprite->z - height, pSprite->sectnum))
+		int nDeltaAngle = ((getangle(dx, dy) + 1024 - actor->spr.ang) & 2047) - 1024;
+		int height = (pDudeInfo->eyeHeight * actor->spr.yrepeat) << 2;
+		if (cansee(target->spr.pos.X, target->spr.pos.Y, target->spr.pos.Z, target->sector(), actor->spr.pos.X, actor->spr.pos.Y, actor->spr.pos.Z - height, actor->sector()))
 		{
 			if (abs(nDeltaAngle) <= pDudeInfo->periphery)
 			{
@@ -160,26 +153,25 @@ static void zombaThinkChase(DBloodActor* actor)
 
 static void zombaThinkPonder(DBloodActor* actor)
 {
-	auto pSprite = &actor->s();
 	if (actor->GetTarget() == nullptr)
 	{
 		aiNewState(actor, &zombieASearch);
 		return;
 	}
-	assert(pSprite->type >= kDudeBase && pSprite->type < kDudeMax);
-	DUDEINFO* pDudeInfo = getDudeInfo(pSprite->type);
+	assert(actor->spr.type >= kDudeBase && actor->spr.type < kDudeMax);
+	DUDEINFO* pDudeInfo = getDudeInfo(actor->spr.type);
 	if (!actor->ValidateTarget(__FUNCTION__)) return;
-	spritetype* pTarget = &actor->GetTarget()->s();
-	XSPRITE* pXTarget = &actor->GetTarget()->x();
-	int dx = pTarget->x - pSprite->x;
-	int dy = pTarget->y - pSprite->y;
+	auto target = actor->GetTarget();
+
+	int dx = target->spr.pos.X - actor->spr.pos.X;
+	int dy = target->spr.pos.Y - actor->spr.pos.Y;
 	aiChooseDirection(actor, getangle(dx, dy));
-	if (pXTarget->health == 0)
+	if (target->xspr.health == 0)
 	{
 		aiNewState(actor, &zombieASearch);
 		return;
 	}
-	if (IsPlayerSprite(pTarget) && (powerupCheck(&gPlayer[pTarget->type - kDudePlayer1], kPwUpShadowCloak) > 0 || powerupCheck(&gPlayer[pTarget->type - kDudePlayer1], kPwUpDeathMaskUseless) > 0))
+	if (target->IsPlayerActor() && (powerupCheck(&gPlayer[target->spr.type - kDudePlayer1], kPwUpShadowCloak) > 0 || powerupCheck(&gPlayer[target->spr.type - kDudePlayer1], kPwUpDeathMaskUseless) > 0))
 	{
 		aiNewState(actor, &zombieAGoto);
 		return;
@@ -187,9 +179,9 @@ static void zombaThinkPonder(DBloodActor* actor)
 	int nDist = approxDist(dx, dy);
 	if (nDist <= pDudeInfo->seeDist)
 	{
-		int nDeltaAngle = ((getangle(dx, dy) + 1024 - pSprite->ang) & 2047) - 1024;
-		int height = (pDudeInfo->eyeHeight * pSprite->yrepeat) << 2;
-		if (cansee(pTarget->x, pTarget->y, pTarget->z, pTarget->sectnum, pSprite->x, pSprite->y, pSprite->z - height, pSprite->sectnum))
+		int nDeltaAngle = ((getangle(dx, dy) + 1024 - actor->spr.ang) & 2047) - 1024;
+		int height = (pDudeInfo->eyeHeight * actor->spr.yrepeat) << 2;
+		if (cansee(target->spr.pos.X, target->spr.pos.Y, target->spr.pos.Z, target->sector(), actor->spr.pos.X, actor->spr.pos.Y, actor->spr.pos.Z - height, actor->sector()))
 		{
 			if (abs(nDeltaAngle) <= pDudeInfo->periphery)
 			{
@@ -198,7 +190,7 @@ static void zombaThinkPonder(DBloodActor* actor)
 				{
 					if (abs(nDeltaAngle) < 85)
 					{
-						sfxPlay3DSound(pSprite, 1101, 1, 0);
+						sfxPlay3DSound(actor, 1101, 1, 0);
 						aiNewState(actor, &zombieAHack);
 					}
 					return;
@@ -212,30 +204,29 @@ static void zombaThinkPonder(DBloodActor* actor)
 
 static void myThinkTarget(DBloodActor* actor)
 {
-	auto pSprite = &actor->s();
-	assert(pSprite->type >= kDudeBase && pSprite->type < kDudeMax);
-	DUDEINFO* pDudeInfo = getDudeInfo(pSprite->type);
+	assert(actor->spr.type >= kDudeBase && actor->spr.type < kDudeMax);
+	DUDEINFO* pDudeInfo = getDudeInfo(actor->spr.type);
 	for (int p = connecthead; p >= 0; p = connectpoint2[p])
 	{
 		PLAYER* pPlayer = &gPlayer[p];
-        auto owneractor = actor->GetOwner();
-        if (owneractor == nullptr || owneractor == pPlayer->actor || pPlayer->pXSprite->health == 0 || powerupCheck(pPlayer, kPwUpShadowCloak) > 0)
+		auto owneractor = actor->GetOwner();
+		if (owneractor == nullptr || owneractor == pPlayer->actor || pPlayer->actor->xspr.health == 0 || powerupCheck(pPlayer, kPwUpShadowCloak) > 0)
 			continue;
-		int x = pPlayer->pSprite->x;
-		int y = pPlayer->pSprite->y;
-		int z = pPlayer->pSprite->z;
-		int nSector = pPlayer->pSprite->sectnum;
-		int dx = x - pSprite->x;
-		int dy = y - pSprite->y;
+		int x = pPlayer->actor->spr.pos.X;
+		int y = pPlayer->actor->spr.pos.Y;
+		int z = pPlayer->actor->spr.pos.Z;
+		auto pSector = pPlayer->actor->sector();
+		int dx = x - actor->spr.pos.X;
+		int dy = y - actor->spr.pos.Y;
 		int nDist = approxDist(dx, dy);
 		if (nDist > pDudeInfo->seeDist && nDist > pDudeInfo->hearDist)
 			continue;
-		if (!cansee(x, y, z, nSector, pSprite->x, pSprite->y, pSprite->z - ((pDudeInfo->eyeHeight * pSprite->yrepeat) << 2), pSprite->sectnum))
+		if (!cansee(x, y, z, pSector, actor->spr.pos.X, actor->spr.pos.Y, actor->spr.pos.Z - ((pDudeInfo->eyeHeight * actor->spr.yrepeat) << 2), actor->sector()))
 			continue;
-		int nDeltaAngle = ((getangle(dx, dy) + 1024 - pSprite->ang) & 2047) - 1024;
+		int nDeltaAngle = ((getangle(dx, dy) + 1024 - actor->spr.ang) & 2047) - 1024;
 		if (nDist < pDudeInfo->seeDist && abs(nDeltaAngle) <= pDudeInfo->periphery)
 		{
-            aiSetTarget(actor, pPlayer->actor);
+			aiSetTarget(actor, pPlayer->actor);
 			aiActivateDude(actor);
 		}
 		else if (nDist < pDudeInfo->hearDist)
@@ -257,16 +248,14 @@ static void myThinkTarget(DBloodActor* actor)
 
 static void myThinkSearch(DBloodActor* actor)
 {
-	auto pXSprite = &actor->x();
-	aiChooseDirection(actor, pXSprite->goalAng);
+	aiChooseDirection(actor, actor->xspr.goalAng);
 	myThinkTarget(actor);
 }
 
 static void entryEZombie(DBloodActor* actor)
 {
-	auto pSprite = &actor->s();
-	pSprite->type = kDudeZombieAxeNormal;
-	pSprite->flags |= 1;
+	actor->spr.type = kDudeZombieAxeNormal;
+	actor->spr.flags |= 1;
 }
 
 static void entryAIdle(DBloodActor* actor)
@@ -276,10 +265,8 @@ static void entryAIdle(DBloodActor* actor)
 
 static void entryEStand(DBloodActor* actor)
 {
-	auto pXSprite = &actor->x();
-	auto pSprite = &actor->s();
-	sfxPlay3DSound(pSprite, 1100, -1, 0);
-	pSprite->ang = getangle(pXSprite->targetX - pSprite->x, pXSprite->targetY - pSprite->y);
+	sfxPlay3DSound(actor, 1100, -1, 0);
+	actor->spr.ang = getangle(actor->xspr.TargetPos.X - actor->spr.pos.X, actor->xspr.TargetPos.Y - actor->spr.pos.Y);
 }
 
 END_BLD_NS

@@ -104,7 +104,9 @@ bool		vidactive = false;
 bool		cursoron = false;
 int			ConBottom, ConScroll, RowAdjust;
 uint64_t	CursorTicker;
-constate_e	ConsoleState = c_up;
+uint8_t		ConsoleState = c_up;
+
+DEFINE_GLOBAL(ConsoleState)
 
 static int TopLine, InsertLine;
 
@@ -331,16 +333,16 @@ void C_DeinitConsole ()
 	// at runtime.)
 	for (size_t i = 0; i < countof(Commands); ++i)
 	{
-		FConsoleCommand *cmd = Commands[i];
+		FConsoleCommand *command = Commands[i];
 
-		while (cmd != NULL)
+		while (command != NULL)
 		{
-			FConsoleCommand *next = cmd->m_Next;
-			if (cmd->IsAlias())
+			FConsoleCommand *nextcmd = command->m_Next;
+			if (command->IsAlias())
 			{
-				delete cmd;
+				delete command;
 			}
-			cmd = next;
+			command = nextcmd;
 		}
 	}
 
@@ -605,7 +607,7 @@ void C_DrawConsole ()
 
 		if (conback.isValid() && gamestate != GS_FULLCONSOLE)
 		{
-			DrawTexture (twod, TexMan.GetGameTexture(conback), 0, visheight - screen->GetHeight(),
+			DrawTexture (twod, conback, false, 0, visheight - screen->GetHeight(),
 				DTA_DestWidth, twod->GetWidth(),
 				DTA_DestHeight, twod->GetHeight(),
 				DTA_ColorOverlay, conshade,
@@ -1027,7 +1029,7 @@ static bool C_HandleKey (event_t *ev, FCommandBuffer &buffer)
 			TabbedList = false;
 			break;
 		}
-		
+
 		case '`':
 			// Check to see if we have ` bound to the console before accepting
 			// it as a way to close the console.

@@ -3,8 +3,7 @@
 #include "resourcefile.h"
 #include "build.h"
 #include "gamefuncs.h"
-
-extern FixedBitArray<MAXSPRITES> activeSprites;
+#include "coreactor.h"
 
 // Savegame utilities
 class FileReader;
@@ -23,27 +22,50 @@ void M_Autosave();
 #define SAVEGAME_EXT ".dsave"
 
 
-inline FSerializer& Serialize(FSerializer& arc, const char* keyname, spritetype*& w, spritetype** def)
+template<> inline FSerializer& Serialize(FSerializer& arc, const char* keyname, sectortype*& w, sectortype** def)
 {
-	int ndx = w ? int(w - sprite) : -1;
-	arc(keyname, ndx);
-	w = ndx == -1 ? nullptr : sprite + ndx;
-	return arc;
-}
-
-inline FSerializer& Serialize(FSerializer& arc, const char* keyname, sectortype*& w, sectortype** def)
-{
+	assert(arc.isReading() || w == nullptr || (w >= &sector[0] && w <= &sector.Last()));
 	int ndx = w ? sectnum(w) : -1;
 	arc(keyname, ndx);
-	w = ndx == -1 ? nullptr : &sector[ndx];
+	w = !validSectorIndex(ndx) ? nullptr : &sector[ndx];
 	return arc;
 }
 
-inline FSerializer& Serialize(FSerializer& arc, const char* keyname, walltype*& w, walltype** def)
+template<> inline FSerializer& Serialize(FSerializer& arc, const char* keyname, walltype*& w, walltype** def)
 {
 	int ndx = w ? wallnum(w) : -1;
 	arc(keyname, ndx);
-	w = ndx == -1 ? nullptr : &wall[ndx];
+	w = !validWallIndex(ndx) ? nullptr : &wall[ndx];
 	return arc;
 }
 
+template<class T>
+inline FSerializer& Serialize(FSerializer& arc, const char* keyname, THitInfo<T>& w, THitInfo<T>* def)
+{
+	if (arc.BeginObject(keyname))
+	{
+		arc("sect", w.hitSector)
+			("sprite", w.hitActor)
+			("wall", w.hitWall)
+			("x", w.hitpos.X)
+			("y", w.hitpos.Y)
+			("z", w.hitpos.Z)
+			.EndObject();
+	}
+	return arc;
+}
+
+template<class T>
+inline FSerializer& Serialize(FSerializer& arc, const char* keyname, TCollision<T>& w, TCollision<T>* def)
+{
+	if (arc.BeginObject(keyname))
+	{
+		arc("type", w.type);
+		if (w.type == kHitWall) arc("index", w.hitWall);
+		else if (w.type == kHitSprite) arc("index", w.hitActor);
+		else if (w.type == kHitSector) arc("index", w.hitSector);
+		else if (arc.isReading()) w.hitSector = nullptr;
+		arc.EndObject();
+	}
+	return arc;
+}

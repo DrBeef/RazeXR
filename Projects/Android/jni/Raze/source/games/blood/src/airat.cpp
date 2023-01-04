@@ -23,7 +23,6 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 
 #include "ns.h"	// Must come before everything else!
 
-#include "compat.h"
 #include "build.h"
 
 #include "blood.h"
@@ -44,60 +43,55 @@ AISTATE ratBite = { kAiStateChase, 6, nRatBiteClient, 120, NULL, NULL, NULL, &ra
 
 void ratBiteSeqCallback(int, DBloodActor* actor)
 {
-	spritetype* pSprite = &actor->s();
-	int dx = bcos(pSprite->ang);
-	int dy = bsin(pSprite->ang);
-	assert(pSprite->type >= kDudeBase && pSprite->type < kDudeMax);
+	int dx = bcos(actor->spr.ang);
+	int dy = bsin(actor->spr.ang);
+	assert(actor->spr.type >= kDudeBase && actor->spr.type < kDudeMax);
 	if (!actor->ValidateTarget(__FUNCTION__)) return;
-	spritetype* pTarget = &actor->GetTarget()->s();
-	if (IsPlayerSprite(pTarget))
-		actFireVector(actor, 0, 0, dx, dy, pTarget->z - pSprite->z, kVectorRatBite);
+	auto target = actor->GetTarget();
+	if (target->IsPlayerActor())
+		actFireVector(actor, 0, 0, dx, dy, target->spr.pos.Z - actor->spr.pos.Z, kVectorRatBite);
 }
 
 static void ratThinkSearch(DBloodActor* actor)
 {
-	auto pXSprite = &actor->x();
-	aiChooseDirection(actor, pXSprite->goalAng);
+	aiChooseDirection(actor, actor->xspr.goalAng);
 	aiThinkTarget(actor);
 }
 
 static void ratThinkGoto(DBloodActor* actor)
 {
-	auto pXSprite = &actor->x();
-	auto pSprite = &actor->s();
-	assert(pSprite->type >= kDudeBase && pSprite->type < kDudeMax);
-	DUDEINFO* pDudeInfo = getDudeInfo(pSprite->type);
-	int dx = pXSprite->targetX - pSprite->x;
-	int dy = pXSprite->targetY - pSprite->y;
+	assert(actor->spr.type >= kDudeBase && actor->spr.type < kDudeMax);
+	DUDEINFO* pDudeInfo = getDudeInfo(actor->spr.type);
+	int dx = actor->xspr.TargetPos.X - actor->spr.pos.X;
+	int dy = actor->xspr.TargetPos.Y - actor->spr.pos.Y;
 	int nAngle = getangle(dx, dy);
 	int nDist = approxDist(dx, dy);
 	aiChooseDirection(actor, nAngle);
-	if (nDist < 512 && abs(pSprite->ang - nAngle) < pDudeInfo->periphery)
+	if (nDist < 512 && abs(actor->spr.ang - nAngle) < pDudeInfo->periphery)
 		aiNewState(actor, &ratSearch);
 	aiThinkTarget(actor);
 }
 
 static void ratThinkChase(DBloodActor* actor)
 {
-	auto pSprite = &actor->s();
 	if (actor->GetTarget() == nullptr)
 	{
 		aiNewState(actor, &ratGoto);
 		return;
 	}
-	assert(pSprite->type >= kDudeBase && pSprite->type < kDudeMax);
-	DUDEINFO* pDudeInfo = getDudeInfo(pSprite->type);
-	spritetype* pTarget = &actor->GetTarget()->s();
-	XSPRITE* pXTarget = &actor->GetTarget()->x();
-	int dx = pTarget->x - pSprite->x;
-	int dy = pTarget->y - pSprite->y;
+	assert(actor->spr.type >= kDudeBase && actor->spr.type < kDudeMax);
+	DUDEINFO* pDudeInfo = getDudeInfo(actor->spr.type);
+	auto target = actor->GetTarget();
+
+	int dx = target->spr.pos.X - actor->spr.pos.X;
+	int dy = target->spr.pos.Y - actor->spr.pos.Y;
 	aiChooseDirection(actor, getangle(dx, dy));
-	if (pXTarget->health == 0)
+	if (target->xspr.health == 0)
 	{
 		aiNewState(actor, &ratSearch);
 		return;
 	}
-	if (IsPlayerSprite(pTarget) && powerupCheck(&gPlayer[pTarget->type - kDudePlayer1], kPwUpShadowCloak) > 0)
+	if (target->IsPlayerActor() && powerupCheck(&gPlayer[target->spr.type - kDudePlayer1], kPwUpShadowCloak) > 0)
 	{
 		aiNewState(actor, &ratSearch);
 		return;
@@ -105,9 +99,9 @@ static void ratThinkChase(DBloodActor* actor)
 	int nDist = approxDist(dx, dy);
 	if (nDist <= pDudeInfo->seeDist)
 	{
-		int nDeltaAngle = ((getangle(dx, dy) + 1024 - pSprite->ang) & 2047) - 1024;
-		int height = (pDudeInfo->eyeHeight * pSprite->yrepeat) << 2;
-		if (cansee(pTarget->x, pTarget->y, pTarget->z, pTarget->sectnum, pSprite->x, pSprite->y, pSprite->z - height, pSprite->sectnum))
+		int nDeltaAngle = ((getangle(dx, dy) + 1024 - actor->spr.ang) & 2047) - 1024;
+		int height = (pDudeInfo->eyeHeight * actor->spr.yrepeat) << 2;
+		if (cansee(target->spr.pos.X, target->spr.pos.Y, target->spr.pos.Z, target->sector(), actor->spr.pos.X, actor->spr.pos.Y, actor->spr.pos.Z - height, actor->sector()))
 		{
 			if (nDist < pDudeInfo->seeDist && abs(nDeltaAngle) <= pDudeInfo->periphery)
 			{

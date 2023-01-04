@@ -42,6 +42,7 @@
 #include "gamestruct.h"
 #include "automap.h"
 #include "hw_voxels.h"
+#include "coreactor.h"
 
 EXTERN_CVAR(Float, r_visibility)
 CVAR(Bool, gl_no_skyclear, false, CVAR_ARCHIVE | CVAR_GLOBALCONFIG)
@@ -50,7 +51,7 @@ CVAR(Bool, gl_texture, true, 0)
 CVAR(Float, gl_mask_threshold, 0.5f, CVAR_ARCHIVE | CVAR_GLOBALCONFIG)
 CVAR(Float, gl_mask_sprite_threshold, 0.5f, CVAR_ARCHIVE | CVAR_GLOBALCONFIG)
 
-FixedBitArray<MAXSECTORS> gotsector;
+BitArray gotsector;
 
 //==========================================================================
 //
@@ -138,14 +139,14 @@ void HWDrawInfo::StartScene(FRenderViewpoint& parentvp, HWViewpointUniforms* uni
 		VPUniforms.mViewMatrix.loadIdentity();
 		VPUniforms.mNormalViewMatrix.loadIdentity();
 		//VPUniforms.mViewHeight = viewheight;
-		VPUniforms.mGlobVis = (2 / 65536.f) * g_visibility / r_ambientlight;
-		VPUniforms.mPalLightLevels = numshades | (static_cast<int>(gl_fogmode) << 8) | (5 << 16);
+		VPUniforms.mGlobVis = (2 / 65536.f) * (g_visibility + g_relvisibility) / r_ambientlight;
+		VPUniforms.mPalLightLevels = numshades | (static_cast<int>(gl_fogmode) << 8);
+		if (isBuildSoftwareLighting()) VPUniforms.mPalLightLevels |= (5 << 16);
 
 		VPUniforms.mClipLine.X = -10000000.0f;
 		VPUniforms.mShadowmapFilter = gl_shadowmap_filter;
 	}
 	vec2_t view = { int(Viewpoint.Pos.X * 16), int(Viewpoint.Pos.Y * -16) };
-	mClipper->SetViewpoint(view);
 
 	ClearBuffers();
 
@@ -200,7 +201,7 @@ void HWDrawInfo::ClearBuffers()
 
 angle_t HWDrawInfo::FrustumAngle()
 {
-	float WidescreenRatio = 1.6666f;	// fixme - this is a placeholder.
+	float WidescreenRatio = (float)screen->GetWidth() / screen->GetHeight();
 	float tilt = fabs(Viewpoint.HWAngles.Pitch.Degrees);
 
 	// If the pitch is larger than this you can look all around at a FOV of 90°
@@ -276,19 +277,19 @@ void HWDrawInfo::DispatchSprites()
 	{
 		auto tspr = &tsprite[i];
 		int tilenum = tspr->picnum;
-		int spritenum = tspr->owner;
+		auto actor = tspr->ownerActor;
 
-		if (spritenum < 0 || (unsigned)tilenum >= MAXTILES)
+		if (actor == nullptr || tspr->xrepeat == 0 || tspr->yrepeat == 0 || (unsigned)tilenum >= MAXTILES)
 			continue;
 
-		if ((unsigned)spritenum < MAXSPRITES)
-			sprite[spritenum].cstat2 |= CSTAT2_SPRITE_MAPPED;
+		actor->spr.cstat2 |= CSTAT2_SPRITE_MAPPED;
 
-		tileUpdatePicnum(&tilenum, sprite->owner + 32768, 0);
+		if ((tspr->cstat & CSTAT_SPRITE_ALIGNMENT_MASK) != CSTAT_SPRITE_ALIGNMENT_SLAB)
+			tileUpdatePicnum(&tilenum, (actor->GetIndex() & 16383) + 32768, 0);
 		tspr->picnum = tilenum;
-		setgotpic(tilenum);
+		gotpic.Set(tilenum);
 
-		if (!(spriteext[spritenum].flags & SPREXT_NOTMD))
+		if (!(actor->sprext.renderflags & SPREXT_NOTMD))
 		{
 			int pt = Ptile2tile(tilenum, tspr->pal);
 			if (hw_models && tile2model[pt].modelid >= 0 && tile2model[pt].framenum >= 0)
@@ -298,54 +299,54 @@ void HWDrawInfo::DispatchSprites()
 			}
 			if (r_voxels)
 			{
-				if ((tspr->cstat & CSTAT_SPRITE_ALIGNMENT) != CSTAT_SPRITE_ALIGNMENT_SLAB && tiletovox[tilenum] >= 0 && voxmodels[tiletovox[tilenum]])
+				if ((tspr->cstat & CSTAT_SPRITE_ALIGNMENT_MASK) != CSTAT_SPRITE_ALIGNMENT_SLAB && tiletovox[tilenum] >= 0 && voxmodels[tiletovox[tilenum]])
 				{
 					HWSprite hwsprite;
 					int num = tiletovox[tilenum];
-					if (hwsprite.ProcessVoxel(this, voxmodels[num], tspr, &sector[tspr->sectnum], voxrotate[num])) 
+					if (hwsprite.ProcessVoxel(this, voxmodels[num], tspr, tspr->sectp, voxrotate[num])) 
 						continue;
 				}
-				else if ((tspr->cstat & CSTAT_SPRITE_ALIGNMENT) == CSTAT_SPRITE_ALIGNMENT_SLAB && tspr->picnum < MAXVOXELS && voxmodels[tilenum])
+				else if ((tspr->cstat & CSTAT_SPRITE_ALIGNMENT_MASK) == CSTAT_SPRITE_ALIGNMENT_SLAB && tspr->picnum < MAXVOXELS && voxmodels[tilenum])
 				{
 					HWSprite hwsprite;
 					int num = tilenum;
-					hwsprite.ProcessVoxel(this, voxmodels[tspr->picnum], tspr, &sector[tspr->sectnum], voxrotate[num]);
+					hwsprite.ProcessVoxel(this, voxmodels[tspr->picnum], tspr, tspr->sectp, voxrotate[num]);
 					continue;
 				}
 			}
 		}
 
-		if (spriteext[spritenum].flags & SPREXT_AWAY1)
+		if (actor->sprext.renderflags & SPREXT_AWAY1)
 		{
-			tspr->pos.x += bcos(tspr->ang, -13);
-			tspr->pos.y += bsin(tspr->ang, -13);
+			tspr->pos.X += bcos(tspr->ang, -13);
+			tspr->pos.Y += bsin(tspr->ang, -13);
 		}
-		else if (spriteext[spritenum].flags & SPREXT_AWAY2)
+		else if (actor->sprext.renderflags & SPREXT_AWAY2)
 		{
-			tspr->pos.x -= bcos(tspr->ang, -13);
-			tspr->pos.y -= bsin(tspr->ang, -13);
+			tspr->pos.X -= bcos(tspr->ang, -13);
+			tspr->pos.Y -= bsin(tspr->ang, -13);
 		}
 
-		switch (tspr->cstat & CSTAT_SPRITE_ALIGNMENT)
+		switch (tspr->cstat & CSTAT_SPRITE_ALIGNMENT_MASK)
 		{
 		case CSTAT_SPRITE_ALIGNMENT_FACING:
 		{
 			HWSprite sprite;
-			sprite.Process(this, tspr, &sector[tspr->sectnum], false);
+			sprite.Process(this, tspr, tspr->sectp, false);
 			break;
 		}
 
 		case CSTAT_SPRITE_ALIGNMENT_WALL:
 		{
 			HWWall wall;
-			wall.ProcessWallSprite(this, tspr, &sector[tspr->sectnum]);
+			wall.ProcessWallSprite(this, tspr, tspr->sectp);
 			break;
 		}
 
 		case CSTAT_SPRITE_ALIGNMENT_FLOOR:
 		{
 			HWFlat flat;
-			flat.ProcessFlatSprite(this, tspr, &sector[tspr->sectnum]);
+			flat.ProcessFlatSprite(this, tspr, tspr->sectp);
 			break;
 		}
 
@@ -377,6 +378,7 @@ void HWDrawInfo::CreateScene(bool portal)
 	screen->mVertexData->Map();
 	screen->mLights->Map();
 
+	memset(tsprite, 0, sizeof(tsprite));
 	spritesortcnt = 0;
 	ingeo = false;
 	geoofs = { 0,0 };
@@ -393,46 +395,48 @@ void HWDrawInfo::CreateScene(bool portal)
 		mDrawer.RenderScene(&vp.SectCount, 1, portal);
 
 	SetupSprite.Clock();
-	gi->processSprites(tsprite, spritesortcnt, view.x, view.y, vp.Pos.Z * -256, bamang(vp.RotAngle), vp.TicFrac * 65536);
+	gi->processSprites(tsprite, spritesortcnt, view.X, view.Y, vp.Pos.Z * -256, bamang(vp.RotAngle), vp.TicFrac * 65536);
 	DispatchSprites();
 	SetupSprite.Unclock();
 
 	GeoEffect eff;
 	int effsect = vp.SectNums ? vp.SectNums[0] : vp.SectCount;
-	int drawsect = effsect;
+	auto drawsectp = &sector[effsect];
+	auto orgdrawsectp = drawsectp;
 	// RR geometry hack. Ugh...
 	// This just adds to the existing render list, so we must offset the effect areas to the same xy-space as the main one as we cannot change the view matrix.
-	if (gi->GetGeoEffect(&eff, &sector[effsect]))
+	if (gi->GetGeoEffect(&eff, drawsectp))
 	{
 		ingeo = true;
 		geoofs = { (float)eff.geox[0], (float)eff.geoy[0] };
 		// process the first layer.
 		for (int i = 0; i < eff.geocnt; i++)
 		{
-			auto sect = &sector[eff.geosectorwarp[i]];
+			auto sect = eff.geosectorwarp[i];
 			for (auto w = 0; w < sect->wallnum; w++)
 			{
-				auto wal = &wall[sect->wallptr + w];
-				wal->x += eff.geox[i];
-				wal->y += eff.geoy[i];
+				auto wal = sect->firstWall() + w;
+				wal->pos.X += eff.geox[i];
+				wal->pos.Y += eff.geoy[i];
 			}
-			sect->dirty = 255;
-			if (eff.geosector[i] == effsect) drawsect = eff.geosectorwarp[i];
+			sect->dirty = EDirty::AllDirty;
+			if (eff.geosector[i] == drawsectp) drawsectp = eff.geosectorwarp[i];
 		}
 
 		if (a1 != 0xffffffff) mDrawer.Init(this, mClipper, view, bamang(vp.RotAngle - a1), bamang(vp.RotAngle + a1));
 		else mDrawer.Init(this, mClipper, view, bamang(0), bamang(0));
 
+		int drawsect = sectnum(drawsectp);
 		mDrawer.RenderScene(&drawsect, 1, false);
 
 		for (int i = 0; i < eff.geocnt; i++)
 		{
-			auto sect = &sector[eff.geosectorwarp[i]];
+			auto sect = eff.geosectorwarp[i];
 			for (auto w = 0; w < sect->wallnum; w++)
 			{
-				auto wal = &wall[sect->wallptr + w];
-				wal->x -= eff.geox[i];
-				wal->y -= eff.geoy[i];
+				auto wal = sect->firstWall() + w;
+				wal->pos.X -= eff.geox[i];
+				wal->pos.Y -= eff.geoy[i];
 			}
 		}
 
@@ -440,29 +444,30 @@ void HWDrawInfo::CreateScene(bool portal)
 		geoofs = { (float)eff.geox2[0], (float)eff.geoy2[0] };
 		for (int i = 0; i < eff.geocnt; i++)
 		{
-			auto sect = &sector[eff.geosectorwarp2[i]];
+			auto sect = eff.geosectorwarp2[i];
 			for (auto w = 0; w < sect->wallnum; w++)
 			{
-				auto wal = &wall[sect->wallptr + w];
-				wal->x += eff.geox2[i];
-				wal->y += eff.geoy2[i];
+				auto wal = sect->firstWall() + w;
+				wal->pos.X += eff.geox2[i];
+				wal->pos.Y += eff.geoy2[i];
 			}
-			sect->dirty = 255;
-			if (eff.geosector[i] == effsect) drawsect = eff.geosectorwarp2[i];
+			sect->dirty = EDirty::AllDirty;
+			if (eff.geosector[i] == orgdrawsectp) drawsectp = eff.geosectorwarp2[i];
 		}
 
 		if (a1 != 0xffffffff) mDrawer.Init(this, mClipper, view, bamang(vp.RotAngle - a1), bamang(vp.RotAngle + a1));
 		else mDrawer.Init(this, mClipper, view, bamang(0), bamang(0));
+		drawsect = sectnum(drawsectp);
 		mDrawer.RenderScene(&drawsect, 1, false);
 
 		for (int i = 0; i < eff.geocnt; i++)
 		{
-			auto sect = &sector[eff.geosectorwarp2[i]];
+			auto sect = eff.geosectorwarp2[i];
 			for (auto w = 0; w < sect->wallnum; w++)
 			{
-				auto wal = &wall[sect->wallptr + w];
-				wal->x -= eff.geox2[i];
-				wal->y -= eff.geoy2[i];
+				auto wal = sect->firstWall() + w;
+				wal->pos.X -= eff.geox2[i];
+				wal->pos.Y -= eff.geoy2[i];
 			}
 		}
 		ingeo = false;
@@ -516,12 +521,41 @@ void HWDrawInfo::RenderScene(FRenderState &state)
 	drawlists[GLDL_MASKEDFLATS].SortFlats(this);
 	drawlists[GLDL_MASKEDWALLSV].SortWallsHorz(this);
 	drawlists[GLDL_MASKEDWALLSH].SortWallsVert(this);
+	drawlists[GLDL_MASKEDWALLSD].SortWallsDiag(this);
 
 
 	// these lists are only wall and floor sprites - often attached to walls and floors - so they need to be offset from the plane they may be attached to.
 	drawlists[GLDL_MASKEDWALLSS].DrawWalls(this, state, false);
 
 	// Each list must draw both its passes before the next one to ensure proper depth buffer contents.
+	auto& list = drawlists[GLDL_MASKEDWALLSD].drawitems;
+	unsigned i = 0;
+	RenderWall.Clock();
+	while (i < list.Size())
+	{
+		unsigned j;
+		auto check = drawlists[GLDL_MASKEDWALLSD].walls[list[i].index]->walldist;
+		state.SetDepthMask(false);
+		for (j = i; j < list.Size() && drawlists[GLDL_MASKEDWALLSD].walls[list[j].index]->walldist == check; j++)
+		{
+			drawlists[GLDL_MASKEDWALLSD].walls[list[j].index]->DrawWall(this, state, false);
+		}
+		state.SetDepthMask(true);
+		for (unsigned k = i; k < j; k++)
+		{
+			drawlists[GLDL_MASKEDWALLSD].walls[list[k].index]->DrawWall(this, state, false);
+		}
+		i = j;
+	}
+	RenderWall.Unclock();
+
+	state.SetDepthMask(false);
+	drawlists[GLDL_MASKEDWALLSD].DrawWalls(this, state, false);
+	state.SetDepthMask(true);
+	state.SetColorMask(false);
+	drawlists[GLDL_MASKEDWALLSD].DrawWalls(this, state, false);
+	state.SetColorMask(true);
+
 	state.SetDepthMask(false);
 	drawlists[GLDL_MASKEDWALLSV].DrawWalls(this, state, false);
 	state.SetDepthMask(true);
@@ -537,6 +571,7 @@ void HWDrawInfo::RenderScene(FRenderState &state)
 	state.SetColorMask(true);
 
 	state.SetDepthBias(-1, -128);
+	drawlists[GLDL_MASKEDSLOPEFLATS].DrawFlats(this, state, false);
 	state.SetDepthMask(false);
 	drawlists[GLDL_MASKEDFLATS].DrawFlats(this, state, false);
 	state.SetDepthMask(true);
@@ -595,6 +630,8 @@ void HWDrawInfo::RenderPortal(HWPortal *p, FRenderState &state, bool usestencil)
 	auto gp = static_cast<HWPortal *>(p);
 	gp->SetupStencil(this, state, usestencil);
 	auto new_di = StartDrawInfo(this, Viewpoint, &VPUniforms);
+	new_di->visibility = visibility;
+	new_di->rellight = rellight;
 	new_di->mCurrentPortal = gp;
 	state.SetLightIndex(-1);
 	gp->DrawContents(new_di, state);

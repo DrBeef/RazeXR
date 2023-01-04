@@ -4,17 +4,19 @@
 
 enum EInterpolationType
 {
-	Interp_Sect_Floorz,
+	Interp_Invalid = -1,
+	Interp_Sect_Floorz = 0,
 	Interp_Sect_Ceilingz,
 	Interp_Sect_Floorheinum,
 	Interp_Sect_Ceilingheinum,
-	
+
 	Interp_Wall_X,
 	Interp_Wall_Y,
-	
+
 	Interp_Sprite_Z,
 
 	Interp_Pan_First,
+	// order of the following 4 flags must match the corresponding sector flags.
 	Interp_Sect_FloorPanX = Interp_Pan_First,
 	Interp_Sect_FloorPanY,
 	Interp_Sect_CeilingPanX,
@@ -25,14 +27,16 @@ enum EInterpolationType
 
 void StartInterpolation(int index, int type);
 void StopInterpolation(int index, int type);
+void StartInterpolation(DCoreActor* actor, int type);
+void StopInterpolation(DCoreActor* actor, int type);
 void UpdateInterpolations();
 void ClearInterpolations();
 void ClearMovementInterpolations();
 void DoInterpolations(double smoothratio);
 void RestoreInterpolations();
 void SerializeInterpolations(FSerializer& arc);
-void clearsectinterpolate(int sectnum);
-void setsectinterpolate(int sectnum);
+void clearsectinterpolate(sectortype* sectnum);
+void setsectinterpolate(sectortype* sectnum);
 
 inline void StartInterpolation(walltype* wall, int type)
 {

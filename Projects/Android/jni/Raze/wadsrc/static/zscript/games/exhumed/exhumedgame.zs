@@ -13,12 +13,12 @@ struct Exhumed native
 	native static ExhumedPlayer GetViewPlayer();
 	native static int GetPistolClip();
 	native static int GetPlayerClip();
-	
+
 	static void DrawAbs(String img, int x, int y, int shade = 0)
 	{
 	    Screen.DrawTexture(TexMan.CheckForTexture(img, TexMan.Type_Any), false, x, y, DTA_FullscreenScale, FSMode_Fit320x200, DTA_TopLeft, true, DTA_Color, Raze.shadeToLight(shade));
 	}
-	
+
 	static void DrawRel(String img, int x, int y, int shade = 0)
 	{
 		let tex = TexMan.CheckForTexture(img, TexMan.Type_Any);
@@ -39,7 +39,7 @@ struct ExhumedPlayer native
 	native int16 nDouble;
 	native int16 nInvisible;
 	native int16 nTorch;
-	native int16 field_2;
+	native int16 nSeqSize;
 	native int16 nAction;
 	//native int16 nSprite;
 	native int16 bIsMummified;
@@ -54,18 +54,18 @@ struct ExhumedPlayer native
 	native int16 nAmmo[7]; // TODO - kMaxWeapons?
 
 	native int16 nCurrentWeapon;
-	native int16 field_3FOUR;
+	native int16 nSeqSize2;
+	native int16 nNextWeapon;
+	native int16 nState;
+	native int16 nLastWeapon;
 	native int16 bIsFiring;
-	native int16 field_38;
-	native int16 field_3A;
-	native int16 field_3C;
 	native int16 nRun;
 	native bool bPlayerPan, bLockPan;
 	//fixedhoriz nDestVertPan;
 
 	//PlayerHorizon horizon;
 	//PlayerAngle angle;
-	
+
 	native bool IsUnderwater();
 	native int GetAngle();
 }

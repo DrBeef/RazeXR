@@ -56,7 +56,7 @@ CVAR (Bool,  use_mouse,				true, CVAR_ARCHIVE|CVAR_GLOBALCONFIG)
 
 
 extern int WaitingForKey, chatmodeon;
-extern constate_e ConsoleState;
+extern uint8_t ConsoleState;
 
 static void I_CheckGUICapture ()
 {

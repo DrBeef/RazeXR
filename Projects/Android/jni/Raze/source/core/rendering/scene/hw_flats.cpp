@@ -36,6 +36,7 @@
 #include "hw_drawstructs.h"
 #include "hw_renderstate.h"
 #include "sectorgeometry.h"
+#include "hw_sections.h"
 
 #ifdef _DEBUG
 CVAR(Int, gl_breaksec, -1, 0)
@@ -92,46 +93,119 @@ void HWFlat::SetupLights(HWDrawInfo *di, FLightNode * node, FDynLightData &light
 //
 //==========================================================================
 
-void HWFlat::MakeVertices()
+void HWFlat::MakeVertices(HWDrawInfo* di)
 {
 	if (vertcount > 0) return;
 	bool canvas = texture->isHardwareCanvas();
 	if (Sprite == nullptr)
 	{
-		auto mesh = sectorGeometry.get(section, plane, geoofs);
-		if (!mesh) return;
-		auto ret = screen->mVertexData->AllocVertices(mesh->vertices.Size());
+		TArray<int>* pIndices;
+		auto mesh = sectionGeometry.get(&sections[section], plane, geoofs, &pIndices);
+
+		auto ret = screen->mVertexData->AllocVertices(pIndices->Size());
 		auto vp = ret.first;
-		float base = (plane == 0 ? sec->floorz : sec->ceilingz) * (1/-256.f);
-		for (unsigned i = 0; i < mesh->vertices.Size(); i++)
+		float base = (plane == 0 ? sec->floorz : sec->ceilingz) * (1 / -256.f);
+		for (unsigned i = 0; i < pIndices->Size(); i++)
 		{
-			auto& pt = mesh->vertices[i];
-			auto& uv = mesh->texcoords[i];
+			auto ii = (*pIndices)[i];
+			auto& pt = mesh->vertices[ii];
+			auto& uv = mesh->texcoords[ii];
 			vp->SetVertex(pt.X, base + pt.Z, pt.Y);
-			vp->SetTexCoord(uv.X, canvas? 1.f - uv.Y : uv.Y);
+			vp->SetTexCoord(uv.X, canvas ? 1.f - uv.Y : uv.Y);
 			vp++;
 		}
 		vertindex = ret.second;
-		vertcount = mesh->vertices.Size();
+		vertcount = pIndices->Size();
+		normal = mesh->normal;
 	}
 	else
 	{
 		vec2_t pos[4];
-		GetFlatSpritePosition(Sprite, Sprite->pos.vec2, pos, true);
+		int ofsz[4];
+		auto cstat = Sprite->cstat;
+		if (tspriteGetSlope(Sprite)) cstat &= ~CSTAT_SPRITE_YFLIP;	// NBlood doesn't y-flip slope sprites.
+		GetFlatSpritePosition(Sprite, Sprite->pos.vec2, pos, ofsz, true);
+		Sprite->cstat = cstat;
 
 		auto ret = screen->mVertexData->AllocVertices(6);
 		auto vp = ret.first;
 		float x = !(Sprite->cstat & CSTAT_SPRITE_XFLIP) ? 0.f : 1.f;
 		float y = !(Sprite->cstat & CSTAT_SPRITE_YFLIP) ? 0.f : 1.f;
+		if (Sprite->clipdist & TSPR_SLOPESPRITE)
+		{
+			int posx = int(di->Viewpoint.Pos.X * 16.f);
+			int posy = int(di->Viewpoint.Pos.Y * -16.f);
+			int posz = int(di->Viewpoint.Pos.Z * -256.f);
+
+			// Make adjustments for poorly aligned slope sprites on floors or ceilings
+			constexpr float ONPLANE_THRESHOLD = 3.f;
+			if (tspriteGetZOfSlope(Sprite, posx, posy) < posz)
+			{
+				float maxofs = -FLT_MAX, minofs = FLT_MAX;
+				for (int i = 0; i < 4; i++)
+				{
+					float vz = getceilzofslopeptr(Sprite->sectp, pos[i].X, pos[i].Y) * (1 / -256.f);
+					float sz = z + ofsz[i] * (1 / -256.f);
+					int diff = vz - sz;
+					if (diff > maxofs) maxofs = diff;
+					if (diff < minofs) minofs = diff;
+				}
+				if (maxofs > 0 && minofs >= -ONPLANE_THRESHOLD && maxofs <= ONPLANE_THRESHOLD) z -= maxofs;
+			}
+			else
+			{
+				float maxofs = -FLT_MAX, minofs = FLT_MAX;
+				for (int i = 0; i < 4; i++)
+				{
+					float vz = getflorzofslopeptr(Sprite->sectp, pos[i].X, pos[i].Y) * (1 / -256.f);
+					float sz = z + ofsz[i] * (1 / -256.f);
+					int diff = vz - sz;
+					if (diff > maxofs) maxofs = diff;
+					if (diff < minofs) minofs = diff;
+				}
+				if (minofs < 0 && maxofs <= -ONPLANE_THRESHOLD && minofs >= ONPLANE_THRESHOLD) z -= minofs;
+			}
+		}
+		else
+		{
+			if (z < di->Viewpoint.Pos.Z) normal = { 0,1,0 };
+			else normal = { 0, -1, 0 };
+		}
+
+
+		unsigned svi = di->SlopeSpriteVertices.Reserve(4);
+		auto svp = &di->SlopeSpriteVertices[svi];
+
+		auto& vpt = di->Viewpoint;
+		depth = (float)((Sprite->pos.X * (1/16.f) - vpt.Pos.X) * vpt.TanCos + (Sprite->pos.Y * (1 / -16.f) - vpt.Pos.Y) * vpt.TanSin);
+
+		for (unsigned j = 0; j < 4; j++)
+		{
+			svp->SetVertex(pos[j].X * (1 / 16.f), z + ofsz[j] * (1 / -256.f), pos[j].Y * (1 / -16.f));
+			if (!canvas) svp->SetTexCoord(j == 1 || j == 2 ? 1.f - x : x, j == 2 || j == 3 ? 1.f - y : y);
+			else svp->SetTexCoord(j == 1 || j == 2 ? 1.f - x : x, j == 2 || j == 3 ? y : 1.f - y);
+			svp++;
+		}
+		if (Sprite->clipdist & TSPR_SLOPESPRITE)
+		{
+			FVector3 v1 = {
+				di->SlopeSpriteVertices[svi + 1].x - di->SlopeSpriteVertices[svi].x,
+				di->SlopeSpriteVertices[svi + 1].y - di->SlopeSpriteVertices[svi].y,
+				di->SlopeSpriteVertices[svi + 1].z - di->SlopeSpriteVertices[svi].z };
+			FVector3 v2 = {
+				di->SlopeSpriteVertices[svi + 2].x - di->SlopeSpriteVertices[svi].x,
+				di->SlopeSpriteVertices[svi + 2].y - di->SlopeSpriteVertices[svi].y,
+				di->SlopeSpriteVertices[svi + 2].z - di->SlopeSpriteVertices[svi].z };
+
+			normal = (v1 ^ v2).Unit();
+		}
 		for (unsigned i = 0; i < 6; i++)
 		{
 			const static unsigned indices[] = { 0, 1, 2, 0, 2, 3 };
-			int j = indices[i];
-			vp->SetVertex(pos[j].x * (1 / 16.f), z, pos[j].y * (1 / -16.f));
-			if (!canvas) vp->SetTexCoord(j == 1 || j == 2 ? 1.f - x : x, j == 2 || j == 3 ? 1.f - y : y);
-			else vp->SetTexCoord(j == 1 || j == 2 ? 1.f - x : x, j == 2 || j == 3 ? y : 1.f - y);
-			vp++;
+			*vp++ = di->SlopeSpriteVertices[svi + indices[i]];
 		}
+		slopeindex = svi;
+		slopecount = 4;
 		vertindex = ret.second;
 		vertcount = 6;
 	}
@@ -144,9 +218,10 @@ void HWFlat::MakeVertices()
 //==========================================================================
 void HWFlat::DrawFlat(HWDrawInfo *di, FRenderState &state, bool translucent)
 {
+	rendered_flats++;
 	if (screen->BuffersArePersistent() && !Sprite)
 	{
-		MakeVertices();
+		MakeVertices(di);
 	}
 
 #ifdef _DEBUG
@@ -156,18 +231,8 @@ void HWFlat::DrawFlat(HWDrawInfo *di, FRenderState &state, bool translucent)
 	}
 #endif
 
-	if (!Sprite)
-	{
-		auto mesh = sectorGeometry.get(section, plane, geoofs);
-		state.SetNormal(mesh->normal);
-	}
-	else
-	{
-		if (z < di->Viewpoint.Pos.Z) state.SetNormal({ 0,1,0 });
-		else state.SetNormal({ 0, -1, 0 });
-	}
-
-	SetLightAndFog(state, fade, palette, shade, visibility, alpha);
+	state.SetNormal(normal);
+	SetLightAndFog(di, state, fade, palette, shade, visibility, alpha);
 
 	if (translucent)
 	{
@@ -224,10 +289,9 @@ void HWFlat::PutFlat(HWDrawInfo *di, int whichplane)
 			SetupLights(di, section->lighthead, lightdata, sector->PortalGroup);
 		}
 #endif
-		MakeVertices();
+		MakeVertices(di);
 	}
 	di->AddFlat(this);
-	rendered_flats++;
 }
 
 //==========================================================================
@@ -249,10 +313,10 @@ void HWFlat::ProcessSector(HWDrawInfo *di, sectortype * frontsector, int section
 
 	dynlightindex = -1;
 
-    const auto &vp = di->Viewpoint;
+	const auto &vp = di->Viewpoint;
 
 	float florz, ceilz;
-	PlanesAtPoint(frontsector, float(vp.Pos.X) * 16.f, float(vp.Pos.Y) * -16.f, &ceilz, &florz);
+	PlanesAtPoint(frontsector, vp.Pos.X, -vp.Pos.Y, &ceilz, &florz);
 
 	visibility = sectorVisibility(frontsector);
 	sec = frontsector;
@@ -290,7 +354,7 @@ void HWFlat::ProcessSector(HWDrawInfo *di, sectortype * frontsector, int section
 		if (alpha != 0.f)
 		{
 			int tilenum = frontsector->floorpicnum;
-			setgotpic(tilenum);
+			gotpic.Set(tilenum);
 			tileUpdatePicnum(&tilenum, tilenum, 0);
 			texture = tileGetTexture(tilenum);
 			if (texture && texture->isValid())
@@ -334,7 +398,7 @@ void HWFlat::ProcessSector(HWDrawInfo *di, sectortype * frontsector, int section
 			//iboindex = frontsector->iboindex[sector_t::ceiling];
 
 			int tilenum = frontsector->ceilingpicnum;
-			setgotpic(tilenum);
+			gotpic.Set(tilenum);
 			tileUpdatePicnum(&tilenum, tilenum, 0);
 			texture = tileGetTexture(tilenum);
 			if (texture && texture->isValid())
@@ -346,19 +410,36 @@ void HWFlat::ProcessSector(HWDrawInfo *di, sectortype * frontsector, int section
 	}
 }
 
-void HWFlat::ProcessFlatSprite(HWDrawInfo* di, spritetype* sprite, sectortype* sector)
+//==========================================================================
+//
+// Process a floor sprite
+//
+//==========================================================================
+
+void HWFlat::ProcessFlatSprite(HWDrawInfo* di, tspritetype* sprite, sectortype* sector)
 {
 	int tilenum = sprite->picnum;
 	texture = tileGetTexture(tilenum);
-	z = sprite->z * (1 / -256.f);
+	bool belowfloor = false;
+	if (sprite->pos.Z > sprite->sectp->floorz)
+	{
+		belowfloor = true;
+		sprite->pos.Z = sprite->sectp->floorz;
+	}
+	z = sprite->pos.Z * (1 / -256.f);
 	if (z == di->Viewpoint.Pos.Z) return; // looking right at the edge.
 	dynlightindex = -1;
 
 	visibility = sectorVisibility(sector) *(4.f / 5.f); // The factor comes directly from Polymost. What is it with Build and these magic factors?
 
 	// Weird Build logic that really makes no sense.
-	if ((sprite->cstat & CSTAT_SPRITE_ONE_SIDED) != 0 && (di->Viewpoint.Pos.Z < z) == ((sprite->cstat & CSTAT_SPRITE_YFLIP) == 0))
-		return;
+	if ((sprite->cstat & CSTAT_SPRITE_ONE_SIDE) != 0)
+	{
+		double myz = !(sprite->clipdist & TSPR_SLOPESPRITE) ? z :
+			tspriteGetZOfSlope(sprite, int(di->Viewpoint.Pos.X * 16), int(di->Viewpoint.Pos.Y * -16)) * -(1. / 256.);
+		if ((di->Viewpoint.Pos.Z < myz) == ((sprite->cstat & CSTAT_SPRITE_YFLIP) == 0))
+			return;
+	}
 
 	if (texture && texture->isValid())
 	{
@@ -369,6 +450,7 @@ void HWFlat::ProcessFlatSprite(HWDrawInfo* di, spritetype* sprite, sectortype* s
 		fade = lookups.getFade(sector->floorpal);	// fog is per sector.
 
 		SetSpriteTranslucency(sprite, alpha, RenderStyle);
+		if (belowfloor) alpha *= 0.33f;
 
 		PutFlat(di, z > di->Viewpoint.Pos.Z);
 	}

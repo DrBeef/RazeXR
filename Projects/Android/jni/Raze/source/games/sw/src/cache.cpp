@@ -62,8 +62,7 @@ void PreCacheOverride(void)
 	SWStatIterator it(STAT_CEILING_FLOOR_PIC_OVERRIDE);
 	while (auto actor = it.Next())
 	{
-		auto sp = &actor->s();
-		int j = SP_TAG2(sp);
+		int j = SP_TAG2(actor);
 		if(j >= 0 && j <= MAXTILES)
 			markTileForPrecache(j, 0);
 	}
@@ -73,16 +72,15 @@ void precacheMap(void)
 {
 	int i;
 	int j;
-	SECTORp sectp;
-	WALLp wp;
-	SPRITEp sp;
+	sectortype* sectp;
+	walltype* wp;
 
-	for(auto& sec : sectors())
+	for(auto& sec: sector)
 	{
 		j = sec.ceilingpicnum;
 		markTileForPrecache(j, sec.ceilingpal);
 
-		if (TEST(picanm[j].sf, PICANM_ANIMTYPE_MASK) >> PICANM_ANIMTYPE_SHIFT)
+		if ((picanm[j].sf & PICANM_ANIMTYPE_MASK) >> PICANM_ANIMTYPE_SHIFT)
 		{
 			for (i = 1; i <= picanm[j].num; i++)
 			{
@@ -94,7 +92,7 @@ void precacheMap(void)
 
 		markTileForPrecache(j, sec.floorpal);
 
-		if (TEST(picanm[j].sf, PICANM_ANIMTYPE_MASK) >> PICANM_ANIMTYPE_SHIFT)
+		if ((picanm[j].sf & PICANM_ANIMTYPE_MASK) >> PICANM_ANIMTYPE_SHIFT)
 		{
 			for (i = 1; i <= picanm[j].num; i++)
 			{
@@ -104,13 +102,13 @@ void precacheMap(void)
 
 	}
 
-	for (auto& wal : walls())
+	for (auto& wal : wall)
 	{
 		j = wal.picnum;
 
 		markTileForPrecache(j, wal.pal);
 
-		if (TEST(picanm[j].sf, PICANM_ANIMTYPE_MASK) >> PICANM_ANIMTYPE_SHIFT)
+		if ((picanm[j].sf & PICANM_ANIMTYPE_MASK) >> PICANM_ANIMTYPE_SHIFT)
 		{
 			for (i = 1; i <= picanm[j].num; i++)
 			{
@@ -123,7 +121,7 @@ void precacheMap(void)
 			j = wal.overpicnum;
 			markTileForPrecache(j, wal.pal);
 
-			if (TEST(picanm[j].sf, PICANM_ANIMTYPE_MASK) >> PICANM_ANIMTYPE_SHIFT)
+			if ((picanm[j].sf & PICANM_ANIMTYPE_MASK) >> PICANM_ANIMTYPE_SHIFT)
 			{
 				for (i = 1; i <= picanm[j].num; i++)
 				{
@@ -138,7 +136,7 @@ void SetupPreCache(void)
 {
 	precacheMap();
 
-	   
+
 	// actors cache ranges are called from SpriteSetup
 	// only caches the actor if its on the level
 
@@ -345,121 +343,119 @@ void PreCachePachinko(int pal)
 	PreCacheRange(4840,4863, pal);
 }
 
-void
-PreCacheActor(void)
+void PreCacheActor(void)
 {
 	int pic;
 
 	SWSpriteIterator it;
 	while (auto actor = it.Next())
 	{
-		auto pUsr = actor->u();
-		auto pSpr = &actor->s();
-		if (pSpr->statnum >= MAXSTATUS)
+		int pal = actor->spr.pal;
+		if (actor->spr.statnum >= MAXSTATUS)
 			continue;
 
-		if (pUsr)
-			pic = pUsr->ID;
+		if (actor->hasU())
+			pic = actor->user.ID;
 		else
-			pic = pSpr->picnum;
+			pic = actor->spr.picnum;
 
 		switch (pic)
 		{
 		case COOLIE_RUN_R0:
-			PreCacheCoolie(pSpr->pal);
+			PreCacheCoolie(pal);
 			break;
 
 		case NINJA_RUN_R0:
 		case NINJA_CRAWL_R0:
-			PreCacheNinja(pSpr->pal);
+			PreCacheNinja(pal);
 			break;
 
 		case GORO_RUN_R0:
-			PreCacheGuardian(pSpr->pal);
+			PreCacheGuardian(pal);
 			break;
 
 		case 1441:
 		case COOLG_RUN_R0:
-			PreCacheGhost(pSpr->pal);
+			PreCacheGhost(pal);
 			break;
 
 		case EEL_RUN_R0:
-			PreCacheEel(pSpr->pal);
+			PreCacheEel(pal);
 			break;
 
 		case SUMO_RUN_R0:
-			PreCacheZilla(pSpr->pal);
+			PreCacheZilla(pal);
 			break;
 
 		case ZILLA_RUN_R0:
-			PreCacheSumo(pSpr->pal);
+			PreCacheSumo(pal);
 			break;
 
 		case TOILETGIRL_R0:
-			PreCacheToiletGirl(pSpr->pal);
+			PreCacheToiletGirl(pal);
 			break;
 
 		case WASHGIRL_R0:
-			PreCacheWashGirl(pSpr->pal);
+			PreCacheWashGirl(pal);
 			break;
 
 		case CARGIRL_R0:
-			PreCacheCarGirl(pSpr->pal);
+			PreCacheCarGirl(pal);
 			break;
 
 		case MECHANICGIRL_R0:
-			PreCacheMechanicGirl(pSpr->pal);
+			PreCacheMechanicGirl(pal);
 			break;
 
 		case SAILORGIRL_R0:
-			PreCacheSailorGirl(pSpr->pal);
+			PreCacheSailorGirl(pal);
 			break;
 
 		case PRUNEGIRL_R0:
-			PreCachePruneGirl(pSpr->pal);
+			PreCachePruneGirl(pal);
 			break;
 
 		case TRASHCAN:
-			PreCacheTrash(pSpr->pal);
+			PreCacheTrash(pal);
 			break;
 
 		case BUNNY_RUN_R0:
-			PreCacheBunny(pSpr->pal);
+			PreCacheBunny(pal);
 			break;
 
 		case RIPPER_RUN_R0:
-			PreCacheRipper(pSpr->pal);
+			PreCacheRipper(pal);
 			break;
 
 		case RIPPER2_RUN_R0:
-			PreCacheRipper2(pSpr->pal);
+			PreCacheRipper2(pal);
 			break;
 
 		case SERP_RUN_R0:
-			PreCacheSerpent(pSpr->pal);
+			PreCacheSerpent(pal);
 			break;
 
 		case LAVA_RUN_R0:
 			break;
 
 		case SKEL_RUN_R0:
-			PreCacheSkel(pSpr->pal);
+			PreCacheSkel(pal);
 			break;
 
 		case HORNET_RUN_R0:
-			PreCacheHornet(pSpr->pal);
+			PreCacheHornet(pal);
 			break;
 
 		case SKULL_R0:
-			PreCacheSkull(pSpr->pal);
+			PreCacheSkull(pal);
 			break;
 
 		case BETTY_R0:
-			PreCacheBetty(pSpr->pal);
+			PreCacheBetty(pal);
 			break;
 
 		case GIRLNINJA_RUN_R0:
-			PreCacheNinjaGirl(pSpr->pal);
+			PreCacheNinjaGirl(pal);
 			break;
 
 		case 623:   // Pachinko win light
@@ -467,11 +463,11 @@ PreCacheActor(void)
 		case PACHINKO2:
 		case PACHINKO3:
 		case PACHINKO4:
-			PreCachePachinko(pSpr->pal);
+			PreCachePachinko(pal);
 			break;
 
 		default:
-			markTileForPrecache(pic, pSpr->pal);
+			markTileForPrecache(pic, pal);
 		}
 	}
 }

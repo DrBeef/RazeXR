@@ -24,7 +24,6 @@
 #ifndef SAVEABLE_H
 #define SAVEABLE_H
 
-#include "compat.h"
 
 struct saveable_code
 {
@@ -39,14 +38,14 @@ struct saveable_data
     unsigned int size;
 };
 
-typedef struct
+struct saveable_module
 {
     saveable_code *code;
     unsigned int numcode;
 
     saveable_data *data;
     unsigned int numdata;
-} saveable_module;
+};
 
 template <typename T>
 constexpr std::enable_if_t<!std::is_pointer<T>::value, size_t> SAVE_SIZEOF(T const & obj) noexcept
@@ -59,16 +58,16 @@ constexpr std::enable_if_t<!std::is_pointer<T>::value, size_t> SAVE_SIZEOF(T con
 
 #define NUM_SAVEABLE_ITEMS(x) countof(x)
 
-typedef struct
+struct savedcodesym
 {
     FString name;
-} savedcodesym;
+};
 
-typedef struct
+struct saveddatasym
 {
     FString name;
     unsigned int offset;
-} saveddatasym;
+};
 
 void Saveable_Init(void);
 

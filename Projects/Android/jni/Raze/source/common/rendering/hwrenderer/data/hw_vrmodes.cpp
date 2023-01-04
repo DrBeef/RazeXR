@@ -207,9 +207,6 @@ DVector3 VREyeInfo::GetViewShift(FRotator viewAngles) const
 	}
 	else
 	{
-		DVector3 outViewShift;
-		outViewShift[0] = outViewShift[1] = outViewShift[2] = 0;
-
 		vec3_t angles;
 		VectorSet(angles, viewAngles.Pitch.Degrees,  viewAngles.Yaw.Degrees, viewAngles.Roll.Degrees);
 
@@ -223,11 +220,7 @@ DVector3 VREyeInfo::GetViewShift(FRotator viewAngles) const
 
 		//eyeOffset[2] += getHmdAdjustedHeightInMapUnit() - getDoomPlayerHeightWithoutCrouch(&player);
 
-		outViewShift[0] = eyeOffset[0];
-		outViewShift[1] = eyeOffset[1];
-		outViewShift[2] = eyeOffset[2];
-
-		return outViewShift;
+		return {eyeOffset[1], eyeOffset[0], eyeOffset[2]};
 	}
 }
 

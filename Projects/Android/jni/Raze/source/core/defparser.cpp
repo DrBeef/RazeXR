@@ -34,7 +34,6 @@
 */
 
 #include "build.h"
-#include "compat.h"
 
 #include "mdsprite.h"  // md3model_t
 #include "buildtiles.h"
@@ -45,6 +44,7 @@
 #include "palettecontainer.h"
 #include "mapinfo.h"
 #include "hw_voxels.h"
+#include "psky.h"
 
 int tileSetHightileReplacement(int picnum, int palnum, const char* filename, float alphacut, float xscale, float yscale, float specpower, float specfactor, bool indexed = false);
 int tileSetSkybox(int picnum, int palnum, FString* facenames, bool indexed = false);
@@ -676,7 +676,7 @@ void parseVoxel(FScanner& sc, FScriptPosition& pos)
 	}
 
 	int lastvoxid = nextvoxid++;
-	
+
 	if (sc.StartBraces(&blockend)) return;
 	while (!sc.FoundEndBrace(blockend))
 	{
@@ -724,7 +724,7 @@ void parseDefineTint(FScanner& sc, FScriptPosition& pos)
 	if (!sc.GetNumber(f)) return;
 	lookups.setPaletteTint(pal, r, g, b, 0, 0, 0, f);
 }
- 
+
 //===========================================================================
 //
 //
@@ -874,35 +874,61 @@ void parseEcho(FScanner& sc, FScriptPosition& pos)
 
 void parseMultiPsky(FScanner& sc, FScriptPosition& pos)
 {
-	usermaphack_t mhk;
-	FScanner::SavedPos blockend;
-	psky_t sky{};
+	// The maximum tile offset ever used in any tiled parallaxed multi-sky.
+	enum { PSKYOFF_MAX = 16 };
 
-	sky.yscale = 65536;
-	if (!sc.GetNumber(sky.tilenum, true)) return;
+	FScanner::SavedPos blockend;
+	SkyDefinition sky{};
+
+	bool crc;
+	sky.scale = 1.f;
+	sky.baselineofs = INT_MIN;
+	if (sc.CheckString("crc"))
+	{
+		if (!sc.GetNumber(sky.crc32, true)) return;
+		crc = true;
+	}
+	else
+	{
+		if (!sc.GetNumber(sky.tilenum, true)) return;
+		crc = false;
+	}
 
 	if (sc.StartBraces(&blockend)) return;
 	while (!sc.FoundEndBrace(blockend))
 	{
 		sc.MustGetString();
-		if (sc.Compare("horizfrac")) sc.GetNumber(sky.horizfrac, true);
-		else if (sc.Compare("yoffset")) sc.GetNumber(sky.yoffs, true);
+		if (sc.Compare("horizfrac")) sc.GetNumber(true); // not used anymore
+		else if (sc.Compare("yoffset")) sc.GetNumber(sky.pmoffset, true);
+		else if (sc.Compare("baseline")) sc.GetNumber(sky.baselineofs, true);
 		else if (sc.Compare("lognumtiles")) sc.GetNumber(sky.lognumtiles, true);
-		else if (sc.Compare("yscale")) sc.GetNumber(sky.yscale, true);
+		else if (sc.Compare("yscale")) { int intscale; sc.GetNumber(intscale, true); sky.scale = intscale * (1. / 65536.); }
 		else if (sc.Compare({ "tile", "panel" }))
 		{
-			int panel, offset;
-			sc.GetNumber(panel, true);
-			sc.GetNumber(offset, true);
-			if ((unsigned)panel < MAXPSKYTILES && (unsigned)offset <= PSKYOFF_MAX) sky.tileofs[panel] = offset;
+			if (!sc.CheckString("}"))
+			{
+				int panel = 0, offset = 0;
+				sc.GetNumber(panel, true);
+				sc.GetNumber(offset, true);
+				if ((unsigned)panel < MAXPSKYTILES && (unsigned)offset <= PSKYOFF_MAX) sky.offsets[panel] = offset;
+			}
+			else
+			{
+				int panel = 0, offset;
+				while (!sc.CheckString("}"))
+				{
+					sc.GetNumber(offset, true);
+					if ((unsigned)panel < MAXPSKYTILES && (unsigned)offset <= PSKYOFF_MAX) sky.offsets[panel] = offset;
+					panel++;
+				}
+			}
 		}
 	}
-
-	if (sky.tilenum != DEFAULTPSKY && (unsigned)sky.tilenum >= MAXUSERTILES) return;
+	if (sky.baselineofs == INT_MIN) sky.baselineofs = sky.pmoffset;
+	if (!crc && sky.tilenum != DEFAULTPSKY && (unsigned)sky.tilenum >= MAXUSERTILES) return;
 	if ((1 << sky.lognumtiles) > MAXPSKYTILES) return;
-	sky.yoffs2 = sky.yoffs;
-	auto psky = tileSetupSky(sky.tilenum);
-	*psky = sky;
+	if (crc) addSkyCRC(sky, sky.crc32);
+	else addSky(sky, sky.tilenum);
 }
 
 //===========================================================================
@@ -1194,8 +1220,8 @@ static bool parseBasePaletteRaw(FScanner& sc, FScriptPosition& pos, int id)
 			{
 				if (shiftleft != 0)
 				{
-					for (bssize_t k = 0; k < 768; k++)
-						palbuf[k] <<= shiftleft;
+					for (auto& pe : palbuf)
+						pe <<= shiftleft;
 				}
 
 				paletteSetColorTable(id, palbuf.Data(), false, false);
@@ -1442,7 +1468,7 @@ void parsePalookup(FScanner& sc, FScriptPosition& pos)
 		else if (sc.Compare("nofloorpal")) lookups.tables[id].noFloorPal = 1;
 		else if (sc.Compare("copy"))
 		{
-			int source;
+			int source = 0;
 			sc.GetNumber(source, true);
 
 			if ((unsigned)source >= MAXPALOOKUPS || source == id)
@@ -1941,7 +1967,7 @@ static bool parseModelHudBlock(FScanner& sc)
 
 	for (int i = starttile; i <= endtile; i++)
 	{
-		vec3f_t addf = { (float)add.X, (float)add.Y, (float)add.Z };
+		FVector3 addf = { (float)add.X, (float)add.Y, (float)add.Z };
 		int res = md_definehud(mdglobal.lastmodelid, i, addf, angadd, flags, fov);
 		if (res < 0)
 		{
@@ -2200,6 +2226,39 @@ static void parseDefineQAV(FScanner& sc, FScriptPosition& pos)
 	fileSystem.CreatePathlessCopy(fn, res_id, 0);
 }
 
+static void parseSpawnClasses(FScanner& sc, FScriptPosition& pos)
+{
+	FString fn;
+	int res_id = -1;
+	int numframes = -1;
+	bool interpolate = false;
+
+	sc.SetCMode(true);
+	if (!sc.CheckString("{"))
+	{
+		pos.Message(MSG_ERROR, "spawnclasses:'{' expected, unable to continue");
+		sc.SetCMode(false);
+		return;
+	}
+	while (!sc.CheckString("}"))
+	{
+		int num = -1;
+		int base = -1;
+		FName cname;
+		sc.GetNumber(num, true);
+		sc.MustGetStringName("=");
+		sc.MustGetString();
+		cname = sc.String;
+		if (sc.CheckString(","))
+		{
+			sc.GetNumber(base, true);
+		}
+
+		// todo: check for proper base class
+		spawnMap.Insert(num, { cname, nullptr, base });
+	}
+	sc.SetCMode(false);
+}
 
 //===========================================================================
 //
@@ -2292,6 +2351,8 @@ static const dispatch basetokens[] =
 	{ "newgamechoices",  parseEmptyBlock   },
 	{ "rffdefineid",     parseRffDefineId      },
 	{ "defineqav",       parseDefineQAV        },
+
+	{ "spawnclasses",		parseSpawnClasses },
 	{ nullptr,           nullptr               },
 };
 

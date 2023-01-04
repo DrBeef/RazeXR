@@ -43,7 +43,7 @@ BEGIN_PS_NS
 
 
 // All this must be moved into the status bar once it is made persistent!
-short nStatusSeqOffset;
+int nStatusSeqOffset;
 
 void InitStatus()
 {
@@ -122,15 +122,15 @@ void UpdateFrame()
 {
     auto tex = tileGetTexture(nBackgroundPic);
 
-    twod->AddFlatFill(0, 0, xdim, windowxy1.y - 3, tex);
-    twod->AddFlatFill(0, windowxy2.y + 4, xdim, ydim, tex);
-    twod->AddFlatFill(0, windowxy1.y - 3, windowxy1.x - 3, windowxy2.y + 4, tex);
-    twod->AddFlatFill(windowxy2.x + 4, windowxy1.y - 3, xdim, windowxy2.y + 4, tex);
+    twod->AddFlatFill(0, 0, xdim, windowxy1.Y - 3, tex);
+    twod->AddFlatFill(0, windowxy2.Y + 4, xdim, ydim, tex);
+    twod->AddFlatFill(0, windowxy1.Y - 3, windowxy1.X - 3, windowxy2.Y + 4, tex);
+    twod->AddFlatFill(windowxy2.X + 4, windowxy1.Y - 3, xdim, windowxy2.Y + 4, tex);
 
-    twod->AddFlatFill(windowxy1.x - 3, windowxy1.y - 3, windowxy1.x, windowxy2.y + 1, tex, 0, 1, 0xff545454);
-    twod->AddFlatFill(windowxy1.x, windowxy1.y - 3, windowxy2.x + 4, windowxy1.y, tex, 0, 1, 0xff545454);
-    twod->AddFlatFill(windowxy2.x + 1, windowxy1.y, windowxy2.x + 4, windowxy2.y + 4, tex, 0, 1, 0xff2a2a2a);
-    twod->AddFlatFill(windowxy1.x - 3, windowxy2.y + 1, windowxy2.x + 1, windowxy2.y + 4, tex, 0, 1, 0xff2a2a2a);
+    twod->AddFlatFill(windowxy1.X - 3, windowxy1.Y - 3, windowxy1.X, windowxy2.Y + 1, tex, 0, 1, 0xff545454);
+    twod->AddFlatFill(windowxy1.X, windowxy1.Y - 3, windowxy2.X + 4, windowxy1.Y, tex, 0, 1, 0xff545454);
+    twod->AddFlatFill(windowxy2.X + 1, windowxy1.Y, windowxy2.X + 4, windowxy2.Y + 4, tex, 0, 1, 0xff2a2a2a);
+    twod->AddFlatFill(windowxy1.X - 3, windowxy2.Y + 1, windowxy2.X + 1, windowxy2.Y + 4, tex, 0, 1, 0xff2a2a2a);
 }
 
 void StatusMessage(int messageTime, const char* fmt, ...)
@@ -144,7 +144,6 @@ void StatusMessage(int messageTime, const char* fmt, ...)
 
 void DrawStatusBar()
 {
-    if (nFreeze == 2) return; // Hide when Ramses is talking.
     if (hud_size <= Hud_Stbar)
     {
         UpdateFrame();

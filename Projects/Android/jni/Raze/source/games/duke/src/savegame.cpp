@@ -32,6 +32,7 @@ Prepared for public release: 03/21/2003 - Charlie Wiederhold, 3D Realms
 #include "gamestate.h"
 #include "dukeactor.h"
 #include "savegamehelp.h"
+#include "gamevar.h"
 
 //==========================================================================
 //
@@ -39,31 +40,38 @@ Prepared for public release: 03/21/2003 - Charlie Wiederhold, 3D Realms
 //
 //==========================================================================
 
-template<> FSerializer& Serialize(FSerializer& arc, const char* key, Duke3d::DDukeActor*& ht, Duke3d::DDukeActor** def)
-{
-	int index = ht? int(ht - Duke3d::hittype) : -1;
-	assert(index >= -1 && index < MAXSPRITES);
-	Serialize(arc, key, index, nullptr);
-	ht = index < 0? nullptr : &Duke3d::hittype[index];
-	return arc;
-}
 
 BEGIN_DUKE_NS
 
-void SerializeActorGlobals(FSerializer& arc);
+FSerializer& Serialize(FSerializer& arc, const char* keyname, GameVarValue& w, GameVarValue* def);
 void lava_serialize(FSerializer& arc);
 void SerializeGameVars(FSerializer &arc);
+
+static FSerializer& Serialize(FSerializer& arc, const char* key, FireProj& p, FireProj* def)
+{
+	if (arc.BeginObject(key))
+	{
+		arc("x", p.pos.X)
+			("y", p.pos.Y)
+			("z", p.pos.Z)
+			("xv", p.vel.X)
+			("yv", p.vel.Y)
+			("zv", p.vel.Z)
+			.EndObject();
+	}
+	return arc;
+}
 
 
 FSerializer& Serialize(FSerializer& arc, const char* keyname, CraneDef& w, CraneDef* def)
 {
 	if (arc.BeginObject(keyname))
 	{
-		arc("x", w.x)
-			("y", w.y)
-			("z", w.z)
-			("polex", w.polex)
-			("poley", w.poley)
+		arc("x", w.pos.X)
+			("y", w.pos.Y)
+			("z", w.pos.Z)
+			("polex", w.pole.X)
+			("poley", w.pole.Y)
 			("pole", w.poleactor)
 			.EndObject();
 	}
@@ -85,9 +93,9 @@ FSerializer& Serialize(FSerializer& arc, const char* keyname, player_orig& w, pl
 {
 	if (arc.BeginObject(keyname))
 	{
-	  arc("ox", w.ox)
-		("oy", w.oy)
-		("oz", w.oz)
+	  arc("ox", w.opos.X)
+		("oy", w.opos.Y)
+		("oz", w.opos.Z)
 		("oa", w.oa)
 		("os", w.os)
 		.EndObject();
@@ -99,27 +107,26 @@ FSerializer& Serialize(FSerializer& arc, const char* keyname, player_struct& w, 
 {
 	if (arc.BeginObject(keyname))
 	{
-		arc("posx", w.pos.x)
-			("posy", w.pos.y)
-			("posz", w.pos.z)
+		arc("posx", w.pos.X)
+			("posy", w.pos.Y)
+			("posz", w.pos.Z)
 			("angle", w.angle)
 			("horizon", w.horizon)
 			.Array("gotweapon", w.gotweapon, MAX_WEAPONS)
 			("pals", w.pals)
-			("fricx", w.fric.x)
-			("fricy", w.fric.y)
-			("exitx", w.exitx)
-			("exity", w.exity)
+			("fricx", w.fric.X)
+			("fricy", w.fric.Y)
+			("exitx", w.exit.X)
+			("exity", w.exit.Y)
 			("numloogs", w.numloogs)
 			("loogcnt", w.loogcnt)
-			.Array("loogiex", w.loogiex, w.numloogs)
-			.Array("loogiey", w.loogiey, w.numloogs)
-			("bobposx", w.bobposx)
-			("bobposy", w.bobposy)
+			.Array("loogie", w.loogie, w.numloogs)
+			("bobposx", w.bobpos.X)
+			("bobposy", w.bobpos.Y)
 			("pyoff", w.pyoff)
-			("posxv", w.posxv)
-			("posyv", w.posyv)
-			("poszv", w.poszv)
+			("posxv", w.vel.X)
+			("posyv", w.vel.Y)
+			("poszv", w.vel.Z)
 			("last_pissed_time", w.last_pissed_time)
 			("truefz", w.truefz)
 			("truecz", w.truecz)
@@ -131,7 +138,7 @@ FSerializer& Serialize(FSerializer& arc, const char* keyname, player_struct& w, 
 			("crack_time", w.crack_time)
 			("aim.mode", w.aim_mode)
 			("psectlotag", w.psectlotag)
-			("cursectnum", w.cursectnum)
+			("cursectnum", w.cursector)
 			("last_extra", w.last_extra)
 			("subweapon", w.subweapon)
 			.Array("ammo_count", w.ammo_amount, MAX_WEAPONS)
@@ -159,7 +166,7 @@ FSerializer& Serialize(FSerializer& arc, const char* keyname, player_struct& w, 
 			("firstaid_amount", w.firstaid_amount)
 			("somethingonplayer", w.somethingonplayer)
 			("on_crane", w.on_crane)
-			("i", w.i)
+			("i", w.actor)
 			("one_parallax_sectnum", w.one_parallax_sectnum)
 			("over_shoulder_on", w.over_shoulder_on)
 			("random_club_frame", w.random_club_frame)
@@ -220,8 +227,8 @@ FSerializer& Serialize(FSerializer& arc, const char* keyname, player_struct& w, 
 			// RR from here on
 			("stairs", w.stairs)
 			("detonate_count", w.detonate_count)
-			("noise_x", w.noise_x)
-			("noise_y", w.noise_y)
+			("noise.X", w.noise.X)
+			("noise.Y", w.noise.Y)
 			("noise_radius", w.noise_radius)
 			("drink_timer", w.drink_timer)
 			("eat_timer", w.eat_timer)
@@ -265,73 +272,58 @@ FSerializer& Serialize(FSerializer& arc, const char* keyname, player_struct& w, 
 			// new stuff
 			("actions", w.sync.actions)
 			.Array("frags", w.frags, MAXPLAYERS)
+			("uservars", w.uservars)
+			("fistsign", w.fistsign)
 			.EndObject();
 
 		w.invdisptime = 0;
-		w.oposx = w.pos.x;
-		w.oposy = w.pos.y;
-		w.oposz = w.pos.z;
+		w.opos.X = w.pos.X;
+		w.opos.Y = w.pos.Y;
+		w.opos.Z = w.pos.Z;
 		w.opyoff = w.pyoff;
-		w.oweapon_sway = w.weapon_sway;
-		w.oweapon_pos = w.weapon_pos;
-		w.okickback_pic = w.kickback_pic;
-		w.orandom_club_frame = w.random_club_frame;
-		w.ohard_landing = w.hard_landing;
+		w.backupweapon();
 		w.sync.actions &= SB_CENTERVIEW|SB_CROUCH; // these are the only bits we need to preserve.
 	}
 	return arc;
 }
 
 
-FSerializer& Serialize(FSerializer& arc, const char* keyname, DDukeActor& w, DDukeActor* def)
+void DDukeActor::Serialize(FSerializer& arc)
 {
-	if (!def) def = &hittype[MAXSPRITES];
-	if (arc.BeginObject(keyname))
-	{
-		arc("cgg", w.cgg, def->cgg)
-			("spriteextra", w.spriteextra, def->spriteextra)
-			("picnum", w.picnum, def->picnum)
-			("ang", w.ang, def->ang)
-			("extra", w.extra, def->extra)
-			("owner", w.owner, def->owner)
-			("movflag", w.movflag, def->movflag)
-			("tempang", w.tempang, def->tempang)
-			("actorstayput", w.actorstayput, def->actorstayput)
-			("dispicnum", w.dispicnum, def->dispicnum)
-			("timetosleep", w.timetosleep, def->timetosleep)
-			("floorz", w.floorz, def->floorz)
-			("ceilingz", w.ceilingz, def->ceilingz)
-			("lastvx", w.lastvx, def->lastvx)
-			("lastvy", w.lastvy, def->lastvy)
-			("aflags", w.aflags, def->aflags)
-			("saved_ammo", w.saved_ammo, def->saved_ammo)
-			("temp_actor", w.temp_actor, def->temp_actor)
-			("seek_actor", w.seek_actor, def->seek_actor)
-			.Array("temp_data", w.temp_data, def->temp_data, 6)
-			.Array("temo_wall", w.temp_walls, def->temp_walls,2)
-			("temp_sect", w.temp_sect, def->temp_sect)
-			.EndObject();
+	//AActor* def = GetDefault();
 
-#ifdef  OLD_SAVEGAME
-		// compat handling
-		if (SaveVersion < 12 && arc.isReading())
-		{
-			if (w.s->picnum == SECTOREFFECTOR)
-			{
-				if (w.s->lotag == SE_20_STRETCH_BRIDGE)
-				{
-					for (int i : {0, 1}) w.temp_walls[i] = &wall[w.temp_data[i+1]];
-				}
-				if (w.s->lotag == SE_128_GLASS_BREAKING)
-				{
-					w.temp_walls[0] = &wall[w.temp_data[2]];
-				}
-			}
-		}
-#endif
-	}
-	return arc;
+	Super::Serialize(arc);
+
+	arc("cgg", cgg)
+		("spriteextra", spriteextra)
+		("picnum", attackertype)
+		("ang", hitang)
+		("extra", hitextra)
+		("owneractor", ownerActor)
+		("owner", hitOwnerActor)
+		("movflag", movflag)
+		("tempang", tempang)
+		("actorstayput", actorstayput)
+		("dispicnum", dispicnum)
+		("basepicnum", basepicnum)
+		("timetosleep", timetosleep)
+		("floorz", floorz)
+		("ceilingz", ceilingz)
+		("lastvx", ovel.X)
+		("lastvy", ovel.Y)
+		("saved_ammo", saved_ammo)
+		("temp_actor", temp_actor)
+		("seek_actor", seek_actor)
+		.Array("temp_data", temp_data, 6)
+		.Array("temo_wall", temp_walls, 2)
+		("temp_sect", temp_sect)
+		("uservars", uservars)
+		("flags1", flags1)
+		("flags2", flags2)
+
+		("fireproj", fproj);
 }
+
 
 FSerializer& Serialize(FSerializer& arc, const char* keyname, Cycler& w, Cycler* def)
 {
@@ -355,9 +347,6 @@ void GameInterface::SerializeGameState(FSerializer& arc)
 {
 	if (arc.isReading())
 	{
-		for (auto& h : hittype) h.clear();
-		memset(sectorextra, 0, sizeof(sectorextra));
-		memset(shadedsector, 0, sizeof(shadedsector));
 		memset(geosectorwarp, -1, sizeof(geosectorwarp));
 		memset(geosectorwarp2, -1, sizeof(geosectorwarp2));
 		memset(ambienthitag, -1, sizeof(ambienthitag));
@@ -367,8 +356,7 @@ void GameInterface::SerializeGameState(FSerializer& arc)
 	{
 		arc("multimode", ud.multimode);
 
-		arc.SparseArray("actors", hittype, MAXSPRITES, activeSprites)
-			("skill", ud.player_skill)
+		arc("skill", ud.player_skill)
 			("from_bonus", ud.from_bonus)
 			("secretlevel", ud.secretlevel)
 			("respawn_monsters", ud.respawn_monsters)
@@ -385,14 +373,12 @@ void GameInterface::SerializeGameState(FSerializer& arc)
 			("levelclock", PlayClock)
 			("bomb_tag", ud.bomb_tag)
 
-			.Array("sectorextra", sectorextra, numsectors)
 			("rtsplaying", rtsplaying)
 			("tempwallptr", tempwallptr)
 			("cranes", cranes)
 			("sound445done", sound445done)
 			.Array("players", ps, ud.multimode)
 			("spriteqamount", spriteqamount)
-			.Array("shadedsector", shadedsector, numsectors)
 			("lastvisinc", lastvisinc)
 			("numanimwalls", numanimwalls)
 			.Array("animwall", animwall, numanimwalls)
@@ -460,7 +446,6 @@ void GameInterface::SerializeGameState(FSerializer& arc)
 			.Array("po", po, ud.multimode)
 			.EndObject();
 
-		SerializeActorGlobals(arc);
 		lava_serialize(arc);
 		SerializeGameVars(arc);
 
@@ -482,7 +467,7 @@ void GameInterface::SerializeGameState(FSerializer& arc)
 				ps[myconnectindex].over_shoulder_on = 1;
 			}
 
-			memset(gotpic, 0, sizeof(gotpic));
+			gotpic.Zero();
 			if (isRR()) cacheit_r(); else cacheit_d();
 
 			Mus_ResumeSaved();

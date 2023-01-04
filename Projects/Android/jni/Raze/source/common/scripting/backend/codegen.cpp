@@ -522,10 +522,10 @@ FxExpression *FxConstant::MakeConstant(PSymbol *sym, const FScriptPosition &pos)
 	}
 	else
 	{
-		PSymbolConstString *csym = dyn_cast<PSymbolConstString>(sym);
-		if (csym != nullptr)
+		PSymbolConstString *csymbol = dyn_cast<PSymbolConstString>(sym);
+		if (csymbol != nullptr)
 		{
-			x = new FxConstant(csym->Str, pos);
+			x = new FxConstant(csymbol->Str, pos);
 		}
 		else
 		{
@@ -1688,6 +1688,13 @@ FxExpression *FxTypeCast::Resolve(FCompileContext &ctx)
 		delete this;
 		return x;
 	}
+	else if ((basex->IsVector2() && IsVector2()) || (basex->IsVector3() && IsVector3()))
+	{
+		auto x = basex;
+		basex = nullptr;
+		delete this;
+		return x;
+	}
 	// todo: pointers to class objects. 
 	// All other types are only compatible to themselves and have already been handled above by the equality check.
 	// Anything that falls through here is not compatible and must print an error.
@@ -1843,7 +1850,7 @@ FxExpression *FxMinusSign::Resolve(FCompileContext& ctx)
 
 ExpEmit FxMinusSign::Emit(VMFunctionBuilder *build)
 {
-	assert(ValueType == Operand->ValueType);
+	//assert(ValueType == Operand->ValueType);
 	ExpEmit from = Operand->Emit(build);
 	ExpEmit to;
 	assert(from.Konst == 0);
@@ -1964,7 +1971,7 @@ ExpEmit FxUnaryNotBitwise::Emit(VMFunctionBuilder *build)
 	from.Free(build);
 	ExpEmit to(build, REGT_INT);
 	assert(!from.Konst);
-	
+
 	build->Emit(OP_NOT, to.RegNum, from.RegNum, 0);
 	return to;
 }
@@ -2587,6 +2594,12 @@ FxExpression *FxMultiAssign::Resolve(FCompileContext &ctx)
 	}
 	auto VMRight = static_cast<FxVMFunctionCall *>(Right);
 	auto rets = VMRight->GetReturnTypes();
+	if (Base.Size() == 1)
+	{
+		Right->ScriptPosition.Message(MSG_ERROR, "Multi-assignment with only one element", VMRight->Function->SymbolName.GetChars());
+		delete this;
+		return nullptr;
+	}
 	if (rets.Size() < Base.Size())
 	{
 		Right->ScriptPosition.Message(MSG_ERROR, "Insufficient returns in function %s", VMRight->Function->SymbolName.GetChars());
@@ -2746,7 +2759,7 @@ FxExpression *FxAddSub::Resolve(FCompileContext& ctx)
 		delete this;
 		return nullptr;
 	}
-	
+
 	if (compileEnvironment.CheckForCustomAddition)
 	{
 		auto result = compileEnvironment.CheckForCustomAddition(this, ctx);
@@ -2756,7 +2769,7 @@ FxExpression *FxAddSub::Resolve(FCompileContext& ctx)
 			goto goon;
 		}
 	}
-	
+
 	if (left->ValueType == TypeTextureID && right->IsInteger())
 	{
 		ValueType = TypeTextureID;
@@ -2764,7 +2777,7 @@ FxExpression *FxAddSub::Resolve(FCompileContext& ctx)
 	else if (left->IsVector() && right->IsVector())
 	{
 		// a vector2 can be added to or subtracted from a vector 3 but it needs to be the right operand.
-		if (left->ValueType == right->ValueType || (left->ValueType == TypeVector3 && right->ValueType == TypeVector2))
+		if (((left->IsVector3() || left->IsVector2()) && right->IsVector2()) || (left->IsVector3() && right->IsVector3()))
 		{
 			ValueType = left->ValueType;
 		}
@@ -2857,8 +2870,9 @@ ExpEmit FxAddSub::Emit(VMFunctionBuilder *build)
 		if (IsVector())
 		{
 			assert(op1.RegType == REGT_FLOAT && op2.RegType == REGT_FLOAT);
-			build->Emit(right->ValueType == TypeVector2? OP_ADDV2_RR : OP_ADDV3_RR, to.RegNum, op1.RegNum, op2.RegNum);
-			if (left->ValueType == TypeVector3 && right->ValueType == TypeVector2 && to.RegNum != op1.RegNum)
+
+			build->Emit(right->IsVector2() ? OP_ADDV2_RR : OP_ADDV3_RR, to.RegNum, op1.RegNum, op2.RegNum);
+			if (left->IsVector3() && right->IsVector2() && to.RegNum != op1.RegNum)
 			{
 				// must move the z-coordinate
 				build->Emit(OP_MOVEF, to.RegNum + 2, op1.RegNum + 2);
@@ -2890,7 +2904,7 @@ ExpEmit FxAddSub::Emit(VMFunctionBuilder *build)
 		if (IsVector())
 		{
 			assert(op1.RegType == REGT_FLOAT && op2.RegType == REGT_FLOAT);
-			build->Emit(right->ValueType == TypeVector2 ? OP_SUBV2_RR : OP_SUBV3_RR, to.RegNum, op1.RegNum, op2.RegNum);
+			build->Emit(right->IsVector2() ? OP_SUBV2_RR : OP_SUBV3_RR, to.RegNum, op1.RegNum, op2.RegNum);
 			return to;
 		}
 		else if (ValueType->GetRegType() == REGT_FLOAT)
@@ -3093,11 +3107,11 @@ ExpEmit FxMulDiv::Emit(VMFunctionBuilder *build)
 		int op;
 		if (op2.Konst)
 		{
-			op = Operator == '*' ? (ValueType == TypeVector2 ? OP_MULVF2_RK : OP_MULVF3_RK) : (ValueType == TypeVector2 ? OP_DIVVF2_RK : OP_DIVVF3_RK);
+			op = Operator == '*' ? (IsVector2() ? OP_MULVF2_RK : OP_MULVF3_RK) : (IsVector2() ? OP_DIVVF2_RK : OP_DIVVF3_RK);
 		}
 		else
 		{
-			op = Operator == '*' ? (ValueType == TypeVector2 ? OP_MULVF2_RR : OP_MULVF3_RR) : (ValueType == TypeVector2 ? OP_DIVVF2_RR : OP_DIVVF3_RR);
+			op = Operator == '*' ? (IsVector2() ? OP_MULVF2_RR : OP_MULVF3_RR) : (IsVector2() ? OP_DIVVF2_RR : OP_DIVVF3_RR);
 		}
 		op1.Free(build);
 		op2.Free(build);
@@ -3508,7 +3522,8 @@ FxExpression *FxCompareEq::Resolve(FCompileContext& ctx)
 		return nullptr;
 	}
 
-	if (left->ValueType != right->ValueType)	// identical types are always comparable, if they can be placed in a register, so we can save most checks if this is the case.
+	// identical types are always comparable, if they can be placed in a register, so we can save most checks if this is the case.
+	if (left->ValueType != right->ValueType && !(left->IsVector2() && right->IsVector2()) && !(left->IsVector3() && right->IsVector3()))
 	{
 		FxExpression *x;
 		if (left->IsNumeric() && right->ValueType == TypeString && (x = StringConstToChar(right)))
@@ -5125,16 +5140,16 @@ ExpEmit FxNew::Emit(VMFunctionBuilder *build)
 	// Call DecoRandom to generate a random number.
 	VMFunction *callfunc;
 	auto sym = FindBuiltinFunction(compileEnvironment.CustomBuiltinNew != NAME_None? compileEnvironment.CustomBuiltinNew : NAME_BuiltinNew);
-	
+
 	assert(sym);
 	callfunc = sym->Variants[0].Implementation;
-	
+
 	FunctionCallEmitter emitters(callfunc);
 
 	int outerside = -1;
 	if (!val->isConstant())
 	{
-		int outerside = FScopeBarrier::SideFromFlags(CallingFunction->Variants[0].Flags);
+		outerside = FScopeBarrier::SideFromFlags(CallingFunction->Variants[0].Flags);
 		if (outerside == FScopeBarrier::Side_Virtual)
 			outerside = FScopeBarrier::SideFromObjectFlags(CallingFunction->OwningClass->ScopeFlags);
 	}
@@ -5569,8 +5584,6 @@ FxExpression *FxRandomPick::Resolve(FCompileContext &ctx)
 
 ExpEmit FxRandomPick::Emit(VMFunctionBuilder *build)
 {
-	unsigned i;
-
 	assert(choices.Size() > 0);
 
 	// Call BuiltinRandom to generate a random number.
@@ -5603,7 +5616,7 @@ ExpEmit FxRandomPick::Emit(VMFunctionBuilder *build)
 
 	// Allocate space for the jump table.
 	size_t jumptable = build->Emit(OP_JMP, 0);
-	for (i = 1; i < choices.Size(); ++i)
+	for (unsigned i = 1; i < choices.Size(); ++i)
 	{
 		build->Emit(OP_JMP, 0);
 	}
@@ -5639,7 +5652,7 @@ ExpEmit FxRandomPick::Emit(VMFunctionBuilder *build)
 		}
 	}
 	// Backpatch each case (except the last, since it ends here) to jump to here.
-	for (i = 0; i < choices.Size() - 1; ++i)
+	for (unsigned i = 0; i < choices.Size() - 1; ++i)
 	{
 		build->BackpatchToHere(finishes[i]);
 	}
@@ -5888,7 +5901,7 @@ FxExpression *FxIdentifier::Resolve(FCompileContext& ctx)
 {
 	PSymbol * sym;
 	FxExpression *newex = nullptr;
-	
+
 	CHECKRESOLVED();
 
 	// Local variables have highest priority.
@@ -6040,7 +6053,7 @@ FxExpression *FxIdentifier::Resolve(FCompileContext& ctx)
 						deprecationMessage.IsEmpty() ? "" : ", ", deprecationMessage.GetChars());
 				}
 			}
-			
+
 
 			newex = new FxGlobalVariable(static_cast<PField *>(sym), ScriptPosition);
 			goto foundit;
@@ -6070,7 +6083,7 @@ FxExpression *FxIdentifier::Resolve(FCompileContext& ctx)
 		newex = new FxCVar(cvar, ScriptPosition);
 		goto foundit;
 	}
-	
+
 	ScriptPosition.Message(MSG_ERROR, "Unknown identifier '%s'", Identifier.GetChars());
 	delete this;
 	return nullptr;
@@ -6408,7 +6421,7 @@ bool FxLocalVariable::RequestAddress(FCompileContext &ctx, bool *writable)
 	if (writable != nullptr) *writable = !ctx.CheckWritable(Variable->VarFlags);
 	return true;
 }
-	
+
 ExpEmit FxLocalVariable::Emit(VMFunctionBuilder *build)
 {
 	// 'Out' variables are actually pointers but this fact must be hidden to the script.
@@ -6773,7 +6786,7 @@ FxExpression *FxStackVariable::Resolve(FCompileContext &ctx)
 ExpEmit FxStackVariable::Emit(VMFunctionBuilder *build)
 {
 	int offsetreg = -1;
-	
+
 	if (membervar->Offset != 0) offsetreg = build->GetConstantInt((int)membervar->Offset);
 
 	if (AddressRequested)
@@ -6965,7 +6978,7 @@ FxExpression *FxStructMember::Resolve(FCompileContext &ctx)
 			{
 				locvar->RegOffset = int(membervar->Offset);
 			}
-			
+
 			locvar->ValueType = membervar->Type;
 			classx = nullptr;
 			delete this;
@@ -7247,7 +7260,7 @@ FxExpression *FxArrayElement::Resolve(FCompileContext &ctx)
 ExpEmit FxArrayElement::Emit(VMFunctionBuilder *build)
 {
 	PArray *arraytype;
-	
+
 	if (arrayispointer)
 	{
 		auto ptr = Array->ValueType->toPointer();
@@ -7269,7 +7282,7 @@ ExpEmit FxArrayElement::Emit(VMFunctionBuilder *build)
 	ExpEmit start;
 	ExpEmit bound;
 	bool nestedarray = false;
-	
+
 	if (SizeAddr != ~0u)
 	{
 		bool ismeta = Array->ExprType == EFX_ClassMember && static_cast<FxClassMember*>(Array)->membervar->Flags & VARF_Meta;
@@ -7671,7 +7684,7 @@ FxExpression *FxFunctionCall::Resolve(FCompileContext& ctx)
 			return x->Resolve(ctx);
 		}
 	}
-	
+
 	if (compileEnvironment.CheckCustomGlobalFunctions)
 	{
 		auto result = compileEnvironment.CheckCustomGlobalFunctions(this, ctx);
@@ -7855,8 +7868,8 @@ FxExpression *FxFunctionCall::Resolve(FCompileContext& ctx)
 			}
 			else if (!ArgList.Size())
 			{
-				auto cls = static_cast<PClassType*>(ctx.Class)->Descriptor;
-				ArgList.Push(new FxConstant(cls, NewClassPointer(cls), ScriptPosition));
+				auto clss = static_cast<PClassType*>(ctx.Class)->Descriptor;
+				ArgList.Push(new FxConstant(clss, NewClassPointer(clss), ScriptPosition));
 			}
 
 			func = new FxNew(ArgList[0]);
@@ -8369,8 +8382,8 @@ isresolved:
 		if (!novirtual || !(afd->Variants[0].Flags & VARF_Virtual))
 		{
 			auto clstype = PType::toClass(ctx.Class);
-			auto ccls = PType::toClass(cls);
-			if (clstype == nullptr || ccls == nullptr || !clstype->Descriptor->IsDescendantOf(ccls->Descriptor))
+			auto cclss = PType::toClass(cls);
+			if (clstype == nullptr || cclss == nullptr || !clstype->Descriptor->IsDescendantOf(cclss->Descriptor))
 			{
 				ScriptPosition.Message(MSG_ERROR, "Cannot call non-static function %s::%s from here", cls->TypeName.GetChars(), MethodName.GetChars());
 				delete this;
@@ -8510,7 +8523,7 @@ VMFunction *FxVMFunctionCall::GetDirectFunction(PFunction *callingfunc, const Ve
 		if (Function->Variants[0].ArgFlags.Size() > imp && !(Function->Variants[0].ArgFlags[imp] & VARF_Optional)) return nullptr;
 		return Function->Variants[0].Implementation;
 	}
-	
+
 	return nullptr;
 }
 
@@ -8569,7 +8582,7 @@ FxExpression *FxVMFunctionCall::Resolve(FCompileContext& ctx)
 			delete this;
 			return nullptr;
 		}
-		
+
 		bool foundvarargs = false;
 		PType * type = nullptr;
 		int flag = 0;
@@ -9069,13 +9082,13 @@ ExpEmit FxVectorBuiltin::Emit(VMFunctionBuilder *build)
 	ExpEmit op = Self->Emit(build);
 	if (Function == NAME_Length)
 	{
-		build->Emit(Self->ValueType == TypeVector2 ? OP_LENV2 : OP_LENV3, to.RegNum, op.RegNum);
+		build->Emit(Self->ValueType == TypeVector2 || Self->ValueType == TypeFVector2 ? OP_LENV2 : OP_LENV3, to.RegNum, op.RegNum);
 	}
 	else
 	{
 		ExpEmit len(build, REGT_FLOAT);
-		build->Emit(Self->ValueType == TypeVector2 ? OP_LENV2 : OP_LENV3, len.RegNum, op.RegNum);
-		build->Emit(Self->ValueType == TypeVector2 ? OP_DIVVF2_RR : OP_DIVVF3_RR, to.RegNum, op.RegNum, len.RegNum);
+		build->Emit(Self->ValueType == TypeVector2 || Self->ValueType == TypeFVector2 ? OP_LENV2 : OP_LENV3, len.RegNum, op.RegNum);
+		build->Emit(Self->ValueType == TypeVector2 || Self->ValueType == TypeFVector2 ? OP_DIVVF2_RR : OP_DIVVF3_RR, to.RegNum, op.RegNum, len.RegNum);
 		len.Free(build);
 	}
 	op.Free(build);
@@ -10511,7 +10524,7 @@ FxExpression *FxClassTypeCast::Resolve(FCompileContext &ctx)
 		delete this;
 		return nullptr;
 	}
-	
+
 	if (basex->ValueType != TypeName && basex->ValueType != TypeString)
 	{
 		ScriptPosition.Message(MSG_ERROR, "Cannot convert %s to class type", basex->ValueType->DescriptiveName());
@@ -10528,7 +10541,7 @@ FxExpression *FxClassTypeCast::Resolve(FCompileContext &ctx)
 		{
 			if (Explicit) cls = FindClassType(clsname, ctx);
 			else cls = PClass::FindClass(clsname);
-			
+
 			if (cls == nullptr || cls->VMType == nullptr)
 			{
 				/* lax */
@@ -10736,6 +10749,10 @@ ExpEmit FxClassPtrCast::Emit(VMFunctionBuilder *build)
 FxLocalVariableDeclaration::FxLocalVariableDeclaration(PType *type, FName name, FxExpression *initval, int varflags, const FScriptPosition &p)
 	:FxExpression(EFX_LocalVariableDeclaration, p)
 {
+	// Local FVector isn't different from Vector
+	if (type == TypeFVector2) type = TypeVector2;
+	else if (type == TypeFVector3) type = TypeVector3;
+
 	ValueType = type;
 	VarFlags = varflags;
 	Name = name;
@@ -10763,7 +10780,7 @@ FxExpression *FxLocalVariableDeclaration::Resolve(FCompileContext &ctx)
 	{
 		auto sfunc = static_cast<VMScriptFunction *>(ctx.Function->Variants[0].Implementation);
 		StackOffset = sfunc->AllocExtraStack(ValueType);
-		
+
 		if (Init != nullptr)
 		{
 			ScriptPosition.Message(MSG_ERROR, "Cannot initialize non-scalar variable %s here", Name.GetChars());
@@ -11158,9 +11175,14 @@ ExpEmit FxLocalArrayDeclaration::Emit(VMFunctionBuilder *build)
 		ClearDynamicArray(build);
 	}
 
+	auto zero = build->GetConstantInt(0);
 	auto elementSizeConst = build->GetConstantInt(static_cast<PArray *>(ValueType)->ElementSize);
-	auto arrOffsetReg = build->Registers[REGT_INT].Get(1);
-	build->Emit(OP_LK, arrOffsetReg, build->GetConstantInt(StackOffset));
+	int arrOffsetReg = 0;
+	if (!isDynamicArray)
+	{
+		arrOffsetReg = build->Registers[REGT_POINTER].Get(1);
+		build->Emit(OP_ADDA_RK, arrOffsetReg, build->FramePointer.RegNum, build->GetConstantInt(StackOffset));
+	}
 
 	for (auto v : values)
 	{
@@ -11168,6 +11190,7 @@ ExpEmit FxLocalArrayDeclaration::Emit(VMFunctionBuilder *build)
 
 		if (isDynamicArray)
 		{
+			emitval.Free(build);
 			continue;
 		}
 
@@ -11180,61 +11203,48 @@ ExpEmit FxLocalArrayDeclaration::Emit(VMFunctionBuilder *build)
 		if (emitval.Konst)
 		{
 			auto constval = static_cast<FxConstant *>(v);
-			int regNum = build->Registers[regtype].Get(1);
+			auto regNum = build->Registers[regtype].Get(1);
 			switch (regtype)
 			{
 			default:
 			case REGT_INT:
-				build->Emit(OP_LK, regNum, build->GetConstantInt(constval->GetValue().GetInt()));
-				build->Emit(OP_SW_R, build->FramePointer.RegNum, regNum, arrOffsetReg);
+				build->Emit(OP_LK, regNum, emitval.RegNum);
+				build->Emit(OP_SW, arrOffsetReg, regNum, zero);
 				break;
 
 			case REGT_FLOAT:
-				build->Emit(OP_LKF, regNum, build->GetConstantFloat(constval->GetValue().GetFloat()));
-				build->Emit(OP_SDP_R, build->FramePointer.RegNum, regNum, arrOffsetReg);
+				build->Emit(OP_LKF, regNum, emitval.RegNum);
+				build->Emit(OP_SDP, arrOffsetReg, regNum, zero);
 				break;
 
 			case REGT_POINTER:
-				build->Emit(OP_LKP, regNum, build->GetConstantAddress(constval->GetValue().GetPointer()));
-				build->Emit(OP_SP_R, build->FramePointer.RegNum, regNum, arrOffsetReg);
+				build->Emit(OP_LKP, regNum, emitval.RegNum);
+				build->Emit(OP_SP, arrOffsetReg, regNum, zero);
 				break;
 
 			case REGT_STRING:
-				build->Emit(OP_LKS, regNum, build->GetConstantString(constval->GetValue().GetString()));
-				build->Emit(OP_SS_R, build->FramePointer.RegNum, regNum, arrOffsetReg);
+				build->Emit(OP_LKS, regNum, emitval.RegNum);
+				build->Emit(OP_SS, arrOffsetReg, regNum, zero);
 				break;
 			}
+
 			build->Registers[regtype].Return(regNum, 1);
-			
-			emitval.Free(build);
 		}
 		else
 		{
-			switch (regtype)
-			{
-			default:
-			case REGT_INT:
-				build->Emit(OP_SW_R, build->FramePointer.RegNum, emitval.RegNum, arrOffsetReg);
-				break;
-
-			case REGT_FLOAT:
-				build->Emit(OP_SDP_R, build->FramePointer.RegNum, emitval.RegNum, arrOffsetReg);
-				break;
-
-			case REGT_POINTER:
-				build->Emit(OP_SP_R, build->FramePointer.RegNum, emitval.RegNum, arrOffsetReg);
-				break;
-
-			case REGT_STRING:
-				build->Emit(OP_SS_R, build->FramePointer.RegNum, emitval.RegNum, arrOffsetReg);
-				break;
-			}
-			emitval.Free(build);
+			build->Emit(v->ValueType->GetStoreOp(), arrOffsetReg, emitval.RegNum, zero);
 		}
+		emitval.Free(build);
 
-		build->Emit(OP_ADD_RK, arrOffsetReg, arrOffsetReg, elementSizeConst);
+		if (!isDynamicArray)
+		{
+			build->Emit(OP_ADDA_RK, arrOffsetReg, arrOffsetReg, elementSizeConst);
+		}
 	}
-	build->Registers[REGT_INT].Return(arrOffsetReg, 1);
+	if (!isDynamicArray)
+	{
+		build->Registers[REGT_POINTER].Return(arrOffsetReg, 1);
+	}
 
 	return ExpEmit();
 }

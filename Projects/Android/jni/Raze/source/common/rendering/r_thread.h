@@ -64,9 +64,8 @@ public:
 	// Working buffer used by the tilted (sloped) span drawer
 	const uint8_t *tiltlighting[MAXWIDTH];
 
-	std::shared_ptr<PolyTriangleThreadData> poly;
-	std::shared_ptr<swrenderer::WallColumnDrawerArgs> columndrawer;
-
+	std::unique_ptr<PolyTriangleThreadData> poly;
+	
 	size_t debug_draw_pos = 0;
 
 	// Checks if a line is rendered by this thread
@@ -156,17 +155,17 @@ public:
 	static void WaitForWorkers();
 
 	static void ResetDebugDrawPos();
-	
+
 private:
 	DrawerThreads();
 	~DrawerThreads();
-	
+
 	void StartThreads();
 	void StopThreads();
 	void WorkerMain(DrawerThread *thread);
 
 	static DrawerThreads *Instance();
-	
+
 	std::mutex threads_mutex;
 	std::vector<DrawerThread> threads;
 
@@ -182,7 +181,7 @@ private:
 	size_t debug_draw_end = 0;
 
 	DrawerThread single_core_thread;
-	
+
 	friend class DrawerCommandQueue;
 };
 
@@ -192,9 +191,9 @@ class DrawerCommandQueue
 {
 public:
 	DrawerCommandQueue(RenderMemory *memoryAllocator);
-	
+
 	void Clear() { commands.clear(); }
-	
+
 	// Queue command to be executed by drawer worker threads
 	template<typename T, typename... Types>
 	void Push(Types &&... args)
@@ -212,13 +211,13 @@ public:
 			command.Execute(&threads->single_core_thread);
 		}
 	}
-	
+
 private:
 	// Allocate memory valid for the duration of a command execution
 	void *AllocMemory(size_t size);
-	
+
 	std::vector<DrawerCommand *> commands;
 	RenderMemory *FrameMemory;
-	
+
 	friend class DrawerThreads;
 };

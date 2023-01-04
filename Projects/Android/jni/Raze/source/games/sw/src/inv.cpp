@@ -44,28 +44,28 @@ BEGIN_SW_NS
 
 extern short NormalVisibility;
 
-void PlayerUpdateInventory(PLAYERp pp, short InventoryNum);
-void InventoryUse(PLAYERp pp);
-void InventoryStop(PLAYERp pp, short InventoryNum);
+void PlayerUpdateInventory(PLAYER* pp, short InventoryNum);
+void InventoryUse(PLAYER* pp);
+void InventoryStop(PLAYER* pp, short InventoryNum);
 
 
 
-void UseInventoryRepairKit(PLAYERp pp);
-void UseInventoryMedkit(PLAYERp pp);
-void UseInventoryRepairKit(PLAYERp pp);
-void UseInventoryCloak(PLAYERp pp);
-void UseInventoryEnvironSuit(PLAYERp pp);
-void UseInventoryNightVision(PLAYERp pp);
-void UseInventoryChemBomb(PLAYERp pp);
-void UseInventoryFlashBomb(PLAYERp pp);
-void UseInventoryCaltrops(PLAYERp pp);
+void UseInventoryRepairKit(PLAYER* pp);
+void UseInventoryMedkit(PLAYER* pp);
+void UseInventoryRepairKit(PLAYER* pp);
+void UseInventoryCloak(PLAYER* pp);
+void UseInventoryEnvironSuit(PLAYER* pp);
+void UseInventoryNightVision(PLAYER* pp);
+void UseInventoryChemBomb(PLAYER* pp);
+void UseInventoryFlashBomb(PLAYER* pp);
+void UseInventoryCaltrops(PLAYER* pp);
 
-void StopInventoryRepairKit(PLAYERp pp, short);
-void StopInventoryMedkit(PLAYERp pp, short);
-void StopInventoryRepairKit(PLAYERp pp, short);
-void StopInventoryCloak(PLAYERp pp, short);
-void StopInventoryEnvironSuit(PLAYERp pp, short);
-void StopInventoryNightVision(PLAYERp pp, short);
+void StopInventoryRepairKit(PLAYER* pp, short);
+void StopInventoryMedkit(PLAYER* pp, short);
+void StopInventoryRepairKit(PLAYER* pp, short);
+void StopInventoryCloak(PLAYER* pp, short);
+void StopInventoryEnvironSuit(PLAYER* pp, short);
+void StopInventoryNightVision(PLAYER* pp, short);
 
 extern PANEL_STATE ps_PanelEnvironSuit[];
 
@@ -82,22 +82,22 @@ INVENTORY_DATA InventoryData[MAX_INVENTORY+1] =
     {nullptr, nullptr, nullptr, 0, 0, 0, 0}
 };
 
-void PanelInvTestSuicide(PANEL_SPRITEp psp)
+void PanelInvTestSuicide(PANEL_SPRITE* psp)
 {
-    if (TEST(psp->flags, PANF_SUICIDE))
+    if (psp->flags & (PANF_SUICIDE))
     {
         pKillSprite(psp);
     }
 }
 
-void KillPanelInv(PLAYERp pp, short InventoryNum)
+void KillPanelInv(PLAYER* pp, short InventoryNum)
 {
     ASSERT(InventoryNum < MAX_INVENTORY);
 
     pp->InventoryTics[InventoryNum] = 0;
 }
 
-void KillAllPanelInv(PLAYERp pp)
+void KillAllPanelInv(PLAYER* pp)
 {
     for (int i = 0; i < MAX_INVENTORY; i++)
     {
@@ -111,7 +111,7 @@ void KillAllPanelInv(PLAYERp pp)
 //
 //////////////////////////////////////////////////////////////////////
 
-void AutoPickInventory(PLAYERp pp)
+void AutoPickInventory(PLAYER* pp)
 {
     int i;
 
@@ -137,9 +137,8 @@ void AutoPickInventory(PLAYERp pp)
     }
 }
 
-void UseInventoryMedkit(PLAYERp pp)
+void UseInventoryMedkit(PLAYER* pp)
 {
-    USERp u = pp->Actor()->u();
     short diff;
     short inv = INVENTORY_MEDKIT;
     short amt;
@@ -148,7 +147,7 @@ void UseInventoryMedkit(PLAYERp pp)
     if (!pp->InventoryAmount[inv])
         return;
 
-    diff = 100 - u->Health;
+    diff = 100 - pp->actor->user.Health;
     if (diff <= 0)
         return;
 
@@ -185,7 +184,7 @@ void UseInventoryMedkit(PLAYERp pp)
 // CHEMICAL WARFARE CANISTERS
 //
 //////////////////////////////////////////////////////////////////////
-void UseInventoryChemBomb(PLAYERp pp)
+void UseInventoryChemBomb(PLAYER* pp)
 {
     short inv = INVENTORY_CHEMBOMB;
 
@@ -208,7 +207,7 @@ void UseInventoryChemBomb(PLAYERp pp)
 // FLASH BOMBS
 //
 //////////////////////////////////////////////////////////////////////
-void UseInventoryFlashBomb(PLAYERp pp)
+void UseInventoryFlashBomb(PLAYER* pp)
 {
     short inv = INVENTORY_FLASHBOMB;
 
@@ -231,7 +230,7 @@ void UseInventoryFlashBomb(PLAYERp pp)
 // CALTROPS
 //
 //////////////////////////////////////////////////////////////////////
-void UseInventoryCaltrops(PLAYERp pp)
+void UseInventoryCaltrops(PLAYER* pp)
 {
     short inv = INVENTORY_CALTROPS;
 
@@ -255,14 +254,14 @@ void UseInventoryCaltrops(PLAYERp pp)
 //
 //////////////////////////////////////////////////////////////////////
 
-void UseInventoryRepairKit(PLAYERp pp)
+void UseInventoryRepairKit(PLAYER* pp)
 {
     short inv = INVENTORY_REPAIR_KIT;
 
     //PlaySound(DIGI_TOOLBOX, pp, v3df_none);
     if (pp == Player + myconnectindex)
     {
-        if (STD_RANDOM_RANGE(1000) > 500)
+        if (StdRandomRange(1000) > 500)
             PlayerSound(DIGI_NOREPAIRMAN, v3df_follow|v3df_dontpan,pp);
         else
             PlayerSound(DIGI_NOREPAIRMAN2, v3df_follow|v3df_dontpan,pp);
@@ -283,9 +282,9 @@ void UseInventoryRepairKit(PLAYERp pp)
 //
 //////////////////////////////////////////////////////////////////////
 
-void UseInventoryCloak(PLAYERp pp)
+void UseInventoryCloak(PLAYER* pp)
 {
-    SPRITEp sp = &pp->Actor()->s();
+    DSWActor* plActor = pp->actor;
 
     if (pp->InventoryActive[pp->InventoryNum])
     {
@@ -300,18 +299,17 @@ void UseInventoryCloak(PLAYERp pp)
     // on/off
     PlayerUpdateInventory(pp, pp->InventoryNum);
 
-    SET(sp->cstat, CSTAT_SPRITE_TRANSLUCENT);
-    sp->shade = 100;
+    plActor->spr.cstat |= (CSTAT_SPRITE_TRANSLUCENT);
+    plActor->spr.shade = 100;
 
     PlaySound(DIGI_GASPOP, pp, v3df_none);
-    //if(RandomRange(1000) > 950)
     if (pp == Player+myconnectindex)
         PlayerSound(DIGI_IAMSHADOW, v3df_follow|v3df_dontpan,pp);
 }
 
-void StopInventoryCloak(PLAYERp pp, short InventoryNum)
+void StopInventoryCloak(PLAYER* pp, short InventoryNum)
 {
-    SPRITEp sp = &pp->Actor()->s();
+    DSWActor* plActor = pp->actor;
 
     pp->InventoryActive[InventoryNum] = false;
 
@@ -325,8 +323,8 @@ void StopInventoryCloak(PLAYERp pp, short InventoryNum)
     // on/off
     PlayerUpdateInventory(pp, InventoryNum);
 
-    RESET(sp->cstat, CSTAT_SPRITE_TRANSLUCENT);
-    sp->shade = 0;
+    plActor->spr.cstat &= ~(CSTAT_SPRITE_TRANSLUCENT);
+    plActor->spr.shade = 0;
 
     PlaySound(DIGI_GASPOP, pp, v3df_none);
 }
@@ -337,8 +335,7 @@ void StopInventoryCloak(PLAYERp pp, short InventoryNum)
 //
 //////////////////////////////////////////////////////////////////////
 
-void
-DoPlayerNightVisionPalette(PLAYERp pp)
+void DoPlayerNightVisionPalette(PLAYER* pp)
 {
     if (pp != Player + screenpeek) return;
 
@@ -361,8 +358,7 @@ DoPlayerNightVisionPalette(PLAYERp pp)
     }
 }
 
-void
-UseInventoryNightVision(PLAYERp pp)
+void UseInventoryNightVision(PLAYER* pp)
 {
     if (pp->InventoryActive[pp->InventoryNum])
     {
@@ -379,8 +375,7 @@ UseInventoryNightVision(PLAYERp pp)
     PlaySound(DIGI_NIGHTON, pp, v3df_dontpan|v3df_follow);
 }
 
-void
-StopInventoryNightVision(PLAYERp pp, short InventoryNum)
+void StopInventoryNightVision(PLAYER* pp, short InventoryNum)
 {
     pp->InventoryActive[InventoryNum] = false;
 
@@ -407,7 +402,7 @@ StopInventoryNightVision(PLAYERp pp, short InventoryNum)
 //
 //////////////////////////////////////////////////////////////////////
 
-void InventoryKeys(PLAYERp pp)
+void InventoryKeys(PLAYER* pp)
 {
     // scroll SPELLs left
     if (pp->input.actions & SB_INVPREV)
@@ -478,7 +473,7 @@ void InventoryKeys(PLAYERp pp)
 	            // switches you to this inventory item
 	            pp->InventoryNum = i;
 
-	            if (InventoryData[pp->InventoryNum].Init && !TEST(pp->Flags, PF_CLIMBING))
+	            if (InventoryData[pp->InventoryNum].Init && !(pp->Flags & PF_CLIMBING))
 	            {
 	                if (pp->InventoryAmount[pp->InventoryNum])
 	                {
@@ -494,11 +489,11 @@ void InventoryKeys(PLAYERp pp)
     }
 }
 
-void InventoryTimer(PLAYERp pp)
+void InventoryTimer(PLAYER* pp)
 {
     // called every time through loop
     short inv = 0;
-    INVENTORY_DATAp id;
+    INVENTORY_DATA* id;
 
     // if bar is up
     if (pp->InventoryBarTics)
@@ -515,7 +510,7 @@ void InventoryTimer(PLAYERp pp)
     for (id = InventoryData; id->Name; id++, inv++)
     {
         // if timed and active
-        if (TEST(id->Flags, INVF_TIMED) && pp->InventoryActive[inv])
+        if ((id->Flags & INVF_TIMED) && pp->InventoryActive[inv])
         {
             // dec tics
             pp->InventoryTics[inv] -= synctics;
@@ -544,7 +539,7 @@ void InventoryTimer(PLAYERp pp)
         // every time the player is in an AUTO_USE situation.
         // This code will decrement the timer and set the Item to InActive
         // EVERY SINGLE TIME.  Relies on the USE function getting called!
-        if (TEST(id->Flags, INVF_AUTO_USE) && pp->InventoryActive[inv])
+        if ((id->Flags & INVF_AUTO_USE) && pp->InventoryActive[inv])
         {
             pp->InventoryTics[inv] -= synctics;
             if (pp->InventoryTics[inv] <= 0)
@@ -572,17 +567,17 @@ void InventoryTimer(PLAYERp pp)
     }
 }
 
-void InventoryUse(PLAYERp pp)
+void InventoryUse(PLAYER* pp)
 {
-    INVENTORY_DATAp id = &InventoryData[pp->InventoryNum];
+    INVENTORY_DATA* id = &InventoryData[pp->InventoryNum];
 
     if (id->Init)
         (*id->Init)(pp);
 }
 
-void InventoryStop(PLAYERp pp, short InventoryNum)
+void InventoryStop(PLAYER* pp, short InventoryNum)
 {
-    INVENTORY_DATAp id = &InventoryData[InventoryNum];
+    INVENTORY_DATA* id = &InventoryData[InventoryNum];
 
     if (id->Stop)
         (*id->Stop)(pp, InventoryNum);
@@ -594,7 +589,7 @@ void InventoryStop(PLAYERp pp, short InventoryNum)
 //
 /////////////////////////////////////////////////////////////////
 
-void PlayerUpdateInventory(PLAYERp pp, short InventoryNum)
+void PlayerUpdateInventory(PLAYER* pp, short InventoryNum)
 {
     pp->InventoryNum = InventoryNum;
 

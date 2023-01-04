@@ -34,57 +34,54 @@ static actionSeq WaspSeq[] = {
     {29, 1}
 };
 
-void SetWaspVel(spritetype* pSprite)
+void SetWaspVel(DExhumedActor* pActor)
 {
-    pSprite->xvel = bcos(pSprite->ang);
-    pSprite->yvel = bsin(pSprite->ang);
+    pActor->spr.xvel = bcos(pActor->spr.ang);
+    pActor->spr.yvel = bsin(pActor->spr.ang);
 }
 
-DExhumedActor* BuildWasp(DExhumedActor* pActor, int x, int y, int z, int nSector, int nAngle, bool bEggWasp)
+DExhumedActor* BuildWasp(DExhumedActor* pActor, int x, int y, int z, sectortype* pSector, int nAngle, bool bEggWasp)
 {
-    spritetype* pSprite;
     if (pActor == nullptr)
     {
-        pActor = insertActor(nSector, 107);
-        pSprite = &pActor->s();
+        pActor = insertActor(pSector, 107);
 
-        pSprite->x = x;
-        pSprite->y = y;
-        pSprite->z = z;
+        pActor->spr.pos.X = x;
+        pActor->spr.pos.Y = y;
+        pActor->spr.pos.Z = z;
     }
     else
     {
-        pSprite = &pActor->s();
-        nAngle = pSprite->ang;
+        nAngle = pActor->spr.ang;
         ChangeActorStat(pActor, 107);
     }
 
-    pSprite->shade = -12;
-    pSprite->cstat = 0x101;
-    pSprite->pal = pSprite->sector()->ceilingpal;
-    pSprite->clipdist = 70;
+    pActor->spr.shade = -12;
+    pActor->spr.cstat = CSTAT_SPRITE_BLOCK_ALL;
+    pActor->spr.pal = pActor->sector()->ceilingpal;
+    pActor->spr.clipdist = 70;
 
     if (bEggWasp)
     {
-        pSprite->xrepeat = 20;
-        pSprite->yrepeat = 20;
+        pActor->spr.xrepeat = 20;
+        pActor->spr.yrepeat = 20;
     }
     else
     {
-        pSprite->xrepeat = 50;
-        pSprite->yrepeat = 50;
+        pActor->spr.xrepeat = 50;
+        pActor->spr.yrepeat = 50;
     }
 
-    pSprite->xoffset = 0;
-    pSprite->yoffset = 0;
-    pSprite->picnum = 1;
-    pSprite->ang = nAngle;
-    pSprite->xvel = 0;
-    pSprite->yvel = 0;
-    pSprite->zvel = 0;
-    pSprite->hitag = 0;
-    pSprite->lotag = runlist_HeadRun() + 1;
-    pSprite->extra = -1;
+    pActor->spr.xoffset = 0;
+    pActor->spr.yoffset = 0;
+    pActor->spr.picnum = 1;
+    pActor->spr.ang = nAngle;
+    pActor->spr.xvel = 0;
+    pActor->spr.yvel = 0;
+    pActor->spr.zvel = 0;
+    pActor->spr.hitag = 0;
+    pActor->spr.lotag = runlist_HeadRun() + 1;
+    pActor->spr.extra = -1;
 
     //	GrabTimeSlot(3);
 
@@ -109,7 +106,7 @@ DExhumedActor* BuildWasp(DExhumedActor* pActor, int x, int y, int z, int nSector
     pActor->nVel = 0;
     pActor->nAngle2 = RandomSize(7) + 127;
 
-    pSprite->owner = runlist_AddRunRec(pSprite->lotag - 1, pActor, 0x1E0000);
+    pActor->spr.intowner = runlist_AddRunRec(pActor->spr.lotag - 1, pActor, 0x1E0000);
 
     pActor->nRun = runlist_AddRunRec(NewRun, pActor, 0x1E0000);
 
@@ -121,7 +118,7 @@ void AIWasp::Draw(RunListEvent* ev)
 {
     auto pActor = ev->pObjActor;
     if (!pActor) return;
-    short nAction = pActor->nAction;
+    int nAction = pActor->nAction;
 
     seq_PlotSequence(ev->nParam, SeqOffsets[kSeqWasp] + WaspSeq[nAction].a, pActor->nFrame, WaspSeq[nAction].b);
     return;
@@ -131,9 +128,8 @@ void AIWasp::RadialDamage(RunListEvent* ev)
 {
     auto pActor = ev->pObjActor;
     if (!pActor) return;
-    auto pSprite = &pActor->s();
 
-    if (!(pSprite->cstat & 0x101))
+    if (!(pActor->spr.cstat & CSTAT_SPRITE_BLOCK_ALL))
         return;
 
     ev->nDamage = runlist_CheckRadialDamage(pActor);
@@ -144,7 +140,6 @@ void AIWasp::Damage(RunListEvent* ev)
 {
     auto pActor = ev->pObjActor;
     if (!pActor) return;
-    auto pSprite = &pActor->s();
 
     if (!ev->nDamage) {
         return;
@@ -163,12 +158,12 @@ void AIWasp::Damage(RunListEvent* ev)
             }
 
             pActor->nAction = 1;
-            pSprite->ang += RandomSize(9) + 768;
-            pSprite->ang &= kAngleMask;
+            pActor->spr.ang += RandomSize(9) + 768;
+            pActor->spr.ang &= kAngleMask;
 
             pActor->nVel = 3000;
 
-            pSprite->zvel = (-20) - RandomSize(6);
+            pActor->spr.zvel = (-20) - RandomSize(6);
         }
         else
         {
@@ -176,12 +171,12 @@ void AIWasp::Damage(RunListEvent* ev)
             pActor->nAction = 4;
             pActor->nFrame = 0;
 
-            pSprite->cstat = 0;
-            pSprite->ang = (pSprite->ang + 1024) & kAngleMask;
+            pActor->spr.cstat = 0;
+            pActor->spr.ang = (pActor->spr.ang + 1024) & kAngleMask;
 
-            SetWaspVel(pSprite);
+            SetWaspVel(pActor);
 
-            pSprite->zvel = 512;
+            pActor->spr.zvel = 512;
 
             nCreaturesKilled++;
         }
@@ -193,16 +188,15 @@ void AIWasp::Tick(RunListEvent* ev)
 {
     auto pActor = ev->pObjActor;
     if (!pActor) return;
-    auto pSprite = &pActor->s();
-    short nAction = pActor->nAction;
+    int nAction = pActor->nAction;
 
     DExhumedActor* pTarget = nullptr;
 
     bool bVal = false;
 
-    short nSeq = SeqOffsets[kSeqWasp] + WaspSeq[nAction].a;
+    int nSeq = SeqOffsets[kSeqWasp] + WaspSeq[nAction].a;
 
-    pSprite->picnum = seq_GetSeqPicnum2(nSeq, pActor->nFrame);
+    pActor->spr.picnum = seq_GetSeqPicnum2(nSeq, pActor->nFrame);
 
     seq_MoveSequence(pActor, nSeq, pActor->nFrame);
 
@@ -217,7 +211,7 @@ void AIWasp::Tick(RunListEvent* ev)
     {
         pTarget = pActor->pTarget;
 
-        if (pTarget && (!(pTarget->s().cstat & 0x101) || (SectFlag[pTarget->s().sectnum] & kSectUnderwater)))
+        if (pTarget && (!(pTarget->spr.cstat & CSTAT_SPRITE_BLOCK_ALL) || (pTarget->sector()->Flag & kSectUnderwater)))
         {
             // goto pink
             pActor->pTarget = nullptr;
@@ -234,7 +228,7 @@ void AIWasp::Tick(RunListEvent* ev)
 
     case 0:
     {
-        pSprite->zvel = bsin(pActor->nAngle, -4);
+        pActor->spr.zvel = bsin(pActor->nAngle, -4);
 
         pActor->nAngle += pActor->nAngle2;
         pActor->nAngle &= kAngleMask;
@@ -250,7 +244,7 @@ void AIWasp::Tick(RunListEvent* ev)
             }
             else
             {
-                pSprite->zvel = 0;
+                pActor->spr.zvel = 0;
                 pActor->nAction = 1;
                 pActor->nFrame = 0;
                 pActor->nVel = 1500;
@@ -292,10 +286,10 @@ void AIWasp::Tick(RunListEvent* ev)
 
         case kHitSprite:
         {
-            if (nChaseVal.actor == pTarget)
+            if (nChaseVal.actor() == pTarget)
             {
-                pSprite->xvel = 0;
-                pSprite->yvel = 0;
+                pActor->spr.xvel = 0;
+                pActor->spr.yvel = 0;
                 runlist_DamageEnemy(pTarget, pActor, pActor->nDamage);
                 pActor->nAction = 2;
                 pActor->nFrame = 0;
@@ -312,9 +306,9 @@ void AIWasp::Tick(RunListEvent* ev)
     {
         if (bVal)
         {
-            pSprite->ang += RandomSize(9) + 768;
-            pSprite->ang &= kAngleMask;
-            pSprite->zvel = (-20) - RandomSize(6);
+            pActor->spr.ang += RandomSize(9) + 768;
+            pActor->spr.ang &= kAngleMask;
+            pActor->spr.zvel = (-20) - RandomSize(6);
 
             pActor->nAction = 1;
             pActor->nVel = 3000;
@@ -327,9 +321,9 @@ void AIWasp::Tick(RunListEvent* ev)
 
         //if (nMove.type != kHitNone) // The code messed up the return value so this check always was true.
         {
-            pSprite->xvel = 0;
-            pSprite->yvel = 0;
-            pSprite->zvel = 1024;
+            pActor->spr.xvel = 0;
+            pActor->spr.yvel = 0;
+            pActor->spr.zvel = 1024;
             pActor->nAction = 5;
             pActor->nFrame = 0;
         }
@@ -338,21 +332,21 @@ void AIWasp::Tick(RunListEvent* ev)
     }
     case 5:
     {
-        int nSector =pSprite->sectnum;
+        auto pSector =pActor->sector();
 
-        pSprite->z += pSprite->zvel;
+        pActor->spr.pos.Z += pActor->spr.zvel;
 
-        if (pSprite->z >= sector[nSector].floorz)
+        if (pActor->spr.pos.Z >= pSector->floorz)
         {
-            if (SectBelow[nSector] > -1)
+            if (pSector->pBelow != nullptr)
             {
-                BuildSplash(pActor, nSector);
-                pSprite->cstat |= 0x8000;
+                BuildSplash(pActor, pSector);
+                pActor->spr.cstat |= CSTAT_SPRITE_INVISIBLE;
             }
 
-            pSprite->xvel = 0;
-            pSprite->yvel = 0;
-            pSprite->zvel = 0;
+            pActor->spr.xvel = 0;
+            pActor->spr.yvel = 0;
+            pActor->spr.zvel = 0;
             pActor->nAction = 6;
             pActor->nFrame = 0;
             runlist_SubRunRec(pActor->nRun);

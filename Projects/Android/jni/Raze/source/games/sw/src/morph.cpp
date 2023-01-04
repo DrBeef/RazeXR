@@ -37,12 +37,11 @@ Prepared for public release: 03/28/2005 - Charlie Wiederhold, 3D Realms
 
 BEGIN_SW_NS
 
-void ScaleSectorObject(SECTOR_OBJECTp);
+void ScaleSectorObject(SECTOR_OBJECT*);
 
-short
-DoSectorObjectSetScale(short match)
+short DoSectorObjectSetScale(short match)
 {
-    SECTOR_OBJECTp sop;
+    SECTOR_OBJECT* sop;
 
     for (sop = SectorObject; sop < &SectorObject[MAX_SECTOR_OBJECTS]; sop++)
     {
@@ -51,7 +50,7 @@ DoSectorObjectSetScale(short match)
 
         if (sop->match_event == match)
         {
-            SET(sop->flags, SOBJ_DYNAMIC);
+            sop->flags |= (SOBJ_DYNAMIC);
             sop->PreMoveAnimator = ScaleSectorObject;
 
             switch (sop->scale_active_type)
@@ -112,11 +111,9 @@ DoSectorObjectSetScale(short match)
     return 0;
 }
 
-short
-DoSOevent(short match, short state)
+short DoSOevent(short match, short state)
 {
-    SECTOR_OBJECTp sop;
-    SPRITEp me_sp;
+    SECTOR_OBJECT* sop;
     short vel_adj=0, spin_adj=0;
 
     for (sop = SectorObject; sop < &SectorObject[MAX_SECTOR_OBJECTS]; sop++)
@@ -126,55 +123,54 @@ DoSOevent(short match, short state)
 
         if (sop->match_event == match)
         {
-            if (TEST(sop->flags, SOBJ_WAIT_FOR_EVENT))
+            if ((sop->flags & SOBJ_WAIT_FOR_EVENT))
             {
                 if (sop->save_vel > 0 || sop->save_spin_speed > 0)
                 {
-                    RESET(sop->flags, SOBJ_WAIT_FOR_EVENT);
+                    sop->flags &= ~(SOBJ_WAIT_FOR_EVENT);
                     sop->vel = sop->save_vel;
                     sop->spin_speed = sop->save_spin_speed;
                 }
             }
 
-            if (sop->match_event_actor == nullptr)
+            auto me_act = sop->match_event_actor;
+            if (me_act == nullptr)
                 continue;
-
-            me_sp = &sop->match_event_actor->s();
 
             // toggle
             if (state == -1)
             {
-                if (TEST_BOOL3(me_sp))
+                if (TEST_BOOL3(me_act))
                 {
-                    RESET_BOOL3(me_sp);
-                    state = OFF;
+                    RESET_BOOL3(me_act);
+                    state = 0;
                 }
                 else
                 {
-                    SET_BOOL3(me_sp);
-                    state = ON;
+                    SET_BOOL3(me_act);
+                    state = 1;
                 }
             }
 
-            if (state == ON)
+            if (state == 1)
             {
-                spin_adj = (int)SP_TAG3(me_sp);
-                vel_adj = SP_TAG7(me_sp);
+                spin_adj = (int)SP_TAG3(me_act);
+                vel_adj = SP_TAG7(me_act);
             }
-            else if (state == OFF)
+            else if (state == 0)
             {
-                spin_adj = -(int)SP_TAG3(me_sp);
-                vel_adj = -SP_TAG7(me_sp);
+                spin_adj = -(int)SP_TAG3(me_act);
+                vel_adj = -SP_TAG7(me_act);
             }
 
             sop->spin_speed += spin_adj;
 
-            if (TEST_BOOL1(me_sp))
+            if (TEST_BOOL1(me_act))
                 sop->vel_tgt += vel_adj;
             else
                 sop->vel += vel_adj;
 
-            if (TEST_BOOL2(me_sp))
+            if (TEST_BOOL2(me_act))
             {
                 sop->dir *= -1;
             }
@@ -188,7 +184,7 @@ DoSOevent(short match, short state)
 // SCALING - PreAnimator
 //
 
-void ScaleSectorObject(SECTOR_OBJECTp sop)
+void ScaleSectorObject(SECTOR_OBJECT* sop)
 {
     switch (sop->scale_type)
     {
@@ -255,7 +251,7 @@ void ScaleSectorObject(SECTOR_OBJECTp sop)
     }
 }
 
-void ScaleRandomPoint(SECTOR_OBJECTp sop, short k, short ang, int x, int y, int *dx, int *dy)
+void ScaleRandomPoint(SECTOR_OBJECT* sop, short k, short ang, int x, int y, int *dx, int *dy)
 {
     int xmul,ymul;
 
@@ -296,27 +292,26 @@ void ScaleRandomPoint(SECTOR_OBJECTp sop, short k, short ang, int x, int y, int 
 // Morph point - move point around
 //
 
-void
-MorphTornado(SECTOR_OBJECTp sop)
+void MorphTornado(SECTOR_OBJECT* sop)
 {
     int mx, my;
     int ceilingz;
     int floorz;
-    SECTORp *sectp;
+    sectortype* *sectp;
     int j;
     int x,y,sx,sy;
 
     // z direction
-    ASSERT(sop->op_main_sector >= 0);
+    ASSERT(sop->op_main_sector != nullptr);
     sop->morph_z += Z(sop->morph_z_speed);
 
     // move vector
-    if (sop->morph_wall_point < 0)
+    if (sop->morph_wall_point == nullptr)
         return;
 
     // place at correct x,y offset from center
-    x = sop->xmid - sop->morph_xoff;
-    y = sop->ymid - sop->morph_yoff;
+    x = sop->pmid.X - sop->morph_xoff;
+    y = sop->pmid.Y - sop->morph_yoff;
 
     sx = x;
     sy = y;
@@ -326,10 +321,10 @@ MorphTornado(SECTOR_OBJECTp sop)
     my = y + MulScale(sop->morph_speed, bsin(sop->morph_ang), 14);
 
     // bound check radius
-    if (ksqrt(SQ(sop->xmid - mx) + SQ(sop->ymid - my)) > sop->morph_dist_max + sop->scale_dist)
+    if (ksqrt(SQ(sop->pmid.X - mx) + SQ(sop->pmid.Y - my)) > sop->morph_dist_max + sop->scale_dist)
     {
         // find angle
-        sop->morph_ang = NORM_ANGLE(getangle(mx - sop->xmid, my - sop->ymid));
+        sop->morph_ang = NORM_ANGLE(getangle(mx - sop->pmid.X, my - sop->pmid.Y));
         // reverse angle
         sop->morph_ang = NORM_ANGLE(sop->morph_ang + 1024);
 
@@ -337,13 +332,13 @@ MorphTornado(SECTOR_OBJECTp sop)
         mx = sx + MulScale(sop->morph_speed << 1, bcos(sop->morph_ang), 14);
         my = sy + MulScale(sop->morph_speed << 1, bsin(sop->morph_ang), 14);
 
-        sop->morph_xoff = sop->xmid - mx;
-        sop->morph_yoff = sop->ymid - my;
+        sop->morph_xoff = sop->pmid.X - mx;
+        sop->morph_yoff = sop->pmid.Y - my;
     }
 
     // save x,y back as offset info
-    sop->morph_xoff = sop->xmid - mx;
-    sop->morph_yoff = sop->ymid - my;
+    sop->morph_xoff = sop->pmid.X - mx;
+    sop->morph_yoff = sop->pmid.Y - my;
 
     if ((RANDOM_P2(1024<<4)>>4) < sop->morph_rand_freq)
         sop->morph_ang = RANDOM_P2(2048);
@@ -352,13 +347,13 @@ MorphTornado(SECTOR_OBJECTp sop)
     dragpoint(sop->morph_wall_point, mx, my);
 
     // bound the Z
-    ceilingz = sector[sop->op_main_sector].ceilingz;
-    floorz = sector[sop->op_main_sector].floorz;
+    ceilingz = sop->op_main_sector->ceilingz;
+    floorz = sop->op_main_sector->floorz;
 
     for (sectp = sop->sectp, j = 0; *sectp; sectp++, j++)
     {
-        if (SectUser[sectnum(*sectp)].Data() &&
-            TEST(SectUser[sectnum(*sectp)]->flags, SECTFU_SO_SLOPE_CEILING_TO_POINT))
+        if ((*sectp)->hasU() &&
+            ((*sectp)->flags & SECTFU_SO_SLOPE_CEILING_TO_POINT))
         {
 #define TOR_LOW (floorz)
             if (sop->morph_z > TOR_LOW)
@@ -372,43 +367,42 @@ MorphTornado(SECTOR_OBJECTp sop)
                 sop->morph_z = ceilingz;
             }
 
-            alignceilslope(sectnum(*sectp), mx, my, sop->morph_z);
+            alignceilslope(*sectp, mx, my, sop->morph_z);
         }
     }
 }
 
 // moves center point around and aligns slope
-void
-MorphFloor(SECTOR_OBJECTp sop)
+void MorphFloor(SECTOR_OBJECT* sop)
 {
     int mx, my;
     int floorz;
-    SECTORp *sectp;
+    sectortype* *sectp;
     int j;
     int x,y;
 
     // z direction
-    ASSERT(sop->op_main_sector >= 0);
+    ASSERT(sop->op_main_sector != nullptr);
     sop->morph_z -= Z(sop->morph_z_speed);
 
     // move vector
-    if (sop->morph_wall_point < 0)
+    if (sop->morph_wall_point == nullptr)
         return;
 
     // place at correct x,y offset from center
-    x = sop->xmid - sop->morph_xoff;
-    y = sop->ymid - sop->morph_yoff;
+    x = sop->pmid.X - sop->morph_xoff;
+    y = sop->pmid.Y - sop->morph_yoff;
 
     // move it from last x,y
     mx = x + MulScale(sop->morph_speed, bcos(sop->morph_ang), 14);
     my = y + MulScale(sop->morph_speed, bsin(sop->morph_ang), 14);
 
     // save x,y back as offset info
-    sop->morph_xoff = sop->xmid - mx;
-    sop->morph_yoff = sop->ymid - my;
+    sop->morph_xoff = sop->pmid.X - mx;
+    sop->morph_yoff = sop->pmid.Y - my;
 
     // bound check radius
-    if (Distance(sop->xmid, sop->ymid, mx, my) > sop->morph_dist_max)
+    if (Distance(sop->pmid.X, sop->pmid.Y, mx, my) > sop->morph_dist_max)
     {
         // go in the other direction
         //sop->morph_speed *= -1;
@@ -417,8 +411,8 @@ MorphFloor(SECTOR_OBJECTp sop)
         // back it up and save it off
         mx = x + MulScale(sop->morph_speed, bcos(sop->morph_ang), 14);
         my = y + MulScale(sop->morph_speed, bsin(sop->morph_ang), 14);
-        sop->morph_xoff = sop->xmid - mx;
-        sop->morph_yoff = sop->ymid - my;
+        sop->morph_xoff = sop->pmid.X - mx;
+        sop->morph_yoff = sop->pmid.Y - my;
 
         // turn it all the way around and then do a random -512 to 512 from there
         //sop->morph_ang = NORM_ANGLE(sop->morph_ang + 1024 + (RANDOM_P2(1024) - 512));
@@ -431,7 +425,7 @@ MorphFloor(SECTOR_OBJECTp sop)
     dragpoint(sop->morph_wall_point, mx, my);
 
     // bound the Z
-    floorz = sector[sop->op_main_sector].floorz;
+    floorz = sop->op_main_sector->floorz;
 
 #define MORPH_FLOOR_ZRANGE Z(300)
 
@@ -450,89 +444,85 @@ MorphFloor(SECTOR_OBJECTp sop)
 
     for (sectp = sop->sectp, j = 0; *sectp; sectp++, j++)
     {
-        if (SectUser[sectnum(*sectp)].Data() &&
-            TEST(SectUser[sectnum(*sectp)]->flags, SECTFU_SO_SLOPE_CEILING_TO_POINT))
+        if ((*sectp)->hasU() &&
+            ((*sectp)->flags & SECTFU_SO_SLOPE_CEILING_TO_POINT))
         {
-            alignflorslope(sectnum(*sectp), mx, my, floorz + sop->morph_z);
+            alignflorslope(*sectp, mx, my, floorz + sop->morph_z);
         }
     }
 }
 
-void
-SOBJ_AlignFloorToPoint(SECTOR_OBJECTp sop, int x, int y, int z)
+void SOBJ_AlignFloorToPoint(SECTOR_OBJECT* sop, int x, int y, int z)
 {
-    SECTORp *sectp;
+    sectortype* *sectp;
     int j;
 
     for (sectp = sop->sectp, j = 0; *sectp; sectp++, j++)
     {
-        if (SectUser[sectnum(*sectp)].Data() &&
-            TEST(SectUser[sectnum(*sectp)]->flags, SECTFU_SO_SLOPE_CEILING_TO_POINT))
+        if ((*sectp)->hasU() &&
+            ((*sectp)->flags & SECTFU_SO_SLOPE_CEILING_TO_POINT))
         {
-            alignflorslope(int16_t(sectnum(*sectp)), x, y, z);
+            alignflorslope(*sectp, x, y, z);
         }
     }
 }
 
-void
-SOBJ_AlignCeilingToPoint(SECTOR_OBJECTp sop, int x, int y, int z)
+void SOBJ_AlignCeilingToPoint(SECTOR_OBJECT* sop, int x, int y, int z)
 {
-    SECTORp *sectp;
+    sectortype* *sectp;
     int j;
 
     for (sectp = sop->sectp, j = 0; *sectp; sectp++, j++)
     {
-        if (SectUser[sectnum(*sectp)].Data() &&
-            TEST(SectUser[sectnum(*sectp)]->flags, SECTFU_SO_SLOPE_CEILING_TO_POINT))
+        if ((*sectp)->hasU() &&
+            ((*sectp)->flags & SECTFU_SO_SLOPE_CEILING_TO_POINT))
         {
-            alignceilslope(int16_t(sectnum(*sectp)), x, y, z);
+            alignceilslope(*sectp, x, y, z);
         }
     }
 }
 
-void
-SOBJ_AlignFloorCeilingToPoint(SECTOR_OBJECTp sop, int x, int y, int z)
+void SOBJ_AlignFloorCeilingToPoint(SECTOR_OBJECT* sop, int x, int y, int z)
 {
-    SECTORp *sectp;
+    sectortype* *sectp;
     int j;
 
     for (sectp = sop->sectp, j = 0; *sectp; sectp++, j++)
     {
-        if (SectUser[sectnum(*sectp)].Data() &&
-            TEST(SectUser[sectnum(*sectp)]->flags, SECTFU_SO_SLOPE_CEILING_TO_POINT))
+        if ((*sectp)->hasU() &&
+            ((*sectp)->flags & SECTFU_SO_SLOPE_CEILING_TO_POINT))
         {
-            alignflorslope(sectnum(*sectp), x, y, z);
-            alignceilslope(sectnum(*sectp), x, y, z);
+            alignflorslope(*sectp, x, y, z);
+            alignceilslope(*sectp, x, y, z);
         }
     }
 }
 
 // moves center point around and aligns slope
-void
-SpikeFloor(SECTOR_OBJECTp sop)
+void SpikeFloor(SECTOR_OBJECT* sop)
 {
     int mx, my;
     int floorz;
     int x,y;
 
     // z direction
-    ASSERT(sop->op_main_sector >= 0);
+    ASSERT(sop->op_main_sector != nullptr);
     sop->morph_z -= Z(sop->morph_z_speed);
 
     // move vector
-    if (sop->morph_wall_point < 0)
+    if (sop->morph_wall_point == nullptr)
         return;
 
     // place at correct x,y offset from center
-    x = sop->xmid - sop->morph_xoff;
-    y = sop->ymid - sop->morph_yoff;
+    x = sop->pmid.X - sop->morph_xoff;
+    y = sop->pmid.Y - sop->morph_yoff;
 
     // move it from last x,y
     mx = x;
     my = y;
 
     // bound the Z
-    floorz = sector[sop->op_main_sector].floorz;
+    floorz = sop->op_main_sector->floorz;
 
 #define MORPH_FLOOR_ZRANGE Z(300)
 
@@ -548,19 +538,6 @@ SpikeFloor(SECTOR_OBJECTp sop)
     }
 
     SOBJ_AlignFloorToPoint(sop, mx, my, floorz + sop->morph_z);
-
-#if 0
-    SECTORp *sectp;
-    int j;
-    for (sectp = sop->sectp, j = 0; *sectp; sectp++, j++)
-    {
-        if (SectUser[*sectp - sector] &&
-            TEST(SectUser[*sectp - sector]->flags, SECTFU_SO_SLOPE_CEILING_TO_POINT))
-        {
-            alignflorslope(*sectp - sector, mx, my, floorz + sop->morph_z);
-        }
-    }
-#endif
 }
 
 

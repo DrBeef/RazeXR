@@ -131,9 +131,9 @@ static void ParseStatistics(const char *fn, TArray<FStatistics> &statlist)
 
 				sc.MustGetString();
 				sc.MustGetString();
-				strncpy(session.name, sc.String, 24);
+				strncpy(session.name, sc.String, 23);
 				sc.MustGetString();
-				strncpy(session.info, sc.String, 60);
+				strncpy(session.info, sc.String, 59);
 
 				int h,m,s;
 				sc.MustGetString();
@@ -149,14 +149,14 @@ static void ParseStatistics(const char *fn, TArray<FStatistics> &statlist)
 						FLevelStatistics &lstats = session.levelstats[session.levelstats.Reserve(1)];
 
 						sc.MustGetString();
-						strncpy(lstats.name, sc.String, 24);
+						strncpy(lstats.name, sc.String, 23);
 						sc.MustGetString();
-						strncpy(lstats.info, sc.String, 60);
+						strncpy(lstats.info, sc.String, 59);
 
-						int h,m,s;
+						int hour,min,sec;
 						sc.MustGetString();
-						sscanf(sc.String, "%d:%d:%d", &h, &m, &s);
-						lstats.timeneeded= ((((h*60)+m)*60)+s);
+						sscanf(sc.String, "%d:%d:%d", &hour, &min, &sec);
+						lstats.timeneeded= ((((hour*60)+min)*60)+sec);
 
 						lstats.skill = 0;
 					}

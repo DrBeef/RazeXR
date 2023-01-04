@@ -39,41 +39,38 @@ BEGIN_SW_NS
 bool PredictionOn = true;
 bool Prediction = false;
 PLAYER PredictPlayer;
-USER PredictUser;
-PLAYERp ppp = &PredictPlayer;
+//USER PredictUser;
+PLAYER* ppp = &PredictPlayer;
 
-typedef struct
+struct PREDICT
 {
     int x,y,z;
     binangle ang;
     fixedhoriz horiz;
     short filler;
-} PREDICT, *PREDICTp;
+};
 
 PREDICT Predict[/*MOVEFIFOSIZ*/256];
 int predictmovefifoplc;
 
-void DoPlayerSectorUpdatePreMove(PLAYERp);
-void DoPlayerSectorUpdatePostMove(PLAYERp);
+void DoPlayerSectorUpdatePreMove(PLAYER*);
+void DoPlayerSectorUpdatePostMove(PLAYER*);
 
 
-void
-InitPrediction(PLAYERp pp)
+void InitPrediction(PLAYER* pp)
 {
     if (!PredictionOn)
         return;
 
     // make a copy of player struct and sprite
-    *ppp = *pp;
-    PredictUser = *pp->Actor()->u();
+    //*ppp = *pp;
+    //PredictUser = *pp->actor->user;
 }
 
-void
-DoPrediction(PLAYERp ppp)
+void DoPrediction(PLAYER* ppp)
 {
 #if 0
-    USERp u;
-    SPRITE spr;
+    spritetype spr;
     int bakrandomseed;
 
     // routine called from MoveLoop
@@ -123,11 +120,10 @@ DoPrediction(PLAYERp ppp)
 #endif
 }
 
-void
-CorrectPrediction(int actualfifoplc)
+void CorrectPrediction(int actualfifoplc)
 {
 #if 0
-    PREDICTp predict = &Predict[actualfifoplc & (MOVEFIFOSIZ-1)];
+    PREDICT* predict = &Predict[actualfifoplc & (MOVEFIFOSIZ-1)];
 
     if (!PredictionOn)
         return;
@@ -145,9 +141,6 @@ CorrectPrediction(int actualfifoplc)
     {
         return;
     }
-
-//    //DSPRINTF(ds,"PREDICT ERROR: %ld %ld %ld %ld %ld %ld %ld %ld %ld %ld", predict->angle.ang.asbuild(), Player[myconnectindex].angle.ang.asbuild(), predict->x,    Player[myconnectindex].posx, predict->y,    Player[myconnectindex].posy, predict->z,    Player[myconnectindex].posz,  predict->horiz.asbuild(), Player[myconnectindex].horizon.horiz.asbuild()));
-//    MONO_PRINT(ds);
 
     InitPrediction(&Player[myconnectindex]);
     // puts the predicted pos back to actual pos

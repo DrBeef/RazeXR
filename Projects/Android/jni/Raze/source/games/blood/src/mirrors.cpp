@@ -33,137 +33,128 @@ BEGIN_BLD_NS
 
 int mirrorcnt, mirrorsector, mirrorwall[4];
 
-MIRROR mirror[16];
+MIRROR mirror[16]; // only needed by Polymost.
+
+//---------------------------------------------------------------------------
+//
+//
+//
+//---------------------------------------------------------------------------
 
 void InitMirrors(void)
 {
-    r_rortexture = 4080;
-    r_rortexturerange = 16;
+	r_rortexture = 4080;
+	r_rortexturerange = 16;
 
-    mirrorcnt = 0;
-    tileDelete(504);
-    portalClear();
-    
+	mirrorcnt = 0;
+	tileDelete(504);
+	portalClear();
+
 	for (int i = 0; i < 16; i++)
 	{
 		tileDelete(4080 + i);
 	}
-    for (int i = numwalls - 1; i >= 0; i--)
-    {
-        if (mirrorcnt == 16)
-            break;
-        int nTile = 4080+mirrorcnt;
-        if (wall[i].overpicnum == 504)
-        {
-            if (wall[i].extra > 0 && GetWallType(i) == kWallStack)
-            {
-                wall[i].overpicnum = nTile;
+	for (int i = (int)wall.Size() - 1; i >= 0; i--)
+	{
+		auto pWalli = &wall[i];
+		if (mirrorcnt == 16)
+			break;
+		int nTile = 4080 + mirrorcnt;
+		if (pWalli->overpicnum == 504)
+		{
+			if (pWalli->extra > 0 && pWalli->type == kWallStack)
+			{
+				pWalli->overpicnum = nTile;
 
-                mirror[mirrorcnt].wallnum = i;
-                mirror[mirrorcnt].type = 0;
-                wall[i].cstat |= 32;
-                int tmp = xwall[wall[i].extra].data;
-                int j;
-                for (j = numwalls - 1; j >= 0; j--)
-                {
-                    if (j == i)
-                        continue;
-                    if (wall[j].extra > 0 && GetWallType(i) == kWallStack)
-                    {
-                        if (tmp != xwall[wall[j].extra].data)
-                            continue;
-                        wall[i].hitag = j;
-                        wall[j].hitag = i;
-                        mirror[mirrorcnt].link = j;
-                        break;
-                    }
-                }
-                if (j < 0)
-                {
-                    Printf(PRINT_HIGH, "wall[%d] has no matching wall link! (data=%d)\n", i, tmp);
-                }
-                else
-                {
-                    mirrorcnt++;
-                    wall[i].portalflags = PORTAL_WALL_VIEW;
-                    wall[i].portalnum = j;
-                }
-            }
-            continue;
-        }
-        if (wall[i].picnum == 504)
-        {
-            mirror[mirrorcnt].link = i;
-            mirror[mirrorcnt].wallnum = i;
-            wall[i].picnum = nTile;
-            mirror[mirrorcnt].type = 0;
-            wall[i].cstat |= 32;
-            wall[i].portalflags = PORTAL_WALL_MIRROR;
-            mirrorcnt++;
-            continue;
-        }
-    }
-    for (int i = numsectors - 1; i >= 0; i--)
-    {
-        if (mirrorcnt >= 15)
-            break;
+				mirror[mirrorcnt].wallnum = i;
+				mirror[mirrorcnt].type = 0;
+				pWalli->cstat |= CSTAT_WALL_1WAY;
+				int tmp = pWalli->xw().data;
+				int j;
+				for (j = (int)wall.Size() - 1; j >= 0; j--)
+				{
+					if (j == i)
+						continue;
+					auto pWallj = &wall[j];
+					if (pWallj->extra > 0 && pWallj->type == kWallStack)
+					{
+						if (tmp != pWallj->xw().data)
+							continue;
+						pWalli->hitag = j; // hitag is only used by Polymost, the new renderer uses external links.
+						pWallj->hitag = i;
+						mirror[mirrorcnt].link = j;
+						break;
+					}
+				}
+				if (j < 0)
+				{
+					Printf(PRINT_HIGH, "wall[%d] has no matching wall link! (data=%d)\n", i, tmp);
+				}
+				else
+				{
+					mirrorcnt++;
+					pWalli->portalflags = PORTAL_WALL_VIEW;
+					pWalli->portalnum = j;
+				}
+			}
+			continue;
+		}
+		if (pWalli->picnum == 504)
+		{
+			mirror[mirrorcnt].link = i;
+			mirror[mirrorcnt].wallnum = i;
+			pWalli->picnum = nTile;
+			mirror[mirrorcnt].type = 0;
+			pWalli->cstat |= CSTAT_WALL_1WAY;
+			pWalli->portalflags = PORTAL_WALL_MIRROR;
+			mirrorcnt++;
+			continue;
+		}
+	}
+	for (int i = (int)sector.Size() - 1; i >= 0; i--)
+	{
+		if (mirrorcnt >= 15)
+			break;
 
-        if (sector[i].floorpicnum == 504)
-        {
-            auto link = getUpperLink(i);
-            if (link == nullptr)
-                continue;
-            auto link2 = link->GetOwner();
-            if (link2 == nullptr)
-                continue;
-            int j = link2->s().sectnum;
-            if (sector[j].ceilingpicnum != 504)
-                I_Error("Lower link sector %d doesn't have mirror picnum\n", j);
-            mirror[mirrorcnt].type = 2;
-            mirror[mirrorcnt].dx = link2->s().x - link->s().x;
-            mirror[mirrorcnt].dy = link2->s().y - link->s().y;
-            mirror[mirrorcnt].dz = link2->s().z - link->s().z;
-            mirror[mirrorcnt].wallnum = i;
-            mirror[mirrorcnt].link = j;
-            sector[i].floorpicnum = 4080 + mirrorcnt;
-            sector[i].portalflags = PORTAL_SECTOR_FLOOR;
-            sector[i].portalnum = portalAdd(PORTAL_SECTOR_FLOOR, j, mirror[mirrorcnt].dx, mirror[mirrorcnt].dy, mirror[mirrorcnt].dz);
-            mirrorcnt++;
-            mirror[mirrorcnt].type = 1;
-            mirror[mirrorcnt].dx = link->s().x - link2->s().x;
-            mirror[mirrorcnt].dy = link->s().y - link2->s().y;
-            mirror[mirrorcnt].dz = link->s().z - link2->s().z;
-            mirror[mirrorcnt].wallnum = j;
-            mirror[mirrorcnt].link = i;
-            sector[j].ceilingpicnum = 4080 + mirrorcnt;
-            sector[j].portalflags = PORTAL_SECTOR_CEILING;
-            sector[j].portalnum = portalAdd(PORTAL_SECTOR_CEILING, i, mirror[mirrorcnt].dx, mirror[mirrorcnt].dy, mirror[mirrorcnt].dz);
-            mirrorcnt++;
-        }
-    }
-    mirrorsector = numsectors;
-    mergePortals();
-#if 1 // The new backend won't need this shit anymore.
-    for (int i = 0; i < 4; i++)
-    {
-        mirrorwall[i] = numwalls+i;
-        wall[mirrorwall[i]].picnum = 504;
-        wall[mirrorwall[i]].overpicnum = 504;
-        wall[mirrorwall[i]].cstat = 0;
-        wall[mirrorwall[i]].nextsector = -1;
-        wall[mirrorwall[i]].nextwall = -1;
-        wall[mirrorwall[i]].point2 = numwalls+i+1;
-    }
-    wall[mirrorwall[3]].point2 = mirrorwall[0];
-    sector[mirrorsector].ceilingpicnum = 504;
-    sector[mirrorsector].floorpicnum = 504;
-    sector[mirrorsector].wallptr = mirrorwall[0];
-    sector[mirrorsector].wallnum = 4;
-#endif
-}
+		auto secti = &sector[i];
+		if (secti->floorpicnum == 504)
+		{
+			auto link = barrier_cast<DBloodActor*>(secti->upperLink);
+			if (link == nullptr)
+				continue;
+			auto link2 = link->GetOwner();
+			if (link2 == nullptr)
+				continue;
 
-void TranslateMirrorColors(int nShade, int nPalette)
-{
+			auto sectj = link2->sector();
+			int j = sectnum(sectj);
+			if (sectj->ceilingpicnum != 504)
+				I_Error("Lower link sector %d doesn't have mirror picnum\n", j);
+			mirror[mirrorcnt].type = 2;
+			mirror[mirrorcnt].dx = link2->spr.pos.X - link->spr.pos.X;
+			mirror[mirrorcnt].dy = link2->spr.pos.Y - link->spr.pos.Y;
+			mirror[mirrorcnt].dz = link2->spr.pos.Z - link->spr.pos.Z;
+			mirror[mirrorcnt].wallnum = i;
+			mirror[mirrorcnt].link = j;
+			secti->floorpicnum = 4080 + mirrorcnt;
+			secti->portalflags = PORTAL_SECTOR_FLOOR;
+			secti->portalnum = portalAdd(PORTAL_SECTOR_FLOOR, j, mirror[mirrorcnt].dx, mirror[mirrorcnt].dy, mirror[mirrorcnt].dz);
+			mirrorcnt++;
+			mirror[mirrorcnt].type = 1;
+			mirror[mirrorcnt].dx = link->spr.pos.X - link2->spr.pos.X;
+			mirror[mirrorcnt].dy = link->spr.pos.Y - link2->spr.pos.Y;
+			mirror[mirrorcnt].dz = link->spr.pos.Z - link2->spr.pos.Z;
+			mirror[mirrorcnt].wallnum = j;
+			mirror[mirrorcnt].link = i;
+			sectj->ceilingpicnum = 4080 + mirrorcnt;
+			sectj->portalflags = PORTAL_SECTOR_CEILING;
+			sectj->portalnum = portalAdd(PORTAL_SECTOR_CEILING, i, mirror[mirrorcnt].dx, mirror[mirrorcnt].dy, mirror[mirrorcnt].dz);
+			mirrorcnt++;
+		}
+	}
+	mirrorsector = sector.Size();
+	mergePortals();
+	InitPolymostMirrorHack();
 }
 
 //---------------------------------------------------------------------------
@@ -176,7 +167,7 @@ FSerializer& Serialize(FSerializer& arc, const char* keyname, MIRROR& w, MIRROR*
 {
 	if (arc.BeginObject(keyname))
 	{
-		arc ("type", w.type)
+		arc("type", w.type)
 			("link", w.link)
 			("dx", w.dx)
 			("dy", w.dy)
@@ -187,14 +178,18 @@ FSerializer& Serialize(FSerializer& arc, const char* keyname, MIRROR& w, MIRROR*
 	return arc;
 }
 
+//---------------------------------------------------------------------------
+//
+//
+//
+//---------------------------------------------------------------------------
+
 void SerializeMirrors(FSerializer& arc)
 {
 	if (arc.BeginObject("mirror"))
 	{
 		arc("mirrorcnt", mirrorcnt)
-			("mirrorsector", mirrorsector)
 			.Array("mirror", mirror, countof(mirror))
-			.Array("mirrorwall", mirrorwall, countof(mirrorwall))
 			.EndObject();
 	}
 
@@ -203,30 +198,14 @@ void SerializeMirrors(FSerializer& arc)
 
 		tileDelete(504);
 
-#ifdef USE_OPENGL
 		r_rortexture = 4080;
 		r_rortexturerange = 16;
-
-#endif
 
 		for (int i = 0; i < 16; i++)
 		{
 			tileDelete(4080 + i);
 		}
-		for (int i = 0; i < 4; i++)
-		{
-			wall[mirrorwall[i]].picnum = 504;
-			wall[mirrorwall[i]].overpicnum = 504;
-			wall[mirrorwall[i]].cstat = 0;
-			wall[mirrorwall[i]].nextsector = -1;
-			wall[mirrorwall[i]].nextwall = -1;
-			wall[mirrorwall[i]].point2 = numwalls + i + 1;
-		}
-		wall[mirrorwall[3]].point2 = mirrorwall[0];
-		sector[mirrorsector].ceilingpicnum = 504;
-		sector[mirrorsector].floorpicnum = 504;
-		sector[mirrorsector].wallptr = mirrorwall[0];
-		sector[mirrorsector].wallnum = 4;
+		InitPolymostMirrorHack();
 	}
 }
 

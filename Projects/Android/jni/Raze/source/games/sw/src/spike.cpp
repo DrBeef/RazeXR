@@ -37,54 +37,47 @@ Prepared for public release: 03/28/2005 - Charlie Wiederhold, 3D Realms
 BEGIN_SW_NS
 
 bool TestSpikeMatchActive(short match);
-void InterpSectorSprites(short sectnum, bool state);
 
 void ReverseSpike(DSWActor* actor)
 {
-    USERp u = actor->u();
-    SPRITEp sp = &actor->s();
-
     // if paused go ahead and start it up again
-    if (u->Tics)
+    if (actor->user.Tics)
     {
-        u->Tics = 0;
+        actor->user.Tics = 0;
         SetSpikeActive(actor);
         return;
     }
 
     // moving toward to OFF pos
-    if (u->z_tgt == u->oz)
+    if (actor->user.z_tgt == actor->user.oz)
     {
-        if (sp->z == u->oz)
-            u->z_tgt = u->sz;
-        else if (u->sz == u->oz)
-            u->z_tgt = sp->z;
+        if (actor->spr.pos.Z == actor->user.oz)
+            actor->user.z_tgt = actor->user.pos.Z;
+        else if (actor->user.pos.Z == actor->user.oz)
+            actor->user.z_tgt = actor->spr.pos.Z;
     }
-    else if (u->z_tgt == u->sz)
+    else if (actor->user.z_tgt == actor->user.pos.Z)
     {
-        if (sp->z == u->oz)
-            u->z_tgt = sp->z;
-        else if (u->sz == u->oz)
-            u->z_tgt = u->sz;
+        if (actor->spr.pos.Z == actor->user.oz)
+            actor->user.z_tgt = actor->spr.pos.Z;
+        else if (actor->user.pos.Z == actor->user.oz)
+            actor->user.z_tgt = actor->user.pos.Z;
     }
 
-    u->vel_rate = -u->vel_rate;
+    actor->user.vel_rate = -actor->user.vel_rate;
 }
 
 bool SpikeSwitch(short match, short setting)
 {
-    SPRITEp sp;
     bool found = false;
 
     SWStatIterator it(STAT_DEFAULT);
     while (auto actor = it.Next())
     {
-        sp = &actor->s();
-
-        if (sp->lotag == TAG_SPRITE_SWITCH_VATOR && sp->hitag == match)
+        if (actor->spr.lotag == TAG_SPRITE_SWITCH_VATOR && actor->spr.hitag == match)
         {
             found = true;
-            AnimateSwitch(sp, setting);
+            AnimateSwitch(actor, setting);
         }
     }
 
@@ -93,67 +86,58 @@ bool SpikeSwitch(short match, short setting)
 
 void SetSpikeActive(DSWActor* actor)
 {
-    USERp u = actor->u();
-    SPRITEp sp = &actor->s();
-    SECTORp sectp = &sector[sp->sectnum];
+    sectortype* sectp = actor->sector();
 
-    if (TEST(sp->cstat, CSTAT_SPRITE_YFLIP))
-        StartInterpolation(sp->sectnum, Interp_Sect_Ceilingheinum);
+    if (actor->spr.cstat & (CSTAT_SPRITE_YFLIP))
+        StartInterpolation(actor->sector(), Interp_Sect_Ceilingheinum);
     else
-        StartInterpolation(sp->sectnum, Interp_Sect_Floorheinum);
+        StartInterpolation(actor->sector(), Interp_Sect_Floorheinum);
 
-    InterpSectorSprites(sp->sectnum, true);
+    InterpSectorSprites(actor->sector(), true);
 
     // play activate sound
-    DoSoundSpotMatch(SP_TAG2(sp), 1, SOUND_OBJECT_TYPE);
+    DoSoundSpotMatch(SP_TAG2(actor), 1, SOUND_OBJECT_TYPE);
 
-    SET(u->Flags, SPR_ACTIVE);
-    u->Tics = 0;
+    actor->user.Flags |= (SPR_ACTIVE);
+    actor->user.Tics = 0;
 
     // moving to the ON position
-    if (u->z_tgt == sp->z)
-        VatorSwitch(SP_TAG2(sp), ON);
+    if (actor->user.z_tgt == actor->spr.pos.Z)
+        VatorSwitch(SP_TAG2(actor), true);
     else
     // moving to the OFF position
-    if (u->z_tgt == u->sz)
-        VatorSwitch(SP_TAG2(sp), OFF);
+    if (actor->user.z_tgt == actor->user.pos.Z)
+        VatorSwitch(SP_TAG2(actor), false);
 }
 
 void SetSpikeInactive(DSWActor* actor)
 {
-    USERp u = actor->u();
-    SPRITEp sp = &actor->s();
-    SECTORp sectp = &sector[sp->sectnum];
+    sectortype* sectp = actor->sector();
 
-    if (TEST(sp->cstat, CSTAT_SPRITE_YFLIP))
-        StopInterpolation(sp->sectnum, Interp_Sect_Ceilingheinum);
+    if (actor->spr.cstat & (CSTAT_SPRITE_YFLIP))
+        StopInterpolation(sectp, Interp_Sect_Ceilingheinum);
     else
-        StopInterpolation(sp->sectnum, Interp_Sect_Floorheinum);
+        StopInterpolation(sectp, Interp_Sect_Floorheinum);
 
-    InterpSectorSprites(sp->sectnum, false);
+    InterpSectorSprites(sectp, false);
 
     // play activate sound
-    DoSoundSpotMatch(SP_TAG2(sp), 2, SOUND_OBJECT_TYPE);
+    DoSoundSpotMatch(SP_TAG2(actor), 2, SOUND_OBJECT_TYPE);
 
-    RESET(u->Flags, SPR_ACTIVE);
+    actor->user.Flags &= ~(SPR_ACTIVE);
 }
 
 // called for operation from the space bar
-void DoSpikeOperate(short sectnum)
+void DoSpikeOperate(sectortype* sect)
 {
-    SPRITEp fsp;
     short match;
 
-    SWSectIterator it(sectnum);
+    SWSectIterator it(sect);
     while (auto actor = it.Next())
     {
-        fsp = &actor->s();
-
-        if (fsp->statnum == STAT_SPIKE && SP_TAG1(fsp) == SECT_SPIKE && SP_TAG3(fsp) == 0)
+        if (actor->spr.statnum == STAT_SPIKE && SP_TAG1(actor) == SECT_SPIKE && SP_TAG3(actor) == 0)
         {
-            sectnum = fsp->sectnum;
-
-            match = SP_TAG2(fsp);
+            match = SP_TAG2(actor);
             if (match > 0)
             {
                 if (!TestSpikeMatchActive(match))
@@ -171,24 +155,16 @@ void DoSpikeOperate(short sectnum)
 // returns first spike found
 void DoSpikeMatch(short match)
 {
-    USERp fu;
-    SPRITEp fsp;
-
     SWStatIterator it(STAT_SPIKE);
     while (auto actor = it.Next())
     {
-        fsp = &actor->s();
-
-        if (SP_TAG1(fsp) == SECT_SPIKE && SP_TAG2(fsp) == match)
+        if (SP_TAG1(actor) == SECT_SPIKE && SP_TAG2(actor) == match)
         {
-            fu = actor->u();
-
-            if (TEST(fu->Flags, SPR_ACTIVE))
+            if (actor->user.Flags & SPR_ACTIVE)
             {
                 ReverseSpike(actor);
                 continue;
             }
-
             SetSpikeActive(actor);
         }
     }
@@ -197,23 +173,16 @@ void DoSpikeMatch(short match)
 
 bool TestSpikeMatchActive(short match)
 {
-    USERp fu;
-    SPRITEp fsp;
-
     SWStatIterator it(STAT_SPIKE);
     while (auto actor = it.Next())
     {
-        fsp = &actor->s();
-
-        if (SP_TAG1(fsp) == SECT_SPIKE && SP_TAG2(fsp) == match)
+        if (SP_TAG1(actor) == SECT_SPIKE && SP_TAG2(actor) == match)
         {
-            fu = actor->u();
-
             // door war
-            if (TEST_BOOL6(fsp))
+            if (TEST_BOOL6(actor))
                 continue;
 
-            if (TEST(fu->Flags, SPR_ACTIVE) || fu->Tics)
+            if (actor->user.Flags & (SPR_ACTIVE) || actor->user.Tics)
                 return true;
         }
     }
@@ -223,34 +192,33 @@ bool TestSpikeMatchActive(short match)
 
 int DoSpikeMove(DSWActor* actor, int *lptr)
 {
-    USERp u = actor->u();
     int zval;
 
     zval = *lptr;
 
     // if LESS THAN goal
-    if (zval < u->z_tgt)
+    if (zval < actor->user.z_tgt)
     {
         // move it DOWN
-        zval += (synctics * u->jump_speed);
+        zval += (synctics * actor->user.jump_speed);
 
-        u->jump_speed += u->vel_rate * synctics;
+        actor->user.jump_speed += actor->user.vel_rate * synctics;
 
         // if the other way make it equal
-        if (zval > u->z_tgt)
-            zval = u->z_tgt;
+        if (zval > actor->user.z_tgt)
+            zval = actor->user.z_tgt;
     }
 
     // if GREATER THAN goal
-    if (zval > u->z_tgt)
+    if (zval > actor->user.z_tgt)
     {
         // move it UP
-        zval -= (synctics * u->jump_speed);
+        zval -= (synctics * actor->user.jump_speed);
 
-        u->jump_speed += u->vel_rate * synctics;
+        actor->user.jump_speed += actor->user.vel_rate * synctics;
 
-        if (zval < u->z_tgt)
-            zval = u->z_tgt;
+        if (zval < actor->user.z_tgt)
+            zval = actor->user.z_tgt;
     }
 
     *lptr = zval;
@@ -260,51 +228,43 @@ int DoSpikeMove(DSWActor* actor, int *lptr)
 
 void SpikeAlign(DSWActor* actor)
 {
-    USERp u = actor->u();
-    SPRITEp sp = &actor->s();
-
     // either work on single sector or all tagged in SOBJ
-    if ((int8_t)SP_TAG7(sp) < 0)
+    if ((int8_t)SP_TAG7(actor) < 0)
     {
-        if (TEST(sp->cstat, CSTAT_SPRITE_YFLIP))
-            alignceilslope(sp->sectnum, sp->x, sp->y, u->zclip);
+        if (actor->spr.cstat & (CSTAT_SPRITE_YFLIP))
+            alignceilslope(actor->sector(), actor->spr.pos.X, actor->spr.pos.Y, actor->user.zclip);
         else
-            alignflorslope(sp->sectnum, sp->x, sp->y, u->zclip);
+            alignflorslope(actor->sector(), actor->spr.pos.X, actor->spr.pos.Y, actor->user.zclip);
     }
     else
     {
-        if (TEST(sp->cstat, CSTAT_SPRITE_YFLIP))
-            SOBJ_AlignCeilingToPoint(&SectorObject[SP_TAG7(sp)], sp->x, sp->y, u->zclip);
+        if (actor->spr.cstat & (CSTAT_SPRITE_YFLIP))
+            SOBJ_AlignCeilingToPoint(&SectorObject[SP_TAG7(actor)], actor->spr.pos.X, actor->spr.pos.Y, actor->user.zclip);
         else
-            SOBJ_AlignFloorToPoint(&SectorObject[SP_TAG7(sp)], sp->x, sp->y, u->zclip);
+            SOBJ_AlignFloorToPoint(&SectorObject[SP_TAG7(actor)], actor->spr.pos.X, actor->spr.pos.Y, actor->user.zclip);
     }
 }
 
-void MoveSpritesWithSpike(short sectnum)
+void MoveSpritesWithSpike(sectortype* sect)
 {
-    SPRITEp sp;
     int cz,fz;
 
-    SWSectIterator it(sectnum);
+    SWSectIterator it(sect);
     while (auto actor = it.Next())
     {
-        sp = &actor->s();
-
         if (actor->hasU())
             continue;
 
-        if (TEST(sp->extra, SPRX_STAY_PUT_VATOR))
+        if ((actor->spr.extra & SPRX_STAY_PUT_VATOR))
             continue;
 
-        getzsofslope(sectnum, sp->x, sp->y, &cz, &fz);
-        sp->z = fz;
+        getzsofslopeptr(sect, actor->spr.pos.X, actor->spr.pos.Y, &cz, &fz);
+        actor->spr.pos.Z = fz;
     }
 }
 
 int DoSpike(DSWActor* actor)
 {
-    USER* u = actor->u();
-    SPRITEp sp = &actor->s();
     int *lptr;
 
     // zclip = floor or ceiling z
@@ -312,37 +272,37 @@ int DoSpike(DSWActor* actor)
     // z_tgt = target z - on pos
     // sz = starting z - off pos
 
-    lptr = &u->zclip;
+    lptr = &actor->user.zclip;
 
     DoSpikeMove(actor, lptr);
-    MoveSpritesWithSpike(sp->sectnum);
+    MoveSpritesWithSpike(actor->sector());
     SpikeAlign(actor);
 
     // EQUAL this entry has finished
-    if (*lptr == u->z_tgt)
+    if (*lptr == actor->user.z_tgt)
     {
         // in the ON position
-        if (u->z_tgt == sp->z)
+        if (actor->user.z_tgt == actor->spr.pos.Z)
         {
             // change target
-            u->z_tgt = u->sz;
-            u->vel_rate = -u->vel_rate;
+            actor->user.z_tgt = actor->user.pos.Z;
+            actor->user.vel_rate = -actor->user.vel_rate;
 
             SetSpikeInactive(actor);
 
-            if (SP_TAG6(sp))
-                DoMatchEverything(nullptr, SP_TAG6(sp), -1);
+            if (SP_TAG6(actor))
+                DoMatchEverything(nullptr, SP_TAG6(actor), -1);
         }
         else
         // in the OFF position
-        if (u->z_tgt == u->sz)
+        if (actor->user.z_tgt == actor->user.pos.Z)
         {
-            short match = SP_TAG2(sp);
+            short match = SP_TAG2(actor);
 
             // change target
-            u->jump_speed = u->vel_tgt;
-            u->vel_rate = (short)abs(u->vel_rate);
-            u->z_tgt = sp->z;
+            actor->user.jump_speed = actor->user.vel_tgt;
+            actor->user.vel_rate = (short)abs(actor->user.vel_rate);
+            actor->user.z_tgt = actor->spr.pos.Z;
 
             SetSpikeInactive(actor);
 
@@ -353,12 +313,12 @@ int DoSpike(DSWActor* actor)
                 //SpikeSwitch(match, OFF);
             }
 
-            if (SP_TAG6(sp) && TEST_BOOL5(sp))
-                DoMatchEverything(nullptr, SP_TAG6(sp), -1);
+            if (SP_TAG6(actor) && TEST_BOOL5(actor))
+                DoMatchEverything(nullptr, SP_TAG6(actor), -1);
         }
 
         // operate only once
-        if (TEST_BOOL2(sp))
+        if (TEST_BOOL2(actor))
         {
             SetSpikeInactive(actor);
             KillActor(actor);
@@ -366,28 +326,23 @@ int DoSpike(DSWActor* actor)
         }
 
         // setup to go back to the original z
-        if (*lptr != u->oz)
+        if (*lptr != actor->user.oz)
         {
-            if (u->WaitTics)
-                u->Tics = u->WaitTics;
+            if (actor->user.WaitTics)
+                actor->user.Tics = actor->user.WaitTics;
         }
     }
-    else // if (*lptr == u->z_tgt)
+    else // if (*lptr == actor->user.z_tgt)
     {
         // if heading for the OFF (original) position and should NOT CRUSH
-        if (TEST_BOOL3(sp) && u->z_tgt == u->oz)
+        if (TEST_BOOL3(actor) && actor->user.z_tgt == actor->user.oz)
         {
-           SPRITEp bsp;
-            USERp bu;
             bool found = false;
 
-            SWSectIterator it(sp->sectnum);
+            SWSectIterator it(actor->sector());
             while (auto itActor = it.Next())
             {
-                bsp = &actor->s();
-                bu = actor->u();
-
-                if (bu && TEST(bsp->cstat, CSTAT_SPRITE_BLOCK) && TEST(bsp->extra, SPRX_PLAYER_OR_ENEMY))
+                if (actor->hasU() && (actor->spr.cstat & CSTAT_SPRITE_BLOCK) && (actor->spr.extra & SPRX_PLAYER_OR_ENEMY))
                 {
                     ReverseSpike(actor);
                     found = true;
@@ -398,14 +353,14 @@ int DoSpike(DSWActor* actor)
             if (!found)
             {
                 short pnum;
-                PLAYERp pp;
+                PLAYER* pp;
                 // go ahead and look for players clip box bounds
                 TRAVERSE_CONNECT(pnum)
                 {
                     pp = Player + pnum;
 
-                    if (pp->lo_sectp == &sector[sp->sectnum] ||
-                        pp->hi_sectp == &sector[sp->sectnum])
+                    if (pp->lo_sectp == actor->sector() ||
+                        pp->hi_sectp == actor->sector())
                     {
                         ReverseSpike(actor);
                         found = true;
@@ -420,42 +375,40 @@ int DoSpike(DSWActor* actor)
 
 int DoSpikeAuto(DSWActor* actor)
 {
-    USER* u = actor->u();
-    SPRITEp sp = &actor->s();
     int *lptr;
 
-    lptr = &u->zclip;
+    lptr = &actor->user.zclip;
 
     DoSpikeMove(actor, lptr);
-    MoveSpritesWithSpike(sp->sectnum);
+    MoveSpritesWithSpike(actor->sector());
     SpikeAlign(actor);
 
     // EQUAL this entry has finished
-    if (*lptr == u->z_tgt)
+    if (*lptr == actor->user.z_tgt)
     {
         // in the UP position
-        if (u->z_tgt == sp->z)
+        if (actor->user.z_tgt == actor->spr.pos.Z)
         {
             // change target
-            u->z_tgt = u->sz;
-            u->vel_rate = -u->vel_rate;
-            u->Tics = u->WaitTics;
+            actor->user.z_tgt = actor->user.pos.Z;
+            actor->user.vel_rate = -actor->user.vel_rate;
+            actor->user.Tics = actor->user.WaitTics;
 
-            if (SP_TAG6(sp))
-                DoMatchEverything(nullptr, SP_TAG6(sp), -1);
+            if (SP_TAG6(actor))
+                DoMatchEverything(nullptr, SP_TAG6(actor), -1);
         }
         else
         // in the DOWN position
-        if (u->z_tgt == u->sz)
+        if (actor->user.z_tgt == actor->user.pos.Z)
         {
             // change target
-            u->jump_speed = u->vel_tgt;
-            u->vel_rate = (short)abs(u->vel_rate);
-            u->z_tgt = sp->z;
-            u->Tics = u->WaitTics;
+            actor->user.jump_speed = actor->user.vel_tgt;
+            actor->user.vel_rate = (short)abs(actor->user.vel_rate);
+            actor->user.z_tgt = actor->spr.pos.Z;
+            actor->user.Tics = actor->user.WaitTics;
 
-            if (SP_TAG6(sp) && TEST_BOOL5(sp))
-                DoMatchEverything(nullptr, SP_TAG6(sp), -1);
+            if (SP_TAG6(actor) && TEST_BOOL5(actor))
+                DoMatchEverything(nullptr, SP_TAG6(actor), -1);
         }
     }
 

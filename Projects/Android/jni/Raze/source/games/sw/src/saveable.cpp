@@ -23,7 +23,6 @@
 
 #include "ns.h"
 
-#include "compat.h"
 #include "tarray.h"
 #include "debugbreak.h"
 BEGIN_SW_NS
@@ -141,6 +140,7 @@ int Saveable_RestoreCodeSym(savedcodesym *sym, void **ptr)
         return 0;
     }
 
+    Saveable_Init();
     for (auto module : saveablemodules)
     {
         for (unsigned i = 0; i < module->numcode; i++)
@@ -152,7 +152,8 @@ int Saveable_RestoreCodeSym(savedcodesym *sym, void **ptr)
             }
         }
     }
-    I_Error("Unknown code reference '%s' in savegame\n", sym->name.GetChars());
+    // No way to recover. I_FatalError is the only chance to get an error message shown. :(
+    I_FatalError("Unknown code reference '%s' in savegame\n", sym->name.GetChars());
     return -1;
 }
 
@@ -164,6 +165,7 @@ int Saveable_RestoreDataSym(saveddatasym *sym, void **ptr)
         return 0;
     }
 
+    Saveable_Init();
     for (auto module : saveablemodules)
     {
         for (unsigned i = 0; i < module->numdata; i++)
@@ -175,7 +177,8 @@ int Saveable_RestoreDataSym(saveddatasym *sym, void **ptr)
             }
         }
     }
-    I_Error("Unknown data reference '%s' in savegame\n", sym->name.GetChars());
+    // No way to recover. I_FatalError is the only chance to get an error message shown. :(
+    I_FatalError("Unknown data reference '%s' in savegame\n", sym->name.GetChars());
     return -1;
 }
 

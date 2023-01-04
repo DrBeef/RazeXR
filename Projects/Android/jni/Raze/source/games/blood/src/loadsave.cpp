@@ -24,7 +24,6 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 
 #include <stdio.h>
 #include "build.h"
-#include "compat.h"
 
 #include "blood.h"
 #include "i_specialpaths.h"
@@ -37,10 +36,10 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 
 BEGIN_BLD_NS
 
-FixedBitArray<MAXSPRITES> activeXSprites;
+void validateLinks();
 
 // All AI states for assigning an index.
-static AISTATE* allAIStates[] =
+static AISTATE* const allAIStates[] =
 {
 	nullptr,
 	&genIdle,
@@ -392,6 +391,12 @@ static AISTATE* allAIStates[] =
 	&zombieFTeslaRecoil,
 };
 
+//---------------------------------------------------------------------------
+//
+//
+//
+//---------------------------------------------------------------------------
+
 FSerializer& Serialize(FSerializer& arc, const char* keyname, AISTATE*& w, AISTATE** def)
 {
 	unsigned i = 0;
@@ -446,73 +451,66 @@ FSerializer& Serialize(FSerializer& arc, const char* keyname, DUDEEXTRA& w, DUDE
 
 	if (arc.BeginObject(keyname))
 	{
-#ifdef OLD_SAVEGAME
 		// Note: birthCounter/thinkTime are a union and share the same value (this is used for savefile backwards compatibility - see correct implementation below)
-		arc("time", w.time, &empty)
-			("recoil", w.teslaHit, &empty2)
-			("prio", w.prio, &empty)
-			("x1", w.stats.birthCounter, &empty)
-			("x2", w.stats.thinkTime, &empty)
-			("x3", w.stats.active, &empty2)
-			.EndObject();
-#else
 		arc("time", w.time, &empty)
 			("teslaHit", w.teslaHit, &empty2)
 			("prio", w.prio, &empty)
 			("thinkTime", w.stats.thinkTime, &empty)
 			("active", w.stats.active, &empty2)
-#endif
+			.EndObject();
 	}
 	return arc;
 }
 
+//---------------------------------------------------------------------------
+//
+//
+//
+//---------------------------------------------------------------------------
 
-FSerializer& Serialize(FSerializer& arc, const char* keyname, DBloodActor& w, DBloodActor* def)
+void DBloodActor::Serialize(FSerializer& arc)
 {
-	static DBloodActor nul;
-	if (!def)
+	Super::Serialize(arc);
+	arc("xvel", vel.X)
+		("yvel", vel.Y)
+		("zvel", vel.Z)
+		("hasx", hasx)
+		("basepoint", basePoint);
+
+	// The rest is only relevant if the actor has an xsprite.
+	if (hasX())
 	{
-		def = &nul;
-		if (arc.isReading()) w.Clear();
+		arc("xsprite", xspr)
+			("dudeslope", dudeSlope)
+			("dudeextra", dudeExtra)
+			("explosionflag", explosionhackflag)
+			("spritehit", hit)
+			("owneractor", ownerActor);
+
 	}
 
-	if (arc.BeginObject(keyname))
+#ifdef NOONE_EXTENSIONS
+	if (gModernMap)
 	{
-#ifndef OLD_SAVEGAME
-		arc("xvel", w.xvel, def->xvel)
-			("yvel", w.yvel, def->yvel)
-			("zvel", w.zvel, def->zvel);
-#endif
+		arc("spritemass", spriteMass)
+			("prevmarker", prevmarker)
+			.Array("conditions", condition, 2);
 
-		// The rest is only relevant if the actor has an xsprite.
-		if (w.hasX())
+
+		// GenDudeExtra only contains valid info for kDudeModernCustom and kDudeModernCustomBurning so only save when needed as these are not small.
+		if (spr.type == kDudeModernCustom || spr.type == kDudeModernCustomBurning)
 		{
-			arc("dudeslope", w.dudeSlope, def->dudeSlope)
-				("dudeextra", w.dudeExtra, def->dudeExtra)
-				("explosionflag", w.explosionhackflag, def->explosionhackflag)
-				("spritehit", w.hit, def->hit);
-#ifndef OLD_SAVEGAME
-			arc("basepoint", w.basePoint, def->basePoint);
-#endif
-
-			if (gModernMap)
-			{
-				arc("spritemass", w.spriteMass, def->spriteMass); // no treatment for old savegames. If this gets lost it is not critical
-#ifndef OLD_SAVEGAME
-					("prevmarker", w.prevmarker, def->prevmarker);
-
-				// GenDudeExtra only contains valid info for kDudeModernCustom and kDudeModernCustomBurning so only save when needed as these are not small.
-				if (w.s().type == kDudeModernCustom || w.s().time == kDudeModernCustomBurning)
-				{
-					arc("gendudeextra", w.genDudeExtra);
-				}
-#endif
-			}
+			arc("gendudeextra", genDudeExtra);
 		}
-		arc.EndObject();
 	}
-	return arc;
+#endif
 }
+
+//---------------------------------------------------------------------------
+//
+//
+//
+//---------------------------------------------------------------------------
 
 FSerializer& Serialize(FSerializer& arc, const char* keyname, XWALL& w, XWALL* def)
 {
@@ -527,20 +525,25 @@ FSerializer& Serialize(FSerializer& arc, const char* keyname, XWALL& w, XWALL* d
 	{
 		arc("flags", w.flags, def->flags)
 			("busy", w.busy, def->busy)
-			("reference", w.reference, def->reference)
 			("data", w.data, def->data)
 			("txid", w.txID, def->txID)
 			("rxid", w.rxID, def->rxID)
 			("busytime", w.busyTime, def->busyTime)
 			("waittime", w.waitTime, def->waitTime)
 			("command", w.command, def->command)
-			("panxvel", w.panXVel, def->panXVel)
-			("panyvel", w.panYVel, def->panYVel)
+			("panxvel", w.panVel.X, def->panVel.X)
+			("panyvel", w.panVel.Y, def->panVel.Y)
 			("key", w.key, def->key)
 			.EndObject();
 	}
 	return arc;
 }
+
+//---------------------------------------------------------------------------
+//
+//
+//
+//---------------------------------------------------------------------------
 
 FSerializer& Serialize(FSerializer& arc, const char* keyname, XSECTOR& w, XSECTOR* def)
 {
@@ -555,7 +558,6 @@ FSerializer& Serialize(FSerializer& arc, const char* keyname, XSECTOR& w, XSECTO
 	{
 		arc("flags", w.flags, def->flags)
 			("busy", w.busy, def->busy)
-			("reference", w.reference, def->reference)
 			("data", w.data, def->data)
 			("txid", w.txID, def->txID)
 			("rxid", w.rxID, def->rxID)
@@ -596,6 +598,12 @@ FSerializer& Serialize(FSerializer& arc, const char* keyname, XSECTOR& w, XSECTO
 	return arc;
 }
 
+//---------------------------------------------------------------------------
+//
+//
+//
+//---------------------------------------------------------------------------
+
 FSerializer& Serialize(FSerializer& arc, const char* keyname, XSPRITE& w, XSPRITE* def)
 {
 	static XSPRITE nul;
@@ -609,7 +617,6 @@ FSerializer& Serialize(FSerializer& arc, const char* keyname, XSPRITE& w, XSPRIT
 		arc("flags", w.flags, def->flags)
 			("aistate", w.aiState, def->aiState)
 			("busy", w.busy, def->busy)
-			("reference", w.reference, def->reference)
 			("txid", w.txID, def->txID)
 			("rxid", w.rxID, def->rxID)
 			("command", w.command, def->command)
@@ -617,10 +624,10 @@ FSerializer& Serialize(FSerializer& arc, const char* keyname, XSPRITE& w, XSPRIT
 			("data2", w.data2, def->data2)
 			("data3", w.data3, def->data3)
 			("data4", w.data4, def->data4)
-			("targetX", w.targetX, def->targetX)
-			("targetY", w.targetY, def->targetY)
-			("targetZ", w.targetZ, def->targetZ)
-			("target", w.target_i, def->target_i)
+			("targetX", w.TargetPos.X, def->TargetPos.X)
+			("targetY", w.TargetPos.Y, def->TargetPos.Y)
+			("targetZ", w.TargetPos.Z, def->TargetPos.Z)
+			("target", w.target, def->target)
 			("sysdata1", w.sysData1, def->sysData1)
 			("sysdata2", w.sysData2, def->sysData2)
 			("scale", w.scale, def->scale)
@@ -647,20 +654,11 @@ FSerializer& Serialize(FSerializer& arc, const char* keyname, XSPRITE& w, XSPRIT
 	return arc;
 }
 
-FSerializer& Serialize(FSerializer& arc, const char* keyname, HITINFO& w, HITINFO* def)
-{
-	if (arc.BeginObject(keyname))
-	{
-		arc("sect", w.hitsect)
-			("sprite", w.hitactor)
-			("wall", w.hitwall)
-			("x", w.hitx)
-			("y", w.hity)
-			("z", w.hitz)
-			.EndObject();
-	}
-	return arc;
-}
+//---------------------------------------------------------------------------
+//
+//
+//
+//---------------------------------------------------------------------------
 
 FSerializer& Serialize(FSerializer& arc, const char* keyname, GAMEOPTIONS& w, GAMEOPTIONS* def)
 {
@@ -686,6 +684,12 @@ FSerializer& Serialize(FSerializer& arc, const char* keyname, GAMEOPTIONS& w, GA
 	return arc;
 }
 
+//---------------------------------------------------------------------------
+//
+//
+//
+//---------------------------------------------------------------------------
+
 void SerializeState(FSerializer& arc)
 {
 	if (arc.isReading())
@@ -694,61 +698,17 @@ void SerializeState(FSerializer& arc)
 	}
 	if (arc.BeginObject("state"))
 	{
-		psky_t* pSky = tileSetupSky(DEFAULTPSKY);
-
-		arc.Array("sector_filler", qsector_filler, numsectors)
-			("visibility", gVisibility)
+		arc("visibility", gVisibility)
 			("frameclock", PlayClock)
 			("framecount", gFrameCount)
-			.Array("basewall", baseWall, numwalls)
-			.Array("basefloor", baseFloor, numsectors)
-			.Array("baseceil", baseCeil, numsectors)
-			.Array("velfloor", velFloor, numsectors)
-			.Array("velceil", velCeil, numsectors)
 			("hitinfo", gHitInfo)
-			.Array("statcount", gStatCount, kMaxStatus + 1)
-			("xwallsused", XWallsUsed)
-			("xsectorsused", XSectorsUsed)
 			("fogmode", gFogMode)
 #ifdef NOONE_EXTENSIONS
 			("modern", gModernMap)
 #endif
 			("cheating", bPlayerCheated)
-			("skyhoriz", pSky->horizfrac)
-			("skyy", pSky->yoffs)
-			("skyy2", pSky->yoffs2)
-			("scale", pSky->yscale)
-			.Array("tileofs", pSky->tileofs, countof(pSky->tileofs))
-			("numtiles", pSky->lognumtiles)
-			("gameoptions", gGameOptions)
+			("gameoptions", gGameOptions);
 
-			.Array("xwall", xwall, XWallsUsed)  // todo
-			.Array("xsector", xsector, XSectorsUsed)
-			.SparseArray("actors", bloodActors, kMaxSprites, activeSprites)
-			.SparseArray("xsprite", xsprite, kMaxXSprites, activeXSprites);
-
-#ifdef OLD_SAVEGAME
-		POINT3D baseSprite[kMaxSprites];
-		int xvel[kMaxSprites], yvel[kMaxSprites], zvel[kMaxSprites];
-		for (int i = 0; i < kMaxSprites; i++)
-		{
-			baseSprite[i] = bloodActors[i].basePoint;
-			xvel[i] = bloodActors[i].xvel;
-			yvel[i] = bloodActors[i].yvel;
-			zvel[i] = bloodActors[i].zvel;
-		}
-		arc.SparseArray("basesprite", baseSprite, kMaxSprites, activeSprites)
-			.SparseArray("xvel", xvel, kMaxSprites, activeSprites)
-			.SparseArray("yvel", yvel, kMaxSprites, activeSprites)
-			.SparseArray("zvel", zvel, kMaxSprites, activeSprites);
-		if (arc.isReading()) for (int i = 0; i < kMaxSprites; i++) if (activeSprites[i])
-		{
-			bloodActors[i].basePoint = baseSprite[i];
-			bloodActors[i].xvel = xvel[i];
-			bloodActors[i].yvel = yvel[i];
-			bloodActors[i].zvel = zvel[i];
-		}
-#endif
 		arc.EndObject();
 	}
 }
@@ -765,15 +725,16 @@ void SerializeView(FSerializer& arc);
 void SerializeNNExts(FSerializer& arc);
 void SerializeMirrors(FSerializer& arc);
 
+//---------------------------------------------------------------------------
+//
+//
+//
+//---------------------------------------------------------------------------
+
 void GameInterface::SerializeGameState(FSerializer& arc)
 {
 	if (arc.isWriting())
 	{
-		activeXSprites.Zero();
-		for (int i = 0; i < kMaxSprites; i++)
-		{
-			if (activeSprites[i] && sprite[i].extra > 0) activeXSprites.Set(sprite[i].extra);
-		}
 	}
 	else
 	{
@@ -781,14 +742,8 @@ void GameInterface::SerializeGameState(FSerializer& arc)
 		sfxKillAllSounds();
 		ambKillAll();
 		seqKillAll();
-		if (gamestate != GS_LEVEL)
-		{
-			memset(xsprite, 0, sizeof(xsprite));
-		}
 	}
-	arc.SerializeMemory("activexsprites", activeXSprites.Storage(), activeXSprites.StorageSize());
 	SerializeState(arc);
-	InitFreeList(nextXSprite, kMaxXSprites, activeXSprites);
 	SerializeActor(arc);
 	SerializePlayers(arc);
 	SerializeEvents(arc);
@@ -815,9 +770,9 @@ void GameInterface::SerializeGameState(FSerializer& arc)
 		viewSetErrorMessage("");
 		Net_ClearFifo();
 		paused = 0;
-		Polymost::Polymost_prepare_loadboard();
 		Mus_ResumeSaved();
 	}
+	validateLinks();
 }
 
 

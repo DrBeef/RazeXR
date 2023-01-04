@@ -9,7 +9,7 @@
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
-// the Free Software Foundation, either version 3 of the License, or
+// the Free Software Foundation, either version 2 of the License, or
 // (at your option) any later version.
 //
 // This program is distributed in the hope that it will be useful,
@@ -143,7 +143,6 @@ void G_BuildTiccmd (ticcmd_t *cmd);
 void D_DoAdvanceDemo (void);
 
 static void SendSetup (uint32_t playersdetected[MAXNETNODES], uint8_t gotsetup[MAXNETNODES], int len);
-static void RunScript(uint8_t **stream, AActor *pawn, int snum, int argn, int always);
 
 int		reboundpacket;
 uint8_t	reboundstore[MAX_MSGLEN];
@@ -421,14 +420,14 @@ int ExpandTics (int low)
 	int mt = maketic / ticdup;
 
 	delta = low - (mt&0xff);
-		
+
 	if (delta >= -64 && delta <= 64)
 		return (mt&~0xff) + low;
 	if (delta > 64)
 		return (mt&~0xff) - 256 + low;
 	if (delta < -64)
 		return (mt&~0xff) + 256 + low;
-				
+
 	I_Error ("ExpandTics: strange value %i at maketic %i", low, maketic);
 	return 0;
 }
@@ -480,7 +479,7 @@ void HSendPacket (int node, int len)
 					node,
 					ExpandTics(netbuffer[1]),
 					numtics, realretrans, len);
-			
+
 			for (i = 0; i < len; i++)
 				fprintf (debugfile, "%c%2x", i==k?'|':' ', ((uint8_t *)netbuffer)[i]);
 		}
@@ -583,7 +582,7 @@ bool HGetPacket (void)
 		InBuffer.Push(store);
 		doomcom.remotenode = -1;
 	}
-	
+
 	if (doomcom.remotenode == -1)
 	{
 		bool gotmessage = false;
@@ -606,7 +605,7 @@ bool HGetPacket (void)
 		return false;
 	}
 #endif
-		
+
 	if (debugfile)
 	{
 		int i, k, realretrans;
@@ -648,7 +647,7 @@ bool HGetPacket (void)
 					doomcom.remotenode,
 					ExpandTics(netbuffer[1]),
 					numtics, realretrans, doomcom.datalength);
-			
+
 			for (i = 0; i < doomcom.datalength; i++)
 				fprintf (debugfile, "%c%2x", i==k?'|':' ', ((uint8_t *)netbuffer)[i]);
 			if (numtics)
@@ -717,7 +716,7 @@ void PlayerIsGone (int netnode, int netconsole)
 	if (netconsole == Net_Arbitrator)
 	{
 		// Pick a new network arbitrator
-		for (int i = 0; i < MAXPLAYERS; i++)
+		for (int pl = 0; pl < MAXPLAYERS; pl++)
 		{
 #if 0
 			if (i != netconsole && playeringame[i] && players[i].Bot == NULL)
@@ -769,7 +768,7 @@ void GetPackets (void)
 	int k;
 	uint8_t playerbytes[MAXNETNODES];
 	int numplayers;
-								 
+
 	while ( HGetPacket() )
 	{
 		if (netbuffer[0] & NCMD_SETUP)
@@ -782,7 +781,7 @@ void GetPackets (void)
 			}
 			continue;			// extra setup packet
 		}
-						
+
 		netnode = doomcom.remotenode;
 		netconsole = playerfornode[netnode] & ~PL_DRONE;
 
@@ -877,9 +876,9 @@ void GetPackets (void)
 		// Figure out what the rest of the bytes are
 		realstart = ExpandTics (netbuffer[1]);
 		realend = (realstart + numtics);
-		
+
 		nodeforplayer[netconsole] = netnode;
-		
+
 		// check for retransmit request
 		if (resendcount[netnode] <= 0 && (netbuffer[0] & NCMD_RETRANSMIT))
 		{
@@ -892,11 +891,11 @@ void GetPackets (void)
 		{
 			resendcount[netnode]--;
 		}
-		
+
 		// check for out of order / duplicated packet			
 		if (realend == nettics[netnode])
 			continue;
-						
+
 		if (realend < nettics[netnode])
 		{
 			if (debugfile)
@@ -904,7 +903,7 @@ void GetPackets (void)
 						 realstart, numtics);
 			continue;
 		}
-		
+
 		// check for a missed packet
 		if (realstart > nettics[netnode])
 		{
@@ -991,7 +990,7 @@ void NetUpdate (void)
 		D_ProcessEvents ();
 		if (pauseext || (maketic - gametic) / ticdup >= BACKUPTICS/2-1)
 			break;			// can't hold any more
-		
+
 		//Printf ("mk:%i ",maketic);
 		G_BuildTiccmd (&localcmds[maketic % LOCALCMDTICS]);
 		maketic++;
@@ -1010,18 +1009,18 @@ void NetUpdate (void)
 			if (maketic % ticdup != 0)
 			{
 				int mod = maketic - maketic % ticdup;
-				int j;
+				int tic;
 
 				// Update the buttons for all tics in this ticdup set as soon as
 				// possible so that the prediction shows jumping as correctly as
 				// possible. (If you press +jump in the middle of a ticdup set,
 				// the jump will actually begin at the beginning of the set, not
 				// in the middle.)
-				for (j = maketic-2; j >= mod; --j)
+				for (tic = maketic-2; tic >= mod; --tic)
 				{
-					localcmds[j % LOCALCMDTICS].ucmd.actions |=
-						localcmds[(j + 1) % LOCALCMDTICS].ucmd.actions;
-					localcmds[j % LOCALCMDTICS].ucmd.setNewWeapon(localcmds[(j + 1) % LOCALCMDTICS].ucmd.getNewWeapon());
+					localcmds[tic % LOCALCMDTICS].ucmd.actions |=
+						localcmds[(tic + 1) % LOCALCMDTICS].ucmd.actions;
+					localcmds[tic % LOCALCMDTICS].ucmd.setNewWeapon(localcmds[(tic + 1) % LOCALCMDTICS].ucmd.getNewWeapon());
 				}
 			}
 			else
@@ -1031,16 +1030,16 @@ void NetUpdate (void)
 				// need to update them in all the localcmds slots that
 				// are dupped so that prediction works properly.
 				int mod = maketic - ticdup;
-				int modp, j;
+				int modp, tic;
 
 				int svel = 0;
 				int fvel = 0;
 				float avel = 0;
 				float horz = 0;
 
-				for (j = 0; j < ticdup; ++j)
+				for (tic = 0; tic < ticdup; ++tic)
 				{
-					modp = (mod + j) % LOCALCMDTICS;
+					modp = (mod + tic) % LOCALCMDTICS;
 					svel += localcmds[modp].ucmd.svel;
 					fvel += localcmds[modp].ucmd.fvel;
 					avel += localcmds[modp].ucmd.avel;
@@ -1052,9 +1051,9 @@ void NetUpdate (void)
 				avel /= ticdup;
 				horz /= ticdup;
 
-				for (j = 0; j < ticdup; ++j)
+				for (tic = 0; tic < ticdup; ++tic)
 				{
-					modp = (mod + j) % LOCALCMDTICS;
+					modp = (mod + tic) % LOCALCMDTICS;
 					localcmds[modp].ucmd.svel = svel;
 					localcmds[modp].ucmd.fvel = fvel;
 					localcmds[modp].ucmd.avel = avel;
@@ -1346,7 +1345,7 @@ void NetUpdate (void)
 						totalavg = lastaverage;
 					}
 				}
-					
+
 				mastertics = nettics[nodeforplayer[Net_Arbitrator]] + totalavg;
 			}
 			if (nettics[0] <= mastertics)
@@ -1464,7 +1463,7 @@ bool DoArbitrate (void *userdata)
 
 				data->playersdetected[0] |= 1 << netbuffer[1];
 
-				StartScreen->NetMessage ("Found %s (node %d, player %d)", GetPlayerName(netbuffer[1]).GetChars(),
+				I_NetMessage ("Found %s (node %d, player %d)", GetPlayerName(netbuffer[1]).GetChars(),
 						node, netbuffer[1]+1);
 			}
 		}
@@ -1611,8 +1610,8 @@ bool D_ArbitrateNetStart (void)
 		data.gotsetup[0] = 0x80;
 	}
 
-	StartScreen->NetInit ("Exchanging game information", 1);
-	if (!StartScreen->NetLoop (DoArbitrate, &data))
+	I_NetInit ("Exchanging game information", 1);
+	if (!I_NetLoop (DoArbitrate, &data))
 	{
 		return false;
 	}
@@ -1630,7 +1629,7 @@ bool D_ArbitrateNetStart (void)
 			fprintf (debugfile, "player %d is on node %d\n", i, nodeforplayer[i]);
 		}
 	}
-	StartScreen->NetDone();
+	I_NetDone();
 	return true;
 }
 
@@ -1766,7 +1765,7 @@ bool D_CheckNetGame (void)
 
 	if (!batchrun) Printf (PRINT_NONOTIFY, "player %i of %i (%i nodes)\n",
 			myconnectindex+1, doomcom.numplayers, doomcom.numnodes);
-	
+
 	return true;
 }
 

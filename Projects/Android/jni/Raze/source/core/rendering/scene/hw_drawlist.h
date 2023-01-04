@@ -24,13 +24,14 @@ enum HWDrawItemType
 	DrawType_WALL,
 	DrawType_FLAT,
 	DrawType_SPRITE,
+	DrawType_SLOPE,
 };
 
 struct HWDrawItem
 {
 	HWDrawItemType rendertype;
 	int index;
-	
+
 	HWDrawItem() = default; // we need this for dynamic arrays.
 	HWDrawItem(HWDrawItemType _rendertype,int _index) : rendertype(_rendertype),index(_index) {}
 };
@@ -43,8 +44,8 @@ struct SortNode
 	SortNode * left;		// left side of this node
 	SortNode * equal;		// equal to this node
 	SortNode * right;		// right side of this node
-	
-	
+
+
 	void UnlinkFromChain();
 	void Link(SortNode * hook);
 	void AddToEqual(SortNode * newnode);
@@ -66,10 +67,10 @@ struct HWDrawList
 	TArray<HWSprite*> sprites;
 	TArray<HWDrawItem> drawitems;
 	int SortNodeStart;
-    float SortZ;
+	float SortZ;
 	SortNode * sorted;
 	bool reverseSort;
-	
+
 public:
 	HWDrawList()
 	{
@@ -77,34 +78,37 @@ public:
 		SortNodeStart=-1;
 		sorted=NULL;
 	}
-	
+
 	~HWDrawList()
 	{
 		Reset();
 	}
-	
+
 	unsigned int Size()
 	{
 		return drawitems.Size();
 	}
-	
+
 	HWWall *NewWall();
-	HWFlat *NewFlat();
+	HWFlat *NewFlat(bool slopespr = false);
 	HWSprite *NewSprite();
 	void Reset();
+	void SortWallsDiag(HWDrawInfo* di);
 	void SortWallsHorz(HWDrawInfo* di);
 	void SortWallsVert(HWDrawInfo* di);
 	void SortFlats(HWDrawInfo* di);
-	
-	
+
+
 	void MakeSortList();
 	SortNode * FindSortPlane(SortNode * head);
 	SortNode * FindSortWall(SortNode * head);
 	void SortPlaneIntoPlane(SortNode * head,SortNode * sort);
 	void SortWallIntoPlane(HWDrawInfo* di, SortNode * head,SortNode * sort);
 	void SortSpriteIntoPlane(SortNode * head,SortNode * sort);
+	void SortSlopeIntoPlane(HWDrawInfo* di, SortNode* head, SortNode* sort);
 	void SortWallIntoWall(HWDrawInfo *di, SortNode * head,SortNode * sort);
 	void SortSpriteIntoWall(HWDrawInfo *di, SortNode * head,SortNode * sort);
+	void SortSlopeIntoWall(HWDrawInfo* di, SortNode* head, SortNode* sort);
 	int CompareSprites(SortNode * a,SortNode * b);
 	SortNode * SortSpriteList(SortNode * head);
 	SortNode * DoSort(HWDrawInfo *di, SortNode * head);

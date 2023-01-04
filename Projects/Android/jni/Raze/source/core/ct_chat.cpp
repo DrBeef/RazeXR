@@ -6,7 +6,7 @@
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
-// the Free Software Foundation, either version 3 of the License, or
+// the Free Software Foundation, either version 2 of the License, or
 // (at your option) any later version.
 //
 // This program is distributed in the hope that it will be useful,
@@ -232,7 +232,7 @@ void CT_Drawer (void)
 		int scale = active_con_scale(drawer);
 		int screen_width = twod->GetWidth() / scale;
 		int screen_height= twod->GetHeight() / scale;
-		
+
 		y = screen_height - displayfont->GetHeight()-2;
 		auto res = gi->GetReservedScreenSpace(hud_size);
 

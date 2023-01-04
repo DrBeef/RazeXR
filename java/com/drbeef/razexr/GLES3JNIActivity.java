@@ -138,9 +138,9 @@ import com.drbeef.externalhapticsservice.HapticServiceClient;
 
 	public void create()
 	{
-		copy_asset("/sdcard/RazeXR", "raze.pk3");
-		copy_asset("/sdcard/RazeXR", "raze.sf2");
-		copy_asset("/sdcard/RazeXR", "commandline.txt");
+		copy_asset("/sdcard/RazeXR", "raze.pk3", true);
+		copy_asset("/sdcard/RazeXR", "raze.sf2", false);
+		copy_asset("/sdcard/RazeXR", "commandline.txt", false);
 
 		//Read these from a file and pass through
 		commandLineParams = new String("raze");
@@ -176,9 +176,9 @@ import com.drbeef.externalhapticsservice.HapticServiceClient;
 		mNativeHandle = GLES3JNILib.onCreate( this, commandLineParams );
 	}
 	
-	public void copy_asset(String path, String name) {
+	public void copy_asset(String path, String name, boolean force) {
 		File f = new File(path + "/" + name);
-		if (!f.exists()) {
+		if (!f.exists() || force) {
 			
 			//Ensure we have an appropriate folder
 			new File(path).mkdirs();

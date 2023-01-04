@@ -89,7 +89,7 @@ static double turnheldtime;
 
 void updateTurnHeldAmt(double const scaleAdjust)
 {
-	turnheldtime += getTicrateScale(BUILDTICRATE, scaleAdjust);
+	turnheldtime += getTicrateScale(BUILDTICRATE) * scaleAdjust;
 }
 
 bool isTurboTurnTime()
@@ -419,7 +419,7 @@ void PlayerAngle::applyinput(float const avel, ESyncBits* actions, double const 
 		if (spin < 0)
 		{
 			// return spin to 0
-			double add = getTicrateScale(!(*actions & SB_CROUCH) ? SPINSTAND : SPINCROUCH, scaleAdjust);
+			double add = getTicrateScale(!(*actions & SB_CROUCH) ? SPINSTAND : SPINCROUCH) * scaleAdjust;
 			spin += add;
 			if (spin > 0)
 			{
@@ -461,32 +461,32 @@ enum
 	BLOODVIEWPITCH = (0x4000 >> SINSHIFTDELTA) - (DEFVIEWPITCH << (SINSHIFTDELTA - 1)), // 1408.
 };
 
-void PlayerHorizon::calcviewpitch(vec2_t const pos, binangle const ang, bool const aimmode, bool const canslopetilt, int const cursectnum, double const scaleAdjust, bool const climbing)
+void PlayerHorizon::calcviewpitch(vec2_t const pos, binangle const ang, bool const aimmode, bool const canslopetilt, sectortype* const cursectnum, double const scaleAdjust, bool const climbing)
 {
-	if (cl_slopetilting && cursectnum >= 0)
+	if (cl_slopetilting && cursectnum != nullptr)
 	{
 		if (aimmode && canslopetilt) // If the floor is sloped
 		{
 			// Get a point, 512 (64 for Blood) units ahead of player's position
 			int const shift = -(isBlood() ? BLOODSINSHIFT : DEFSINSHIFT);
-			int const x = pos.x + ang.bcos(shift);
-			int const y = pos.y + ang.bsin(shift);
-			int tempsect = cursectnum;
+			int const x = pos.X + ang.bcos(shift);
+			int const y = pos.Y + ang.bsin(shift);
+			auto tempsect = cursectnum;
 			updatesector(x, y, &tempsect);
 
-			if (tempsect >= 0) // If the new point is inside a valid sector...
+			if (tempsect != nullptr) // If the new point is inside a valid sector...
 			{
 				// Get the floorz as if the new (x,y) point was still in
 				// your sector
-				int const j = getflorzofslope(cursectnum, pos.x, pos.y);
-				int const k = getflorzofslope(tempsect, x, y);
+				int const j = getflorzofslopeptr(cursectnum, pos.X, pos.Y);
+				int const k = getflorzofslopeptr(tempsect, x, y);
 
 				// If extended point is in same sector as you or the slopes
 				// of the sector of the extended point and your sector match
 				// closely (to avoid accidently looking straight out when
 				// you're at the edge of a sector line) then adjust horizon
 				// accordingly
-				if (cursectnum == tempsect || (!isBlood() && abs(getflorzofslope(tempsect, x, y) - k) <= (4 << 8)))
+				if (cursectnum == tempsect || (!isBlood() && abs(getflorzofslopeptr(tempsect, x, y) - k) <= (4 << 8)))
 				{
 					horizoff += q16horiz(xs_CRoundToInt(scaleAdjust * ((j - k) * (!isBlood() ? DEFVIEWPITCH : BLOODVIEWPITCH))));
 				}
@@ -548,20 +548,6 @@ FSerializer& Serialize(FSerializer& arc, const char* keyname, PlayerHorizon& w, 
 			w.ohorizoff = w.horizoff;
 			w.inputdisabled = w.inputdisabled;
 			w.resetadjustment();
-		}
-	}
-	return arc;
-}
-
-FSerializer& Serialize(FSerializer& arc, const char* keyname, PlayerPosition& w, PlayerPosition* def)
-{
-	if (arc.BeginObject(keyname))
-	{
-		arc("pos", w.pos).EndObject();
-
-		if (arc.isReading())
-		{
-			w.opos = w.pos;
 		}
 	}
 	return arc;

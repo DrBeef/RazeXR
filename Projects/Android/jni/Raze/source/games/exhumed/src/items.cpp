@@ -29,8 +29,8 @@ BEGIN_PS_NS
 
 struct AnimInfo
 {
-    short a;
-    short repeat;
+    int16_t a;
+    int16_t repeat;
 };
 
 AnimInfo nItemAnimInfo[] = {
@@ -96,17 +96,16 @@ AnimInfo nItemAnimInfo[] = {
     { -1, 32 }
 };
 
-short nItemMagic[] = { 500, 1000, 100, 500, 400, 200, 700, 0 };
+const int16_t nItemMagic[] = { 500, 1000, 100, 500, 400, 200, 700, 0 };
 
-/*
+TArray<DExhumedActor*> Regenerates; // must handle read barriers manually!
+int nMagicCount;
 
-short something
-short x/y repeat
-
-*/
-
-TArray<DExhumedActor*> Regenerates;
-short nMagicCount;
+size_t MarkItems()
+{
+    GC::MarkArray(Regenerates);
+    return Regenerates.Size();
+}
 
 void SerializeItems(FSerializer& arc)
 {
@@ -120,33 +119,31 @@ void SerializeItems(FSerializer& arc)
 
 void BuildItemAnim(DExhumedActor* pActor)
 {
-	auto pSprite = &pActor->s();
-
-    int nItem = pSprite->statnum - 906;
+    int nItem = pActor->spr.statnum - 906;
 
     if (nItemAnimInfo[nItem].a >= 0)
     {
-        auto pAnimActor = BuildAnim(pActor, 41, nItemAnimInfo[nItem].a, pSprite->x, pSprite->y, pSprite->z, pSprite->sectnum, nItemAnimInfo[nItem].repeat, 20);
+        auto pAnimActor = BuildAnim(pActor, 41, nItemAnimInfo[nItem].a, pActor->spr.pos.X, pActor->spr.pos.Y, pActor->spr.pos.Z, pActor->sector(), nItemAnimInfo[nItem].repeat, 20);
 
         if (nItem == 44) {
-            pAnimActor->s().cstat |= 2;
+            pAnimActor->spr.cstat |= CSTAT_SPRITE_TRANSLUCENT;
         }
 
-        ChangeActorStat(pAnimActor, pSprite->statnum);
-        pAnimActor->s().hitag = pSprite->hitag;
-        pSprite->owner = 0;
+        ChangeActorStat(pAnimActor, pActor->spr.statnum);
+        pAnimActor->spr.hitag = pActor->spr.hitag;
+        pActor->spr.intowner = 0;
     }
     else
     {
-        pSprite->owner = -1;
-        pSprite->yrepeat = (uint8_t)nItemAnimInfo[nItem].repeat;
-        pSprite->xrepeat = (uint8_t)nItemAnimInfo[nItem].repeat;
+        pActor->spr.intowner = -1;
+        pActor->spr.yrepeat = (uint8_t)nItemAnimInfo[nItem].repeat;
+        pActor->spr.xrepeat = (uint8_t)nItemAnimInfo[nItem].repeat;
     }
 }
 
 void DestroyItemAnim(DExhumedActor* actor)
 {
-    if (actor && actor->s().owner >= 0) 
+    if (actor && actor->spr.intowner >= 0) 
         DestroyAnim(actor);
 }
 
@@ -179,13 +176,12 @@ static bool UseEye(int nPlayer)
     if (PlayerList[nPlayer].nInvisible >= 0) 
         PlayerList[nPlayer].nInvisible = 900;
 
-    auto pActor = PlayerList[nPlayer].Actor();
-	auto pSprite = &pActor->s();
+    auto pActor = PlayerList[nPlayer].pActor;
 
-    pSprite->cstat |= 0x8000;
+    pActor->spr.cstat |= CSTAT_SPRITE_INVISIBLE;
 
     if (PlayerList[nPlayer].pPlayerFloorSprite != nullptr) {
-        pSprite->cstat |= 0x8000;
+        pActor->spr.cstat |= CSTAT_SPRITE_INVISIBLE;
     }
 
     if (nPlayer == nLocalPlayer)
@@ -203,7 +199,7 @@ static bool UseMask(int nPlayer)
 
     if (nPlayer == nLocalPlayer)
     {
-        D3PlayFX(StaticSound[kSound31], PlayerList[nPlayer].Actor());
+        D3PlayFX(StaticSound[kSound31], PlayerList[nPlayer].pActor);
     }
     return true;
 }
@@ -227,7 +223,7 @@ bool UseHeart(int nPlayer)
         if (nPlayer == nLocalPlayer)
         {
             ItemFlash();
-            D3PlayFX(StaticSound[kSound31], PlayerList[nPlayer].Actor());
+            D3PlayFX(StaticSound[kSound31], PlayerList[nPlayer].pActor);
         }
         return true;
     }
@@ -243,7 +239,7 @@ bool UseScarab(int nPlayer)
     if (nPlayer == nLocalPlayer)
     {
         ItemFlash();
-        D3PlayFX(StaticSound[kSound31], PlayerList[nPlayer].Actor());
+        D3PlayFX(StaticSound[kSound31], PlayerList[nPlayer].pActor);
     }
     return true;
 }
@@ -256,7 +252,7 @@ static bool UseHand(int nPlayer)
     if (nPlayer == nLocalPlayer)
     {
         ItemFlash();
-        D3PlayFX(StaticSound[kSound31], PlayerList[nPlayer].Actor());
+        D3PlayFX(StaticSound[kSound31], PlayerList[nPlayer].pActor);
     }
     return true;
 }
@@ -330,8 +326,6 @@ int GrabItem(int nPlayer, int nItem)
 
 void DropMagic(DExhumedActor* pActor)
 {
-	auto pSprite = &pActor->s();
-
     if (lFinaleStart) {
         return;
     }
@@ -344,16 +338,16 @@ void DropMagic(DExhumedActor* pActor)
             nullptr,
             64,
             0,
-            pSprite->x,
-            pSprite->y,
-            pSprite->z,
-            pSprite->sectnum,
+            pActor->spr.pos.X,
+            pActor->spr.pos.Y,
+            pActor->spr.pos.Z,
+            pActor->sector(),
             48,
             4);
 
         if (pAnimActor)
         {
-            AddFlash(pAnimActor->s().sectnum, pAnimActor->s().x, pAnimActor->s().y, pAnimActor->s().z, 128);
+            AddFlash(pAnimActor->sector(), pAnimActor->spr.pos.X, pAnimActor->spr.pos.Y, pAnimActor->spr.pos.Z, 128);
             ChangeActorStat(pAnimActor, 950);
         }
         nMagicCount = RandomSize(2);
@@ -368,32 +362,30 @@ void InitItems()
 
 void StartRegenerate(DExhumedActor* pActor)
 {
-    spritetype *pSprite = &pActor->s();
-
     auto pos = Regenerates.Find(pActor);
     if (pos >= Regenerates.Size())
     {
         // ?? CHECKME
-        pSprite->xvel = pSprite->xrepeat;
-        pSprite->zvel = pSprite->shade;
-        pSprite->yvel = pSprite->pal;
+        pActor->spr.xvel = pActor->spr.xrepeat;
+        pActor->spr.zvel = pActor->spr.shade;
+        pActor->spr.yvel = pActor->spr.pal;
     }
     else
     {
         Regenerates.Delete(pos);
     }
 
-    pSprite->extra = 1350;
+    pActor->spr.extra = 1350;
 
     if (!(currentLevel->gameflags & LEVEL_EX_MULTI))
     {
-        pSprite->ang /= 5;
+        pActor->spr.ang /= 5;
     }
 
-    pSprite->cstat = 0x8000;
-    pSprite->xrepeat = 1;
-    pSprite->yrepeat = 1;
-    pSprite->pal = 1;
+    pActor->spr.cstat = CSTAT_SPRITE_INVISIBLE;
+    pActor->spr.xrepeat = 1;
+    pActor->spr.yrepeat = 1;
+    pActor->spr.pal = 1;
 
     Regenerates.Push(pActor);
 }
@@ -402,15 +394,14 @@ void DoRegenerates()
 {
     for(unsigned i = 0; i < Regenerates.Size(); i++)
     {
-        auto pActor = Regenerates[i];
-        auto pSprite = &pActor->s();
-        if (pSprite->extra > 0)
+        DExhumedActor* pActor = GC::ReadBarrier(Regenerates[i]);
+        if (pActor->spr.extra > 0)
         {
-            pSprite->extra--;
+            pActor->spr.extra--;
 
-            if (pSprite->extra <= 0)
+            if (pActor->spr.extra <= 0)
             {
-                BuildAnim(nullptr, 38, 0, pSprite->x, pSprite->y, pSprite->z, pSprite->sectnum, 64, 4);
+                BuildAnim(nullptr, 38, 0, pActor->spr.pos.X, pActor->spr.pos.Y, pActor->spr.pos.Z, pActor->sector(), 64, 4);
                 D3PlayFX(StaticSound[kSoundTorchOn], pActor);
             }
             else {
@@ -419,26 +410,26 @@ void DoRegenerates()
         }
         else
         {
-            if (pSprite->xrepeat < pSprite->xvel)
+            if (pActor->spr.xrepeat < pActor->spr.xvel)
             {
-                pSprite->xrepeat += 2;
-                pSprite->yrepeat += 2;
+                pActor->spr.xrepeat += 2;
+                pActor->spr.yrepeat += 2;
                 continue;
             }
         }
 
-        pSprite->zvel = 0;
-        pSprite->yrepeat = (uint8_t)pSprite->xvel;
-        pSprite->xrepeat = (uint8_t)pSprite->xvel;
-        pSprite->pal  = (uint8_t)pSprite->yvel;
-        pSprite->yvel = pSprite->zvel; // setting to 0
-        pSprite->xvel = pSprite->zvel; // setting to 0
+        pActor->spr.zvel = 0;
+        pActor->spr.yrepeat = (uint8_t)pActor->spr.xvel;
+        pActor->spr.xrepeat = (uint8_t)pActor->spr.xvel;
+        pActor->spr.pal  = (uint8_t)pActor->spr.yvel;
+        pActor->spr.yvel = pActor->spr.zvel; // setting to 0
+        pActor->spr.xvel = pActor->spr.zvel; // setting to 0
 
-        if (pSprite->statnum == kStatExplodeTrigger) {
-            pSprite->cstat = 0x101;
+        if (pActor->spr.statnum == kStatExplodeTrigger) {
+            pActor->spr.cstat = CSTAT_SPRITE_BLOCK_ALL;
         }
         else {
-            pSprite->cstat = 0;
+            pActor->spr.cstat = 0;
         }
         Regenerates.Delete(i);
         i--;

@@ -39,8 +39,7 @@ Prepared for public release: 03/28/2005 - Charlie Wiederhold, 3D Realms
 
 BEGIN_SW_NS
 
-static int SectorOfWall(short theline);
-static void DoWallBreakSpriteMatch(short match);
+static void DoWallBreakSpriteMatch(int match);
 
 BREAK_INFO WallBreakInfo[] =
 {
@@ -441,20 +440,20 @@ static int CompareBreakInfo(void const * a, void const * b)
     return break_info1->picnum - break_info2->picnum;
 }
 
-int CompareSearchBreakInfo(short *picnum, BREAK_INFOp break_info)
+int CompareSearchBreakInfo(int *picnum, BREAK_INFO* break_info)
     {
     // will return a number less than 0 if picnum < break_info->picnum
     return(*picnum - break_info->picnum);
     }
 
-BREAK_INFOp FindWallBreakInfo(short picnum)
+BREAK_INFO* FindWallBreakInfo(int picnum)
     {
-    return(BREAK_INFOp)(bsearch(&picnum, &WallBreakInfo, SIZ(WallBreakInfo), sizeof(BREAK_INFO), (int(*)(const void*,const void*))CompareSearchBreakInfo));
+    return(BREAK_INFO*)(bsearch(&picnum, &WallBreakInfo, SIZ(WallBreakInfo), sizeof(BREAK_INFO), (int(*)(const void*,const void*))CompareSearchBreakInfo));
     }
 
-BREAK_INFOp FindSpriteBreakInfo(short picnum)
+BREAK_INFO* FindSpriteBreakInfo(int picnum)
     {
-    return(BREAK_INFOp)(bsearch(&picnum, &SpriteBreakInfo, SIZ(SpriteBreakInfo), sizeof(BREAK_INFO), (int(*)(const void*,const void*))CompareSearchBreakInfo));
+    return(BREAK_INFO*)(bsearch(&picnum, &SpriteBreakInfo, SIZ(SpriteBreakInfo), sizeof(BREAK_INFO), (int(*)(const void*,const void*))CompareSearchBreakInfo));
     }
 
 //////////////////////////////////////////////
@@ -467,38 +466,37 @@ void SortBreakInfo(void)
     qsort(&WallBreakInfo, SIZ(WallBreakInfo), sizeof(BREAK_INFO), CompareBreakInfo);
 }
 
-BREAK_INFOp SetupWallForBreak(WALLp wallp)
+BREAK_INFO* SetupWallForBreak(walltype* wallp)
 {
-    BREAK_INFOp break_info;
+    BREAK_INFO* break_info;
 
     break_info = FindWallBreakInfo(wallp->picnum);
     if (break_info)
     {
         wallp->lotag = TAG_WALL_BREAK;
-        SET(wallp->extra, WALLFX_DONT_STICK);
+        wallp->extra |= (WALLFX_DONT_STICK);
     }
 
-    if (wallp->overpicnum > 0 && TEST(wallp->cstat, CSTAT_WALL_MASKED))
+    if (wallp->overpicnum > 0 && (wallp->cstat & CSTAT_WALL_MASKED))
     {
         break_info = FindWallBreakInfo(wallp->overpicnum);
         if (break_info)
         {
             wallp->lotag = TAG_WALL_BREAK;
-            SET(wallp->extra, WALLFX_DONT_STICK);
+            wallp->extra |= (WALLFX_DONT_STICK);
         }
     }
 
     return break_info;
 }
 
-BREAK_INFOp SetupSpriteForBreak(DSWActor* actor)
+BREAK_INFO* SetupSpriteForBreak(DSWActor* actor)
 {
-    auto sp = &actor->s();
-    short picnum = sp->picnum;
-    BREAK_INFOp break_info;
+    int picnum = actor->spr.picnum;
+    BREAK_INFO* break_info;
 
     // ignore as a breakable if true
-    if (sp->lotag == TAG_SPRITE_HIT_MATCH)
+    if (actor->spr.lotag == TAG_SPRITE_HIT_MATCH)
         return nullptr;
 
     break_info = FindSpriteBreakInfo(picnum);
@@ -506,23 +504,23 @@ BREAK_INFOp SetupSpriteForBreak(DSWActor* actor)
     {
 
         // use certain sprites own blocking for determination
-        if (TEST(break_info->flags, BF_OVERRIDE_BLOCK))
+        if ((break_info->flags & BF_OVERRIDE_BLOCK))
         {
             // if not blocking then skip this code
-            if (!TEST(sp->cstat, CSTAT_SPRITE_BLOCK))
+            if (!(actor->spr.cstat & CSTAT_SPRITE_BLOCK))
             {
-                return (BREAK_INFOp)(-1);
+                return (BREAK_INFO*)(-1);
             }
         }
 
-        if (TEST(break_info->flags, BF_BURN))
-            SET(sp->extra, SPRX_BURNABLE);
+        if ((break_info->flags & BF_BURN))
+            actor->spr.extra |= (SPRX_BURNABLE);
         else
-            SET(sp->extra, SPRX_BREAKABLE);
+            actor->spr.extra |= (SPRX_BREAKABLE);
 
-        sp->clipdist = SPRITEp_SIZE_X(sp);
+        actor->spr.clipdist = ActorSizeX(actor);
 
-        SET(sp->cstat, CSTAT_SPRITE_BREAKABLE);
+        actor->spr.cstat |= (CSTAT_SPRITE_BREAKABLE);
     }
 
     return break_info;
@@ -532,13 +530,12 @@ BREAK_INFOp SetupSpriteForBreak(DSWActor* actor)
 // ACTIVATE
 //////////////////////////////////////////////
 
-DSWActor* FindBreakSpriteMatch(short match)
+DSWActor* FindBreakSpriteMatch(int match)
 {
     SWStatIterator it(STAT_BREAKABLE);
     while (auto actor = it.Next())
     {
-        auto sp = &actor->s();
-        if (SP_TAG2(sp) == match && sp->picnum == ST1)
+        if (SP_TAG2(actor) == match && actor->spr.picnum == ST1)
         {
             return actor;
         }
@@ -551,28 +548,28 @@ DSWActor* FindBreakSpriteMatch(short match)
 // WALL
 //
 
-int AutoBreakWall(WALLp wallp, int hit_x, int hit_y, int hit_z, short ang, short type)
+int AutoBreakWall(walltype* wallp, int hit_x, int hit_y, int hit_z, int ang, int type)
 {
-    BREAK_INFOp break_info;
-    WALLp nwp;
+    BREAK_INFO* break_info;
+    walltype* nwp;
 
     wallp->lotag = 0;
-    if (wallp->nextwall >= 0)
+    if (wallp->twoSided())
     {
-        nwp = &wall[wallp->nextwall];
+        nwp = wallp->nextWall();
 
         // get rid of both sides
         // only break ONE of the walls
 
         if (nwp->lotag == TAG_WALL_BREAK &&
             nwp->overpicnum > 0 &&
-            TEST(nwp->cstat, CSTAT_WALL_MASKED))
+            (nwp->cstat & CSTAT_WALL_MASKED))
         {
             nwp->lotag = 0;
         }
     }
 
-    if (wallp->overpicnum > 0 && TEST(wallp->cstat, CSTAT_WALL_MASKED))
+    if (wallp->overpicnum > 0 && (wallp->cstat & CSTAT_WALL_MASKED))
         break_info = FindWallBreakInfo(wallp->overpicnum);
     else
         break_info = FindWallBreakInfo(wallp->picnum);
@@ -589,40 +586,39 @@ int AutoBreakWall(WALLp wallp, int hit_x, int hit_y, int hit_z, short ang, short
     {
         vec3_t hit_pos = { hit_x, hit_y, hit_z };
         // need correct location for spawning shrap
-        auto breakActor = InsertActor(0, STAT_DEFAULT);
-        auto bsp = &breakActor->s();
-        bsp->cstat = 0;
-        bsp->extra = 0;
-        bsp->ang = ang;
-        bsp->picnum = ST1;
-        bsp->xrepeat = bsp->yrepeat = 64;
+        auto breakActor = insertActor(0, STAT_DEFAULT);
+        breakActor->spr.cstat = 0;
+        breakActor->spr.extra = 0;
+        breakActor->spr.ang = ang;
+        breakActor->spr.picnum = ST1;
+        breakActor->spr.xrepeat = breakActor->spr.yrepeat = 64;
         SetActorZ(breakActor, &hit_pos);
         SpawnShrap(breakActor, nullptr, -1, break_info);
         KillActor(breakActor);
     }
 
     // change the wall
-    if (wallp->overpicnum > 0 && TEST(wallp->cstat, CSTAT_WALL_MASKED))
+    if (wallp->overpicnum > 0 && (wallp->cstat & CSTAT_WALL_MASKED))
     {
         if (break_info->breaknum == -1)
         {
-            RESET(wallp->cstat, CSTAT_WALL_MASKED|CSTAT_WALL_1WAY|CSTAT_WALL_BLOCK_HITSCAN|CSTAT_WALL_BLOCK);
+            wallp->cstat &= ~(CSTAT_WALL_MASKED|CSTAT_WALL_1WAY|CSTAT_WALL_BLOCK_HITSCAN|CSTAT_WALL_BLOCK);
             wallp->overpicnum = 0;
-            if (wallp->nextwall >= 0)
+            if (wallp->twoSided())
             {
-                nwp = &wall[wallp->nextwall];
-                RESET(nwp->cstat, CSTAT_WALL_MASKED|CSTAT_WALL_1WAY|CSTAT_WALL_BLOCK_HITSCAN|CSTAT_WALL_BLOCK);
+                nwp = wallp->nextWall();
+                nwp->cstat &= ~(CSTAT_WALL_MASKED|CSTAT_WALL_1WAY|CSTAT_WALL_BLOCK_HITSCAN|CSTAT_WALL_BLOCK);
                 nwp->overpicnum = 0;
             }
         }
         else
         {
-            RESET(wallp->cstat, CSTAT_WALL_BLOCK_HITSCAN|CSTAT_WALL_BLOCK);
+            wallp->cstat &= ~(CSTAT_WALL_BLOCK_HITSCAN|CSTAT_WALL_BLOCK);
             wallp->overpicnum = break_info->breaknum;
-            if (wallp->nextwall >= 0)
+            if (wallp->twoSided())
             {
-                nwp = &wall[wallp->nextwall];
-                RESET(nwp->cstat, CSTAT_WALL_BLOCK_HITSCAN|CSTAT_WALL_BLOCK);
+                nwp = wallp->nextWall();
+                nwp->cstat &= ~(CSTAT_WALL_BLOCK_HITSCAN|CSTAT_WALL_BLOCK);
                 nwp->overpicnum = break_info->breaknum;
             }
         }
@@ -641,12 +637,12 @@ int AutoBreakWall(WALLp wallp, int hit_x, int hit_y, int hit_z, short ang, short
     return true;
 }
 
-bool UserBreakWall(WALLp wp, short)
+bool UserBreakWall(walltype* wp)
 {
-    short match = wp->hitag;
-    int block_flags = CSTAT_WALL_BLOCK|CSTAT_WALL_BLOCK_HITSCAN;
-    int type_flags = CSTAT_WALL_TRANSLUCENT|CSTAT_WALL_MASKED|CSTAT_WALL_1WAY;
-    int flags = block_flags|type_flags;
+    int match = wp->hitag;
+    const auto block_flags = CSTAT_WALL_BLOCK|CSTAT_WALL_BLOCK_HITSCAN;
+    const auto type_flags = CSTAT_WALL_TRANSLUCENT|CSTAT_WALL_MASKED|CSTAT_WALL_1WAY;
+    const auto flags = block_flags|type_flags;
     bool ret = false;
 
     auto actor = FindBreakSpriteMatch(match);
@@ -655,64 +651,62 @@ bool UserBreakWall(WALLp wp, short)
     {
         // do it the old way and get rid of wall - assumed to be masked
         DoSpawnSpotsForKill(match);
-        RESET(wp->cstat, flags);
-        if (wp->nextwall >= 0)
-            RESET(wall[wp->nextwall].cstat, flags);
+        wp->cstat &= ~(flags);
+        if (wp->twoSided())
+            wp->nextWall()->cstat &= ~(flags);
 
         // clear tags
         wp->hitag = wp->lotag = 0;
-        if (wp->nextwall >= 0)
-            wall[wp->nextwall].hitag = wall[wp->nextwall].lotag = 0;
+        if (wp->twoSided())
+            wp->nextWall()->hitag = wp->nextWall()->lotag = 0;
         return true;
     }
 
-    auto sp = &actor->s();
-
-    if (wp->picnum == SP_TAG5(sp))
+    if (wp->picnum == SP_TAG5(actor))
         return true;
 
     // make it BROKEN
-    if (SP_TAG7(sp) <= 1)
+    if (SP_TAG7(actor) <= 1)
     {
         DoSpawnSpotsForKill(match);
         DoLightingMatch(match, -1);
 
-        if (SP_TAG8(sp) == 0)
+        if (SP_TAG8(actor) == 0)
         {
-            wp->picnum = SP_TAG5(sp);
+            wp->picnum = SP_TAG5(actor);
             // clear tags
             wp->hitag = wp->lotag = 0;
-            if (wp->nextwall >= 0)
-                wall[wp->nextwall].hitag = wall[wp->nextwall].lotag = 0;
+            if (wp->twoSided())
+                wp->nextWall()->hitag = wp->nextWall()->lotag = 0;
             ret = false;
         }
-        else if (SP_TAG8(sp) == 1)
+        else if (SP_TAG8(actor) == 1)
         {
             // clear flags
-            RESET(wp->cstat, flags);
-            if (wp->nextwall >= 0)
-                RESET(wall[wp->nextwall].cstat, flags);
+            wp->cstat &= ~(flags);
+            if (wp->twoSided())
+                wp->nextWall()->cstat &= ~(flags);
             // clear tags
             wp->hitag = wp->lotag = 0;
-            if (wp->nextwall >= 0)
-                wall[wp->nextwall].hitag = wall[wp->nextwall].lotag = 0;
+            if (wp->twoSided())
+                wp->nextWall()->hitag = wp->nextWall()->lotag = 0;
 
             ret = true;
         }
-        else if (SP_TAG8(sp) == 2)
+        else if (SP_TAG8(actor) == 2)
         {
             // set to broken pic
-            wp->picnum = SP_TAG5(sp);
+            wp->picnum = SP_TAG5(actor);
 
             // clear flags
-            RESET(wp->cstat, block_flags);
-            if (wp->nextwall >= 0)
-                RESET(wall[wp->nextwall].cstat, block_flags);
+            wp->cstat &= ~(block_flags);
+            if (wp->twoSided())
+                wp->nextWall()->cstat &= ~(block_flags);
 
             // clear tags
             wp->hitag = wp->lotag = 0;
-            if (wp->nextwall >= 0)
-                wall[wp->nextwall].hitag = wall[wp->nextwall].lotag = 0;
+            if (wp->twoSided())
+                wp->nextWall()->hitag = wp->nextWall()->lotag = 0;
 
             ret = false;
         }
@@ -730,51 +724,43 @@ bool UserBreakWall(WALLp wp, short)
     return false;
 }
 
-int WallBreakPosition(short hit_wall, int *sectnum, int *x, int *y, int *z, short *ang)
+int WallBreakPosition(walltype* wp, sectortype** sectp, int *x, int *y, int *z, int *ang)
 {
-    short w,nw;
-    WALLp wp;
     int nx,ny;
-    short wall_ang;
+    int wall_ang;
 
-    w = hit_wall;
-    wp = &wall[w];
+    wall_ang = NORM_ANGLE(getangle(wp->delta())+512);
 
-    nw = wall[w].point2;
-    wall_ang = NORM_ANGLE(getangle(wall[nw].x - wall[w].x, wall[nw].y - wall[w].y)+512);
-
-    *sectnum = SectorOfWall(w);
-    ASSERT(*sectnum >= 0);
+    *sectp = wp->sectorp();
+    ASSERT(*sectp);
 
     // midpoint of wall
-    *x = DIV2(wall[w].x + wall[w].x);
-    *y = DIV2(wall[w].y + wall[w].y);
+    *x = (wp->wall_int_pos().X + wp->wall_int_pos().X) >> 1;
+    *y = (wp->wall_int_pos().Y + wp->wall_int_pos().Y) >> 1;
 
-    //getzsofsector(*sectnum, *x, *y, cz, fz);
-
-    if (wp->nextwall < 0)
+    if (!wp->twoSided())
     {
         // white wall
-        *z = DIV2(sector[*sectnum].floorz + sector[*sectnum].ceilingz);
+        *z = ((*sectp)->floorz + (*sectp)->ceilingz) >> 1;
     }
     else
     {
-        short next_sectnum = wp->nextsector;
+        auto next_sect = wp->nextSector();
 
         // red wall
-        ASSERT(wp->nextsector >= 0);
+        ASSERT(wp->twoSided());
 
         // floor and ceiling meet
-        if (sector[next_sectnum].floorz == sector[next_sectnum].ceilingz)
-            *z = DIV2(sector[*sectnum].floorz + sector[*sectnum].ceilingz);
+        if (next_sect->floorz == next_sect->ceilingz)
+            *z = ((*sectp)->floorz + (*sectp)->ceilingz) >> 1;
         else
         // floor is above other sector
-        if (sector[next_sectnum].floorz < sector[*sectnum].floorz)
-            *z = DIV2(sector[next_sectnum].floorz + sector[*sectnum].floorz);
+        if (next_sect->floorz < (*sectp)->floorz)
+            *z = (next_sect->floorz + (*sectp)->floorz) >> 1;
         else
         // ceiling is below other sector
-        if (sector[next_sectnum].ceilingz > sector[*sectnum].ceilingz)
-            *z = DIV2(sector[next_sectnum].ceilingz + sector[*sectnum].ceilingz);
+        if (next_sect->ceilingz > (*sectp)->ceilingz)
+            *z = (next_sect->ceilingz + (*sectp)->ceilingz) >> 1;
     }
 
     *ang = wall_ang;
@@ -785,8 +771,8 @@ int WallBreakPosition(short hit_wall, int *sectnum, int *x, int *y, int *z, shor
     *x += nx;
     *y += ny;
 
-    updatesectorz(*x,*y,*z,sectnum);
-    if (*sectnum < 0)
+    updatesectorz(*x,*y,*z,sectp);
+    if (*sectp == nullptr)
     {
         *x = INT32_MAX;  // don't spawn shrap, just change wall
         return false;
@@ -796,20 +782,20 @@ int WallBreakPosition(short hit_wall, int *sectnum, int *x, int *y, int *z, shor
 }
 
 // If the tough parameter is not set, then it can't break tough walls and sprites
-bool HitBreakWall(WALLp wp, int hit_x, int hit_y, int hit_z, short ang, short type)
+bool HitBreakWall(walltype* wp, int hit_x, int hit_y, int hit_z, int ang, int type)
 {
-    short match = wp->hitag;
+    int match = wp->hitag;
 
     if (match > 0)
     {
-        UserBreakWall(wp, ang);
+        UserBreakWall(wp);
         return true;
     }
 
     //if (hit_x == INT32_MAX)
     {
-        int sectnum;
-        WallBreakPosition(wallnum(wp), &sectnum, &hit_x, &hit_y, &hit_z, &ang);
+        sectortype* sect = nullptr;
+        WallBreakPosition(wp, &sect, &hit_x, &hit_y, &hit_z, &ang);
     }
 
     AutoBreakWall(wp, hit_x, hit_y, hit_z, ang, type);
@@ -822,8 +808,10 @@ bool HitBreakWall(WALLp wp, int hit_x, int hit_y, int hit_z, short ang, short ty
 
 int KillBreakSprite(DSWActor* breakActor)
 {
-    SPRITEp bp = &breakActor->s();
-    USERp bu = breakActor->u();
+    // Double deletion can easily happen with the break sprite code.
+    if (breakActor->ObjectFlags & OF_EuthanizeMe)
+        return false;
+
 
     // Does not actually kill the sprite so it will be valid for the rest
     // of the loop traversal.
@@ -833,9 +821,9 @@ int KillBreakSprite(DSWActor* breakActor)
 
     SpriteQueueDelete(breakActor);
 
-    if (bu)
+    if (breakActor->hasU())
     {
-        if (bp->statnum == STAT_DEFAULT)
+        if (breakActor->spr.statnum == STAT_DEFAULT)
             // special case allow kill of sprites on STAT_DEFAULT list
             // a few things have users and are not StateControlled
             KillActor(breakActor);
@@ -853,10 +841,8 @@ int KillBreakSprite(DSWActor* breakActor)
 
 int UserBreakSprite(DSWActor* breakActor)
 {
-    SPRITEp sp;
-    SPRITEp bp = &breakActor->s();
-    short match = bp->lotag;
-    short match_extra;
+    int match = breakActor->spr.lotag;
+    int match_extra;
 
     auto actor = FindBreakSpriteMatch(match);
 
@@ -871,52 +857,51 @@ int UserBreakSprite(DSWActor* breakActor)
         return true;
     }
 
-    sp = &actor->s();
-    match_extra = SP_TAG6(bp);
+    match_extra = SP_TAG6(breakActor);
 
-    if (bp->picnum == SP_TAG5(sp))
+    if (breakActor->spr.picnum == SP_TAG5(actor))
         return true;
 
     // make it BROKEN
-    if (SP_TAG7(sp) <= 1)
+    if (SP_TAG7(actor) <= 1)
     {
         DoMatchEverything(nullptr, match_extra, -1);
         //DoSpawnSpotsForKill(match_extra);
-        DoLightingMatch(match_extra, OFF);
+        DoLightingMatch(match_extra, 0);
 
-        if (SP_TAG8(sp) == 0)
+        if (SP_TAG8(actor) == 0)
         {
-            bp->picnum = SP_TAG5(sp);
-            RESET(bp->extra, SPRX_BREAKABLE);
+            breakActor->spr.picnum = SP_TAG5(actor);
+            breakActor->spr.extra &= ~(SPRX_BREAKABLE);
         }
         else
         // kill sprite
-        if (SP_TAG8(sp) == 1)
+        if (SP_TAG8(actor) == 1)
         {
             // Kill sound if one is attached
             DeleteNoSoundOwner(breakActor);
             KillBreakSprite(breakActor);
             return true;
         }
-        else if (SP_TAG8(sp) == 2)
+        else if (SP_TAG8(actor) == 2)
         // leave it
         {
             // set to broken pic
-            bp->picnum = SP_TAG5(sp);
+            breakActor->spr.picnum = SP_TAG5(actor);
 
             // reset
-            if (SP_TAG8(sp) == 2)
+            if (SP_TAG8(actor) == 2)
             {
-                RESET(bp->cstat, CSTAT_SPRITE_BLOCK|CSTAT_SPRITE_BLOCK_HITSCAN);
+                breakActor->spr.cstat &= ~(CSTAT_SPRITE_BLOCK|CSTAT_SPRITE_BLOCK_HITSCAN);
             }
 
-            RESET(bp->extra, SPRX_BREAKABLE);
+            breakActor->spr.extra &= ~(SPRX_BREAKABLE);
         }
     }
     else
     {
         // increment picnum
-        bp->picnum++;
+        breakActor->spr.picnum++;
 
         DoSpawnSpotsForDamage(match_extra);
     }
@@ -924,17 +909,15 @@ int UserBreakSprite(DSWActor* breakActor)
     return false;
 }
 
-int AutoBreakSprite(DSWActor* breakActor, short type)
+int AutoBreakSprite(DSWActor* breakActor, int type)
 {
-    SPRITEp bp = &breakActor->s();
-    BREAK_INFOp break_info;
-    extern void DoWallBreakMatch(short match);
+    BREAK_INFO* break_info;
 
-    break_info = FindSpriteBreakInfo(bp->picnum);
+    break_info = FindSpriteBreakInfo(breakActor->spr.picnum);
 
 
-    if ((int16_t)bp->hitag < 0)
-        DoWallBreakMatch(bp->hitag);
+    if ((int16_t)breakActor->spr.hitag < 0)
+        DoWallBreakMatch(breakActor->spr.hitag);
 
     if (!break_info)
     {
@@ -946,36 +929,36 @@ int AutoBreakSprite(DSWActor* breakActor, short type)
     {
         if (break_info->breaknum != -1)
         {
-            if (!TEST(break_info->flags, BF_LEAVE_BREAK))
+            if (!(break_info->flags & BF_LEAVE_BREAK))
             {
-                RESET(bp->extra, SPRX_BREAKABLE);
-                RESET(bp->cstat, CSTAT_SPRITE_BREAKABLE);
+                breakActor->spr.extra &= ~(SPRX_BREAKABLE);
+                breakActor->spr.cstat &= ~(CSTAT_SPRITE_BREAKABLE);
             }
 
-            bp->picnum = break_info->breaknum;
+            breakActor->spr.picnum = break_info->breaknum;
             // pass Break Info Globally
             SpawnShrap(breakActor, nullptr, -1, break_info);
-            if (bp->picnum == 3683)
-                RESET(bp->cstat, CSTAT_SPRITE_BLOCK|CSTAT_SPRITE_BLOCK_HITSCAN);
+            if (breakActor->spr.picnum == 3683)
+                breakActor->spr.cstat &= ~(CSTAT_SPRITE_BLOCK|CSTAT_SPRITE_BLOCK_HITSCAN);
         }
 
         return false;
     }
 
-    RESET(bp->extra, SPRX_BREAKABLE);
-    RESET(bp->cstat, CSTAT_SPRITE_BREAKABLE);
+    breakActor->spr.extra &= ~(SPRX_BREAKABLE);
+    breakActor->spr.cstat &= ~(CSTAT_SPRITE_BREAKABLE);
 
     // pass Break Info Globally
     SpawnShrap(breakActor, nullptr, -1, break_info);
 
     // kill it or change the pic
-    if (TEST(break_info->flags, BF_KILL) || break_info->breaknum == -1)
+    if ((break_info->flags & BF_KILL) || break_info->breaknum == -1)
     {
-        if (TEST(break_info->flags, BF_FIRE_FALL))
+        if ((break_info->flags & BF_FIRE_FALL))
             SpawnBreakFlames(breakActor);
 
-        RESET(bp->cstat, CSTAT_SPRITE_BLOCK|CSTAT_SPRITE_BLOCK_HITSCAN);
-        SET(bp->cstat, CSTAT_SPRITE_INVISIBLE);
+        breakActor->spr.cstat &= ~(CSTAT_SPRITE_BLOCK|CSTAT_SPRITE_BLOCK_HITSCAN);
+        breakActor->spr.cstat |= CSTAT_SPRITE_INVISIBLE;
         // Kill sound if one is attached
         DeleteNoSoundOwner(breakActor);
         KillBreakSprite(breakActor);
@@ -983,9 +966,9 @@ int AutoBreakSprite(DSWActor* breakActor, short type)
     }
     else
     {
-        bp->picnum = break_info->breaknum;
-        if (bp->picnum == 3683)
-            RESET(bp->cstat, CSTAT_SPRITE_BLOCK|CSTAT_SPRITE_BLOCK_HITSCAN);
+        breakActor->spr.picnum = break_info->breaknum;
+        if (breakActor->spr.picnum == 3683)
+            breakActor->spr.cstat &= ~(CSTAT_SPRITE_BLOCK|CSTAT_SPRITE_BLOCK_HITSCAN);
     }
 
     return false;
@@ -993,100 +976,71 @@ int AutoBreakSprite(DSWActor* breakActor, short type)
 
 bool NullActor(DSWActor* actor)
 {
-    auto u = actor->u();
     // a Null Actor is defined as an actor that has no real controlling programming attached
 
     // check to see if attached to SO
-    if (TEST(u->Flags, SPR_SO_ATTACHED))
+    if (actor->user.Flags & (SPR_SO_ATTACHED))
         return true;
 
     // does not have a STATE or FUNC to control it
-    if (!u->State)
+    if (!actor->user.State)
         return true;
 
     // does not have a STATE or FUNC to control it
-    if (!u->ActorActionFunc)
+    if (!actor->user.ActorActionFunc)
         return true;
 
     return false;
 }
 
-int HitBreakSprite(DSWActor* breakActor, short type)
+int HitBreakSprite(DSWActor* breakActor, int type)
 {
-    SPRITEp bp = &breakActor->s();
-    USERp bu = breakActor->u();
-
-    if (TEST_BOOL1(bp))
+    if (TEST_BOOL1(breakActor))
     {
-        if (TEST_BOOL2(bp))
+        if (TEST_BOOL2(breakActor))
             return false;
 
         return UserBreakSprite(breakActor);
     }
 
-    if (bu && !NullActor(breakActor))
+    if (breakActor->hasU() && !NullActor(breakActor))
     {
         // programmed animating type - without BOOL1 set
-        if (bp->lotag)
-            DoLightingMatch(bp->lotag, -1);
+        if (breakActor->spr.lotag)
+            DoLightingMatch(breakActor->spr.lotag, -1);
 
         SpawnShrap(breakActor, nullptr);
-        RESET(bp->extra, SPRX_BREAKABLE);
+        breakActor->spr.extra &= ~SPRX_BREAKABLE;
         return false;
     }
 
     return AutoBreakSprite(breakActor, type);
 }
 
-static int SectorOfWall(short theline)
+void DoWallBreakMatch(int match)
 {
-    short i, startwall, endwall, sectnum;
-
-    sectnum = -1;
-
-    for (i=0; i<numsectors; i++)
-    {
-        startwall = sector[i].wallptr;
-        endwall = startwall + sector[i].wallnum - 1;
-        if ((theline >= startwall) && (theline <= endwall))
-        {
-            sectnum = i;
-            break;
-        }
-    }
-
-    return sectnum;
-}
-
-void DoWallBreakMatch(short match)
-{
-    int i,sectnum;
+    sectortype* sect = nullptr;
     int x,y,z;
-    WALLp wp;
-    short wall_ang;
+    int wall_ang;
 
-    for (i=0; i<=numwalls; i++)
+    for(auto& wal : wall)
     {
-        if (wall[i].hitag == match)
+        if (wal.hitag == match)
         {
-            WallBreakPosition(i, &sectnum, &x, &y, &z, &wall_ang);
-            //short nw = wall[i].point2;
-            //wall_ang = NORM_ANGLE(getangle(wall[nw].x - wall[i].x, wall[nw].y - wall[i].y)+512);
-            wp = &wall[i];
-            wp->hitag = 0; // Reset the hitag
-            AutoBreakWall(wp, x, y, z, wall_ang, 0);
+            WallBreakPosition(&wal, &sect, &x, &y, &z, &wall_ang);
+
+            wal.hitag = 0; // Reset the hitag
+            AutoBreakWall(&wal, x, y, z, wall_ang, 0);
         }
     }
 }
 
-static void DoWallBreakSpriteMatch(short match)
+static void DoWallBreakSpriteMatch(int match)
 {
     SWStatIterator it(STAT_ENEMY);
     while (auto actor = it.Next())
     {
-        SPRITEp sp = &actor->s();
-
-        if (sp->hitag == match)
+        if (actor->spr.hitag == match)
         {
             KillActor(actor);
         }

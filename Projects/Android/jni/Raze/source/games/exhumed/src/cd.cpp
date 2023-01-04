@@ -17,7 +17,6 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 //-------------------------------------------------------------------------
 #include "ns.h"
 #include "build.h"
-#include "compat.h"
 #include "engine.h"
 #include "sound.h"
 #include "exhumed.h"
@@ -48,11 +47,11 @@ bool playCDtrack(int nTrack, bool bLoop)
 
     // try ogg vorbis now from root directory.
     sprintf(filename, "exhumed%02d.ogg", nTrack);
-    if (!Mus_Play(filename, true))
+    if (!Mus_Play(filename, bLoop))
     {
         // try ogg vorbis now from GOG MUSIC subdirectory.
         sprintf(filename, "track%02d.ogg", nTrack);
-        Mus_Play(filename, true);
+        Mus_Play(filename, bLoop);
     }
     return true;
 }

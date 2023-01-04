@@ -46,7 +46,7 @@ Modifications for JonoF's port by Jonathon Fowler (jf@jonof.id.au)
 #include "sectorgeometry.h"
 #include "gamefuncs.h"
 #include "hw_sections.h"
-
+#include "coreactor.h"
 CVAR(Bool, am_followplayer, true, CVAR_ARCHIVE)
 CVAR(Bool, am_rotate, true, CVAR_ARCHIVE)
 CVAR(Float, am_linealpha, 1.0f, CVAR_ARCHIVE)
@@ -61,8 +61,8 @@ int follow_x = INT_MAX, follow_y = INT_MAX, follow_a = INT_MAX;
 static int gZoom = 768;
 bool automapping;
 bool gFullMap;
-FixedBitArray<MAXSECTORS> show2dsector;
-FixedBitArray<MAXWALLS> show2dwall;
+BitArray show2dsector;
+BitArray show2dwall;
 static int x_min_bound = INT_MAX, y_min_bound, x_max_bound, y_max_bound;
 
 CVAR(Color, am_twosidedcolor, 0xaaaaaa, CVAR_ARCHIVE)
@@ -167,13 +167,13 @@ static void CalcMapBounds()
 	y_max_bound = INT_MIN;
 
 
-	for (int i = 0; i < numwalls; i++)
+	for(auto& wal : wall)
 	{
 		// get map min and max coordinates
-		if (wall[i].x < x_min_bound) x_min_bound = wall[i].x;
-		if (wall[i].y < y_min_bound) y_min_bound = wall[i].y;
-		if (wall[i].x > x_max_bound) x_max_bound = wall[i].x;
-		if (wall[i].y > y_max_bound) y_max_bound = wall[i].y;
+		if (wal.wall_int_pos().X < x_min_bound) x_min_bound = wal.wall_int_pos().X;
+		if (wal.wall_int_pos().Y < y_min_bound) y_min_bound = wal.wall_int_pos().Y;
+		if (wal.wall_int_pos().X > x_max_bound) x_max_bound = wal.wall_int_pos().X;
+		if (wal.wall_int_pos().Y > y_max_bound) y_max_bound = wal.wall_int_pos().Y;
 	}
 }
 
@@ -267,9 +267,8 @@ void SerializeAutomap(FSerializer& arc)
 	{
 		arc("automapping", automapping)
 			("fullmap", gFullMap)
-			// Only store what's needed. Unfortunately for sprites it is not that easy
-			.SerializeMemory("mappedsectors", show2dsector.Storage(), (numsectors + 7) / 8)
-			.SerializeMemory("mappedwalls", show2dwall.Storage(), (numwalls + 7) / 8)
+			("mappedsectors", show2dsector)
+			("mappedwalls", show2dwall)
 			.EndObject();
 	}
 }
@@ -294,21 +293,21 @@ void ClearAutomap()
 //
 //---------------------------------------------------------------------------
 
-void MarkSectorSeen(int i)
+void MarkSectorSeen(sectortype* sec)
 {
-	if (i >= 0) 
+	if (sec) 
 	{
-		show2dsector.Set(i);
-		auto wal = &wall[sector[i].wallptr];
-		for (int j = sector[i].wallnum; j > 0; j--, wal++)
+		show2dsector.Set(sectnum(sec));
+		for (auto& wal : wallsofsector(sec))
 		{
-			i = wal->nextsector;
-			if (i < 0) continue;
-			if (wal->cstat & 0x0071) continue;
-			if (wall[wal->nextwall].cstat & 0x0071) continue;
-			if (sector[i].lotag == 32767) continue;
-			if (sector[i].ceilingz >= sector[i].floorz) continue;
-			show2dsector.Set(i);
+			if (!wal.twoSided()) continue;
+			const auto bits = (CSTAT_WALL_BLOCK | CSTAT_WALL_MASKED | CSTAT_WALL_1WAY | CSTAT_WALL_BLOCK_HITSCAN);
+			if (wal.cstat & bits) continue;
+			if (wal.nextWall()->cstat & bits) continue;
+			auto osec = wal.nextSector();
+			if (osec->lotag == 32767) continue;
+			if (osec->ceilingz >= osec->floorz) continue;
+			show2dsector.Set(sectnum(osec));
 		}
 	}
 }
@@ -325,7 +324,7 @@ void drawlinergb(int32_t x1, int32_t y1, int32_t x2, int32_t y2, PalEntry p)
 		twod->AddThickLine(x1 / 4096, y1 / 4096, x2 / 4096, y2 / 4096, am_linethickness, p, uint8_t(am_linealpha * 255));
 	} else {
 		// Use more efficient thin line drawing routine.
-		twod->AddLine(x1 / 4096.f, y1 / 4096.f, x2 / 4096.f, y2 / 4096.f, windowxy1.x, windowxy1.y, windowxy2.x, windowxy2.y, p, uint8_t(am_linealpha * 255));
+		twod->AddLine(x1 / 4096.f, y1 / 4096.f, x2 / 4096.f, y2 / 4096.f, windowxy1.X, windowxy1.Y, windowxy2.X, windowxy2.Y, p, uint8_t(am_linealpha * 255));
 	}
 }
 
@@ -391,13 +390,13 @@ bool ShowRedLine(int j, int i)
 		if (automapMode == am_full)
 		{
 			if (sector[i].floorz != sector[i].ceilingz)
-				if (sector[wal->nextsector].floorz != sector[wal->nextsector].ceilingz)
-					if (((wal->cstat | wall[wal->nextwall].cstat) & (16 + 32)) == 0)
-						if (sector[i].floorz == sector[wal->nextsector].floorz)
+				if (wal->nextSector()->floorz != wal->nextSector()->ceilingz)
+					if (((wal->cstat | wal->nextWall()->cstat) & (CSTAT_WALL_MASKED | CSTAT_WALL_1WAY)) == 0)
+						if (sector[i].floorz == wal->nextSector()->floorz)
 							return false;
-			if (sector[i].floorpicnum != sector[wal->nextsector].floorpicnum)
+			if (sector[i].floorpicnum != wal->nextSector()->floorpicnum)
 				return false;
-			if (sector[i].floorshade != sector[wal->nextsector].floorshade)
+			if (sector[i].floorshade != wal->nextSector()->floorshade)
 				return false;
 		}
 		return true;
@@ -417,39 +416,32 @@ void drawredlines(int cposx, int cposy, int czoom, int cang)
 	int width = screen->GetWidth();
 	int height = screen->GetHeight();
 
-	for (int i = 0; i < numsectors; i++)
+	for (unsigned i = 0; i < sector.Size(); i++)
 	{
 		if (!gFullMap && !show2dsector[i]) continue;
 
-		int startwall = sector[i].wallptr;
-		int endwall = sector[i].wallptr + sector[i].wallnum;
-
 		int z1 = sector[i].ceilingz;
 		int z2 = sector[i].floorz;
-		walltype* wal;
-		int j;
 
-		for (j = startwall, wal = &wall[startwall]; j < endwall; j++, wal++)
+		for (auto& wal : wallsofsector(i))
 		{
-			int k = wal->nextwall;
-			if (k < 0 || k >= numwalls) continue;
+			if (!wal.twoSided()) continue;
 
-			int s = wal->nextsector;
-			if (s < 0 || s >= numsectors) continue;
+			auto osec = wal.nextSector();
 
-			if (sector[s].ceilingz == z1 && sector[s].floorz == z2)
-				if (((wal->cstat | wall[wal->nextwall].cstat) & (16 + 32)) == 0) continue;
+			if (osec->ceilingz == z1 && osec->floorz == z2)
+				if (((wal.cstat | wal.nextWall()->cstat) & (CSTAT_WALL_MASKED | CSTAT_WALL_1WAY)) == 0) continue;
 
-			if (ShowRedLine(j, i))
+			if (ShowRedLine(wallnum(&wal), i))
 			{
-				int ox = wal->x - cposx;
-				int oy = wal->y - cposy;
+				int ox = wal.wall_int_pos().X - cposx;
+				int oy = wal.wall_int_pos().Y - cposy;
 				int x1 = DMulScale(ox, xvect, -oy, yvect, 16) + (width << 11);
 				int y1 = DMulScale(oy, xvect, ox, yvect, 16) + (height << 11);
 
-				auto wal2 = &wall[wal->point2];
-				ox = wal2->x - cposx;
-				oy = wal2->y - cposy;
+				auto wal2 = wal.point2Wall();
+				ox = wal2->wall_int_pos().X - cposx;
+				oy = wal2->wall_int_pos().Y - cposy;
 				int x2 = DMulScale(ox, xvect, -oy, yvect, 16) + (width << 11);
 				int y2 = DMulScale(oy, xvect, ox, yvect, 16) + (height << 11);
 
@@ -472,33 +464,27 @@ static void drawwhitelines(int cposx, int cposy, int czoom, int cang)
 	int width = screen->GetWidth();
 	int height = screen->GetHeight();
 
-	for (int i = numsectors - 1; i >= 0; i--)
+	for (int i = (int)sector.Size() - 1; i >= 0; i--)
 	{
 		if (!gFullMap && !show2dsector[i] && !isSWALL()) continue;
 
-		int startwall = sector[i].wallptr;
-		int endwall = sector[i].wallptr + sector[i].wallnum;
-
-		walltype* wal;
-		int j;
-
-		for (j = startwall, wal = &wall[startwall]; j < endwall; j++, wal++)
+		for (auto& wal : wallsofsector(i))
 		{
-			if (wal->nextwall >= 0) continue;
-			if (!gFullMap && !tileGetTexture(wal->picnum)->isValid()) continue;
+			if (wal.nextwall >= 0) continue;
+			if (!gFullMap && !tileGetTexture(wal.picnum)->isValid()) continue;
 
-			if (isSWALL() && !gFullMap && !show2dwall[j])
+			if (isSWALL() && !gFullMap && !show2dwall[wallnum(&wal)])
 				continue;
 
-			int ox = wal->x - cposx;
-			int oy = wal->y - cposy;
+			int ox = wal.wall_int_pos().X - cposx;
+			int oy = wal.wall_int_pos().Y - cposy;
 			int x1 = DMulScale(ox, xvect, -oy, yvect, 16) + (width << 11);
 			int y1 = DMulScale(oy, xvect, ox, yvect, 16) + (height << 11);
 
-			int k = wal->point2;
+			int k = wal.point2;
 			auto wal2 = &wall[k];
-			ox = wal2->x - cposx;
-			oy = wal2->y - cposy;
+			ox = wal2->wall_int_pos().X - cposx;
+			oy = wal2->wall_int_pos().Y - cposy;
 			int x2 = DMulScale(ox, xvect, -oy, yvect, 16) + (width << 11);
 			int y2 = DMulScale(oy, xvect, ox, yvect, 16) + (height << 11);
 
@@ -567,37 +553,42 @@ void renderDrawMapView(int cposx, int cposy, int czoom, int cang)
 	int width = screen->GetWidth();
 	int height = screen->GetHeight();
 	TArray<FVector4> vertices;
-	TArray<int> floorsprites;
+	TArray<DCoreActor*> floorsprites;
 
 
-	for (int i = numsectors - 1; i >= 0; i--)
+	for (int i = (int)sector.Size() - 1; i >= 0; i--)
 	{
+		auto sect = &sector[i];
 		if (!gFullMap && !show2dsector[i]) continue;
 
 		//Collect floor sprites to draw
-		SectIterator it(i);
-		int s;
-		while ((s = it.NextIndex()) >= 0)
+		TSectIterator<DCoreActor> it(sect);
+		while (auto act = it.Next())
 		{
-			if (sprite[s].cstat & CSTAT_SPRITE_INVISIBLE)
+			if (act->spr.cstat & CSTAT_SPRITE_INVISIBLE)
 				continue;
 
-			if ((sprite[s].cstat & CSTAT_SPRITE_ALIGNMENT_MASK) == CSTAT_SPRITE_ALIGNMENT_FLOOR)
+			if (act->spr.cstat & CSTAT_SPRITE_ALIGNMENT_FLOOR)	// floor and slope sprites
 			{
-				if ((sprite[s].cstat & (CSTAT_SPRITE_ONE_SIDED | CSTAT_SPRITE_YFLIP)) == (CSTAT_SPRITE_ONE_SIDED | CSTAT_SPRITE_YFLIP))
+				if ((act->spr.cstat & (CSTAT_SPRITE_ONE_SIDE | CSTAT_SPRITE_YFLIP)) == (CSTAT_SPRITE_ONE_SIDE | CSTAT_SPRITE_YFLIP))
 					continue; // upside down
-				floorsprites.Push(s);
+				floorsprites.Push(act);
 			}
 		}
 
-		if (sector[i].floorstat & CSTAT_SECTOR_SKY) continue;
+		if (sect->floorstat & CSTAT_SECTOR_SKY) continue;
 
-		int picnum = sector[i].floorpicnum;
+		int picnum = sect->floorpicnum;
 		if ((unsigned)picnum >= (unsigned)MAXTILES) continue;
 
-		for (auto ii : sectionspersector[i])
+		int translation = TRANSLATION(Translation_Remap + curbasepal, sector[i].floorpal);
+		PalEntry light = shadeToLight(sector[i].floorshade);
+		gotpic.Set(picnum);
+
+		for (auto section : sectionsPerSector[i])
 		{
-			auto mesh = sectorGeometry.get(ii, 0, { 0.f,0.f });
+			TArray<int>* indices;
+			auto mesh = sectionGeometry.get(&sections[section], 0, { 0.f, 0.f }, &indices);
 			vertices.Resize(mesh->vertices.Size());
 			for (unsigned j = 0; j < mesh->vertices.Size(); j++)
 			{
@@ -607,59 +598,54 @@ void renderDrawMapView(int cposx, int cposy, int czoom, int cang)
 				int y1 = DMulScale(oy, xvect, ox, yvect, 16) + (height << 11);
 				vertices[j] = { x1 / 4096.f, y1 / 4096.f, mesh->texcoords[j].X, mesh->texcoords[j].Y };
 			}
+
+			twod->AddPoly(tileGetTexture(picnum, true), vertices.Data(), vertices.Size(), (unsigned*)indices->Data(), indices->Size(), translation, light,
+				LegacyRenderStyles[STYLE_Translucent], windowxy1.X, windowxy1.Y, windowxy2.X + 1, windowxy2.Y + 1);
 		}
-
-		int translation = TRANSLATION(Translation_Remap + curbasepal, sector[i].floorpal);
-		setgotpic(picnum);
-		twod->AddPoly(tileGetTexture(picnum, true), vertices.Data(), vertices.Size(), nullptr, 0, translation, shadeToLight(sector[i].floorshade), 
-			LegacyRenderStyles[STYLE_Translucent], windowxy1.x, windowxy1.y, windowxy2.x + 1, windowxy2.y + 1);
-
-
 	}
-	qsort(floorsprites.Data(), floorsprites.Size(), sizeof(int), [](const void* a, const void* b)
+	qsort(floorsprites.Data(), floorsprites.Size(), sizeof(DCoreActor*), [](const void* a, const void* b)
 		{
-			int A = *(int*)a;
-			int B = *(int*)b;
-			if (sprite[A].z != sprite[B].z) return sprite[B].z - sprite[A].z;
-			return A - B; // ensures stable sort.
+			auto A = *(DCoreActor**)a;
+			auto B = *(DCoreActor**)b;
+			if (A->spr.pos.Z != B->spr.pos.Z) return B->spr.pos.Z - A->spr.pos.Z;
+			return A->time - B->time; // ensures stable sort.
 		});
 
 	vertices.Resize(4);
-	for (auto sn : floorsprites)
+	for (auto actor : floorsprites)
 	{
-		if (!gFullMap && !(sprite[sn].cstat2 & CSTAT2_SPRITE_MAPPED)) continue;
-		auto spr = &sprite[sn];
+		if (!gFullMap && !(actor->spr.cstat2 & CSTAT2_SPRITE_MAPPED)) continue;
 		vec2_t pp[4];
-		GetFlatSpritePosition(spr, spr->pos.vec2, pp, true);
+		GetFlatSpritePosition(actor, actor->spr.pos.vec2, pp, true);
 
 		for (unsigned j = 0; j < 4; j++)
 		{
-			int ox = pp[j].x - cposx;
-			int oy = pp[j].y - cposy;
+			int ox = pp[j].X - cposx;
+			int oy = pp[j].Y - cposy;
 			int x1 = DMulScale(ox, xvect, -oy, yvect, 16) + (width << 11);
 			int y1 = DMulScale(oy, xvect, ox, yvect, 16) + (height << 11);
 			vertices[j] = { x1 / 4096.f, y1 / 4096.f, j == 1 || j == 2 ? 1.f : 0.f, j == 2 || j == 3 ? 1.f : 0.f };
 		}
 		int shade;
-		if ((sector[spr->sectnum].ceilingstat & CSTAT_SECTOR_SKY)) shade = sector[spr->sectnum].ceilingshade;
-		else shade = sector[spr->sectnum].floorshade;
-		shade += spr->shade;
+		if ((actor->sector()->ceilingstat & CSTAT_SECTOR_SKY)) shade = actor->sector()->ceilingshade;
+		else shade = actor->sector()->floorshade;
+		shade += actor->spr.shade;
 		PalEntry color = shadeToLight(shade);
 		FRenderStyle rs = LegacyRenderStyles[STYLE_Translucent];
 		float alpha = 1;
-		if (spr->cstat & CSTAT_SPRITE_TRANSLUCENT)
+		if (actor->spr.cstat & CSTAT_SPRITE_TRANSLUCENT)
 		{
-			rs = GetRenderStyle(0, !!(spr->cstat & CSTAT_SPRITE_TRANSLUCENT_INVERT));
-			alpha = GetAlphaFromBlend((spr->cstat & CSTAT_SPRITE_TRANSLUCENT_INVERT) ? DAMETH_TRANS2 : DAMETH_TRANS1, 0);
+			rs = GetRenderStyle(0, !!(actor->spr.cstat & CSTAT_SPRITE_TRANS_FLIP));
+			alpha = GetAlphaFromBlend((actor->spr.cstat & CSTAT_SPRITE_TRANS_FLIP) ? DAMETH_TRANS2 : DAMETH_TRANS1, 0);
 			color.a = uint8_t(alpha * 255);
 		}
 
-		int translation = TRANSLATION(Translation_Remap + curbasepal, spr->pal);
-		int picnum = spr->picnum;
-		setgotpic(picnum);
+		int translation = TRANSLATION(Translation_Remap + curbasepal, actor->spr.pal);
+		int picnum = actor->spr.picnum;
+		gotpic.Set(picnum);
 		const static unsigned indices[] = { 0, 1, 2, 0, 2, 3 };
 		twod->AddPoly(tileGetTexture(picnum, true), vertices.Data(), vertices.Size(), indices, 6, translation, color, rs,
-			windowxy1.x, windowxy1.y, windowxy2.x + 1, windowxy2.y + 1);
+			windowxy1.X, windowxy1.Y, windowxy2.X + 1, windowxy2.Y + 1);
 	}
 }
 
@@ -678,7 +664,7 @@ void DrawOverheadMap(int pl_x, int pl_y, int pl_angle, double const smoothratio)
 	}
 	int x = follow_x;
 	int y = follow_y;
-	follow_a = am_rotate ? pl_angle : 0;
+	follow_a = am_rotate ? pl_angle : 1536;
 	AutomapControl();
 
 	if (automapMode == am_full)

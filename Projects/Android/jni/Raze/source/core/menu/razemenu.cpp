@@ -90,17 +90,24 @@ FNewGameStartup NewGameStartupInfo;
 
 static bool DoStartGame(FNewGameStartup& gs)
 {
-	auto vol = FindVolume(gs.Episode);
-	if (!vol) return false;
-
-	if (isShareware() && (vol->flags & VF_SHAREWARELOCK))
+	MapRecord* map;
+	if (gs.Map == nullptr)
 	{
-		M_StartMessage(GStrings("SHAREWARELOCK"), 1, NAME_None);
-		return false;
-	}
+		auto vol = FindVolume(gs.Episode);
+		if (!vol) return false;
 
-	auto map = FindMapByName(vol->startmap);
-	if (!map) return false;
+		if (isShareware() && (vol->flags & VF_SHAREWARELOCK))
+		{
+			M_StartMessage(GStrings("SHAREWARELOCK"), 1, NAME_None);
+			return false;
+		}
+
+		map = FindMapByName(vol->startmap);
+		if (!map) return false;
+	}
+	else
+		map = gs.Map;
+
 	soundEngine->StopAllChannels();
 
 	gi->StartGame(gs);	// play game specific effects (like Duke/RR/SW's voice lines when starting a game.)
@@ -132,21 +139,18 @@ bool M_SetSpecialMenu(FName& menu, int param)
 		break;
 
 	case NAME_Skillmenu:
-		// sent from the episode menu
-		NewGameStartupInfo.Episode = param;
-		NewGameStartupInfo.Level = 0;
+		// sent from the episode or user map menu
+		if (param != INT_MAX)
+		{
+			NewGameStartupInfo.Map = nullptr;
+			NewGameStartupInfo.Episode = param;
+			NewGameStartupInfo.Level = 0;
+		}
 		NewGameStartupInfo.Skill = gDefaultSkill;
 		return true;
 
 	case NAME_Startgame:
-	case NAME_StartgameNoSkill:
 		NewGameStartupInfo.Skill = param;
-		if (menu == NAME_StartgameNoSkill)
-		{
-			menu = NAME_Startgame;
-			NewGameStartupInfo.Episode = param;
-			NewGameStartupInfo.Skill = 1;
-		}
 		if (DoStartGame(NewGameStartupInfo))
 		{
 			M_ClearMenus();
@@ -156,10 +160,6 @@ bool M_SetSpecialMenu(FName& menu, int param)
 			inputState.ClearAllInput();
 		}
 		return false;
-
-	case NAME_CustomSubMenu1:
-		menu = ENamedName(menu.GetIndex() + param);
-		break;
 
 	case NAME_Savegamemenu:
 		if (!gi->CanSave())
@@ -426,26 +426,22 @@ static void BuildEpisodeMenu()
 				addedVolumes++;
 				if (vol.subtitle.IsNotEmpty())
 				{
-					auto it = CreateCustomListMenuItemText(ld->mXpos, y, ld->mLinespacing * 6 / 10, 1,
+					auto item = CreateCustomListMenuItemText(ld->mXpos, y, ld->mLinespacing * 6 / 10, 1,
 						vol.subtitle, SmallFont, CR_GRAY, false, NAME_None, vol.index);
 					y += ld->mLinespacing * 6 / 10;
-					ld->mItems.Push(it);
+					ld->mItems.Push(item);
 					textadded = true;
 				}
 			}
 		}
-#if 0	// this needs to be backed by a working selection menu, until that gets done it must be disabled.
 		if (!(g_gameType & GAMEFLAG_SHAREWARE))
 		{
-			//auto it = new FListMenuItemNativeStaticText(ld->mXpos, "", NIT_SmallFont);	// empty entry as spacer.
-			//ld->mItems.Push(it);
-
 			y += ld->mLinespacing / 3;
-			auto it = CreateCustomListMenuItemText(ld->mXpos, y, ld->mLinespacing, 'U', "$MNU_USERMAP", ld->mFont, 0, 0, NAME_UsermapMenu);
+			auto it = CreateCustomListMenuItemText(ld->mXpos, y, ld->mLinespacing, 'U', "$MNU_USERMAP", ld->mFont, CR_UNTRANSLATED, 0, NAME_UsermapMenu, 0);
 			ld->mItems.Push(it);
 			addedVolumes++;
 		}
-#endif
+
 		if (addedVolumes == 1)
 		{
 			ld->mAutoselect = ld->mItems.Size() - (textadded ? 2 : 1);

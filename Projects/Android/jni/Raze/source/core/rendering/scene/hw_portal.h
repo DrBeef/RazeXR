@@ -145,14 +145,14 @@ public:
 	BoundingRect boundingBox;
 	int planesused = 0;
 
-    HWPortal(FPortalSceneState *s, bool local = false) : mState(s), boundingBox(false)
-    {
-    }
-    virtual ~HWPortal() {}
-    virtual int ClipSeg(walltype *seg, const DVector3 &viewpos) { return PClip_Inside; }
-    virtual int ClipSector(sectortype *sub) { return PClip_Inside; }
-    virtual int ClipPoint(const DVector2 &pos) { return PClip_Inside; }
-    virtual walltype *ClipLine() { return nullptr; }
+	HWPortal(FPortalSceneState *s, bool local = false) : mState(s), boundingBox(false)
+	{
+	}
+	virtual ~HWPortal() {}
+	virtual int ClipSeg(walltype *seg, const DVector3 &viewpos) { return PClip_Inside; }
+	virtual int ClipSector(sectortype *sub) { return PClip_Inside; }
+	virtual int ClipPoint(const DVector2 &pos) { return PClip_Inside; }
+	virtual walltype *ClipLine() { return nullptr; }
 	virtual void * GetSource() const = 0;	// GetSource MUST be implemented!
 	virtual const char *GetName() = 0;
 	virtual bool AllowSSAO() { return true; }
@@ -212,14 +212,14 @@ struct FPortalSceneState
 
 extern FPortalSceneState portalState;
 
-    
+
 class HWScenePortalBase : public HWPortal
 {
 protected:
-    HWScenePortalBase(FPortalSceneState *state) : HWPortal(state, false)
-    {
-        
-    }
+	HWScenePortalBase(FPortalSceneState *state) : HWPortal(state, false)
+	{
+
+	}
 public:
 	void ClearClipper(HWDrawInfo *di, Clipper *clipper);
 	virtual bool NeedDepthBuffer() { return true; }
@@ -244,7 +244,7 @@ protected:
 	{
 		this->line = line;
 		//v1 = &line->pos;
-		//v2 = &wall[line->point2].pos;
+		//v2 = &line->point2Wall()->pos;
 		//CalcDelta();
 	}
 
@@ -297,8 +297,9 @@ public:
 
 struct HWLineToSpritePortal : public HWLinePortal
 {
+	walltype clipline = {};
 	walltype* origin;
-	spritetype* camera;
+	DCoreActor* camera;
 protected:
 	bool Setup(HWDrawInfo* di, FRenderState& rstate, Clipper* clipper) override;
 	virtual void* GetSource() const override { return origin; }
@@ -308,11 +309,9 @@ protected:
 
 public:
 
-	HWLineToSpritePortal(FPortalSceneState* state, walltype* from, spritetype* to)
-		: HWLinePortal(state, &wall[numwalls]), origin(from), camera(to)
+	HWLineToSpritePortal(FPortalSceneState* state, walltype* from, DCoreActor* to)
+		: HWLinePortal(state, &clipline), origin(from), camera(to)
 	{
-		// todo: set up two fake walls at the end of the walls array to be used for backside clipping.
-		// Not really needed for vanilla support but maybe later for feature enhancement.
 	}
 };
 
@@ -322,7 +321,7 @@ struct HWSkyboxPortal : public HWScenePortalBase
 {
 	bool oldclamp;
 	int old_pm;
-	spritetype * portal;
+	DCoreActor * portal;
 
 protected:
 	bool Setup(HWDrawInfo *di, FRenderState &rstate, Clipper *clipper) override;
@@ -335,7 +334,7 @@ protected:
 public:
 
 
-	HWSkyboxPortal(FPortalSceneState *state, spritetype * pt) : HWScenePortalBase(state)
+	HWSkyboxPortal(FPortalSceneState *state, DCoreActor * pt) : HWScenePortalBase(state)
 	{
 		portal = pt;
 	}
@@ -403,7 +402,7 @@ protected:
 	virtual const char *GetName();
 
 public:
-	
+
 	HWHorizonPortal(FPortalSceneState *state, HWHorizonInfo * pt, FRenderViewpoint &vp, bool local = false);
 };
 #endif

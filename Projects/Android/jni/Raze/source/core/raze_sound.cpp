@@ -44,6 +44,7 @@
 #include "cmdlib.h"
 #include "gamecontrol.h"
 #include "build.h"
+#include "coreactor.h"
 
 extern ReverbContainer* ForcedEnvironment;
 static int LastReverb;
@@ -97,7 +98,7 @@ FString NoiseDebug(SoundEngine *engine)
 	int ch = 0;
 
 	FString out;
-	
+
 	out.Format("*** SOUND DEBUG INFO ***\nListener: %3.2f %2.3f %2.3f\n"
 		"x     y     z     vol   dist  chan  pri   flags       aud   pos   name\n", listener.X, listener.Y, listener.Z);
 
@@ -181,18 +182,25 @@ static FSerializer& Serialize(FSerializer& arc, const char* key, FSoundChan& cha
 			("userdata", chan.UserData)
 			.Array("point", chan.Point, 3);
 
-		int SourceIndex = 0;
-		if (arc.isWriting())
+		assert(dynamic_cast<RazeSoundEngine*>(soundEngine));
+
+		auto eng = static_cast<RazeSoundEngine*>(soundEngine);
+		// Let's handle actor sources here becaue they are the same for all games.
+		if (eng->SourceIsActor(&chan))
 		{
-			if (chan.SourceType == SOURCE_Actor) SourceIndex = int((spritetype*)(chan.Source) - sprite);
-			else SourceIndex = soundEngine->SoundSourceIndex(&chan);
+			DCoreActor* SourceIndex = nullptr;
+			if (arc.isWriting()) SourceIndex = const_cast<DCoreActor*>(reinterpret_cast<const DCoreActor*>(chan.Source));
+			arc("Source", SourceIndex);
+			if (arc.isReading()) chan.Source = SourceIndex;
 		}
-		arc("Source", SourceIndex);
-		if (arc.isReading())
+		else
 		{
-			if (chan.SourceType == SOURCE_Actor) chan.Source = &sprite[SourceIndex];
-			else soundEngine->SetSource(&chan, SourceIndex);
+			int SourceIndex = 0;
+			if (arc.isWriting()) SourceIndex = eng->SoundSourceIndex(&chan);
+			arc("Source", SourceIndex);
+			if (arc.isReading()) eng->SetSource(&chan, SourceIndex);
 		}
+
 		arc.EndObject();
 	}
 	return arc;
@@ -208,50 +216,61 @@ void S_SerializeSounds(FSerializer& arc)
 {
 	FSoundChan* chan;
 
-GSnd->Sync(true);
+	GSnd->Sync(true);
 
-if (arc.isWriting())
-{
-	// Count channels and accumulate them so we can store them in
-	// reverse order. That way, they will be in the same order when
-	// reloaded later as they are now.
-	TArray<FSoundChan*> chans = soundEngine->AllActiveChannels();
-
-	if (chans.Size() > 0 && arc.BeginArray("sounds"))
+	if (arc.isWriting())
 	{
-		for (unsigned int i = chans.Size(); i-- != 0; )
-		{
-			// Replace start time with sample position.
-			uint64_t start = chans[i]->StartTime;
-			chans[i]->StartTime = GSnd ? GSnd->GetPosition(chans[i]) : 0;
-			arc(nullptr, *chans[i]);
-			chans[i]->StartTime = start;
-		}
-		arc.EndArray();
-	}
-}
-else
-{
-	unsigned int count;
+		// Count channels and accumulate them so we can store them in
+		// reverse order. That way, they will be in the same order when
+		// reloaded later as they are now.
+		TArray<FSoundChan*> chans = soundEngine->AllActiveChannels();
 
-	soundEngine->StopAllChannels();
-	if (arc.BeginArray("sounds"))
-	{
-		count = arc.ArraySize();
-		for (unsigned int i = 0; i < count; ++i)
+		if (chans.Size() > 0 && arc.BeginArray("sounds"))
 		{
-			chan = (FSoundChan*)soundEngine->GetChannel(nullptr);
-			arc(nullptr, *chan);
-			// Sounds always start out evicted when restored from a save.
-			chan->ChanFlags |= CHANF_EVICTED | CHANF_ABSTIME;
+			for (unsigned int i = chans.Size(); i-- != 0; )
+			{
+				// Replace start time with sample position.
+				uint64_t start = chans[i]->StartTime;
+				chans[i]->StartTime = GSnd ? GSnd->GetPosition(chans[i]) : 0;
+				arc(nullptr, *chans[i]);
+				chans[i]->StartTime = start;
+			}
+			arc.EndArray();
 		}
-		arc.EndArray();
 	}
-	// Add a small delay so that eviction only runs once the game is up and runnnig.
-	soundEngine->SetRestartTime(I_GetTime() + 2);
-}
-GSnd->Sync(false);
-GSnd->UpdateSounds();
+	else
+	{
+		unsigned int count;
+
+		soundEngine->StopAllChannels();
+		if (arc.BeginArray("sounds"))
+		{
+			count = arc.ArraySize();
+			for (unsigned int i = 0; i < count; ++i)
+			{
+				chan = (FSoundChan*)soundEngine->GetChannel(nullptr);
+				arc(nullptr, *chan);
+				// Sounds always start out evicted when restored from a save.
+				chan->ChanFlags |= CHANF_EVICTED | CHANF_ABSTIME;
+			}
+			arc.EndArray();
+		}
+		// Add a small delay so that eviction only runs once the game is up and runnnig.
+		soundEngine->SetRestartTime(I_GetTime() + 2);
+	}
+	// Check if there's actor sounds without an actor. This can happen if a savegame is badly timed with a freshly destroyed actor.
+	soundEngine->EnumerateChannels([](FSoundChan* chan)
+		{
+			auto eng = static_cast<RazeSoundEngine*>(soundEngine);
+			if (eng->SourceIsActor(chan) && chan->Source == nullptr)
+			{
+				eng->StopChannel(chan);
+			}
+			return 0;
+		});
+
+	GSnd->Sync(false);
+	GSnd->UpdateSounds();
 }
 
 //==========================================================================

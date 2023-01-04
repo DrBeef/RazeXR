@@ -2,11 +2,11 @@
 
 #ifdef USE_OPENGL
 
-#include "compat.h"
 #include "build.h"
 #include "engine_priv.h"
 #include "polymost.h"
 #include "mdsprite.h"
+#include "coreactor.h"
 
 #include "palette.h"
 #include "textures.h"
@@ -30,7 +30,7 @@ static int32_t curextra=MAXTILES;
 #define MIN_CACHETIME_PRINT 10
 
 using namespace Polymost;
-int32_t polymost_voxdraw(voxmodel_t* m, tspriteptr_t const tspr, bool rotate);
+int32_t polymost_voxdraw(voxmodel_t* m, tspritetype* const tspr, bool rotate);
 
 static int32_t addtileP(int32_t ,int32_t tile,int32_t pallet)
 {
@@ -81,7 +81,7 @@ static int32_t nummodelsalloced = 0;
 
 static int32_t maxmodelverts = 0, allocmodelverts = 0;
 static int32_t maxmodeltris = 0, allocmodeltris = 0;
-static vec3f_t *vertlist = NULL; //temp array to store interpolated vertices for drawing
+static FVector3 *vertlist = NULL; //temp array to store interpolated vertices for drawing
 
 #ifdef USE_GLEXT
 static int32_t allocvbos = 0, curvbo = 0;
@@ -303,7 +303,7 @@ int32_t md_defineskin(int32_t modelid, const char *skinfn, int32_t palnum, int32
     return 0;
 }
 
-int32_t md_definehud(int32_t modelid, int32_t tilex, vec3f_t add, int32_t angadd, int32_t flags, int32_t fov)
+int32_t md_definehud(int32_t modelid, int32_t tilex, FVector3 add, int32_t angadd, int32_t flags, int32_t fov)
 {
     if (!mdinited) mdinit();
 
@@ -399,7 +399,7 @@ FGameTexture *mdloadskin(idmodel_t *m, int32_t number, int32_t pal, int32_t surf
 }
 
 //Note: even though it says md2model, it works for both md2model&md3model
-static void updateanimation(md2model_t *m, tspriteptr_t tspr, uint8_t lpal)
+static void updateanimation(md2model_t *m, tspritetype* tspr, uint8_t lpal)
 {
     if (m->numframes < 2)
     {
@@ -410,14 +410,8 @@ static void updateanimation(md2model_t *m, tspriteptr_t tspr, uint8_t lpal)
     int32_t const tile = Ptile2tile(tspr->picnum,lpal);
     m->cframe = m->nframe = tile2model[tile].framenum;
 
-#ifdef DEBUGGINGAIDS
-    if (m->cframe >= m->numframes)
-        Printf("1: c > n\n");
-#endif
-
+    auto ownerActor = tspr->ownerActor;
     int32_t const smoothdurationp = (hw_animsmoothing && (tile2model[tile].smoothduration != 0));
-    spritesmooth_t * const smooth = &spritesmooth[((unsigned)tspr->owner < MAXSPRITES+MAXUNIQHUDID) ? tspr->owner : MAXSPRITES+MAXUNIQHUDID-1];
-    spriteext_t * const sprext = &spriteext[((unsigned)tspr->owner < MAXSPRITES) ? tspr->owner : MAXSPRITES-1];
 
     const mdanim_t *anim;
     for (anim = m->animations; anim && anim->startframe != m->cframe; anim = anim->next)
@@ -430,47 +424,45 @@ static void updateanimation(md2model_t *m, tspriteptr_t tspr, uint8_t lpal)
 
     if (!anim)
     {
-        if (!smoothdurationp || ((smooth->mdoldframe == m->cframe) && (smooth->mdcurframe == m->cframe)))
+        if (!smoothdurationp || ((ownerActor->spsmooth.mdoldframe == m->cframe) && (ownerActor->spsmooth.mdcurframe == m->cframe)))
         {
             m->interpol = 0;
             return;
         }
 
-        // assert(smoothdurationp && ((smooth->mdoldframe != m->cframe) || (smooth->mdcurframe != m->cframe)))
-
-        if (smooth->mdoldframe != m->cframe)
+        if (ownerActor->spsmooth.mdoldframe != m->cframe)
         {
-            if (smooth->mdsmooth == 0)
+            if (ownerActor->spsmooth.mdsmooth == 0)
             {
-                sprext->mdanimtims = mdtims;
+                ownerActor->sprext.mdanimtims = mdtims;
                 m->interpol = 0;
-                smooth->mdsmooth = 1;
-                smooth->mdcurframe = m->cframe;
+                ownerActor->spsmooth.mdsmooth = 1;
+                ownerActor->spsmooth.mdcurframe = m->cframe;
             }
-            else if (smooth->mdcurframe != m->cframe)
+            else if (ownerActor->spsmooth.mdcurframe != m->cframe)
             {
-                sprext->mdanimtims = mdtims;
+                ownerActor->sprext.mdanimtims = mdtims;
                 m->interpol = 0;
-                smooth->mdsmooth = 1;
-                smooth->mdoldframe = smooth->mdcurframe;
-                smooth->mdcurframe = m->cframe;
+                ownerActor->spsmooth.mdsmooth = 1;
+                ownerActor->spsmooth.mdoldframe = ownerActor->spsmooth.mdcurframe;
+                ownerActor->spsmooth.mdcurframe = m->cframe;
             }
         }
-        else  // if (smooth->mdcurframe != m->cframe)
+        else  // if (ownerActor->spsmooth.mdcurframe != m->cframe)
         {
-            sprext->mdanimtims = mdtims;
+            ownerActor->sprext.mdanimtims = mdtims;
             m->interpol = 0;
-            smooth->mdsmooth = 1;
-            smooth->mdoldframe = smooth->mdcurframe;
-            smooth->mdcurframe = m->cframe;
+            ownerActor->spsmooth.mdsmooth = 1;
+            ownerActor->spsmooth.mdoldframe = ownerActor->spsmooth.mdcurframe;
+            ownerActor->spsmooth.mdcurframe = m->cframe;
         }
     }
-    else if (/* anim && */ sprext->mdanimcur != anim->startframe)
+    else if (/* anim && */ ownerActor->sprext.mdanimcur != anim->startframe)
     {
-        //if (sprext->flags & SPREXT_NOMDANIM) Printf("SPREXT_NOMDANIM\n");
-        //Printf("smooth launched ! oldanim %i new anim %i\n", sprext->mdanimcur, anim->startframe);
-        sprext->mdanimcur = (int16_t)anim->startframe;
-        sprext->mdanimtims = mdtims;
+        //if (ownerActor->sprext.flags & SPREXT_NOMDANIM) Printf("SPREXT_NOMDANIM\n");
+        //Printf("smooth launched ! oldanim %i new anim %i\n", ownerActor->sprext.mdanimcur, anim->startframe);
+        ownerActor->sprext.mdanimcur = (int16_t)anim->startframe;
+        ownerActor->sprext.mdanimtims = mdtims;
         m->interpol = 0;
 
         if (!smoothdurationp)
@@ -481,24 +473,24 @@ static void updateanimation(md2model_t *m, tspriteptr_t tspr, uint8_t lpal)
         }
 
         m->nframe = anim->startframe;
-        m->cframe = smooth->mdoldframe;
+        m->cframe = ownerActor->spsmooth.mdoldframe;
 
-        smooth->mdsmooth = 1;
+        ownerActor->spsmooth.mdsmooth = 1;
         goto prep_return;
     }
 
-    fps = smooth->mdsmooth ? xs_CRoundToInt((1.0f / ((float)tile2model[tile].smoothduration * (1.f / (float)UINT16_MAX))) * 66.f)
+    fps = ownerActor->spsmooth.mdsmooth ? xs_CRoundToInt((1.0f / ((float)tile2model[tile].smoothduration * (1.f / (float)UINT16_MAX))) * 66.f)
                                    : anim ? anim->fpssc : 1;
 
-    i = (mdtims - sprext->mdanimtims) * ((fps * 120) / 120);
+    i = (mdtims - ownerActor->sprext.mdanimtims) * ((fps * 120) / 120);
 
-    j = (smooth->mdsmooth || !anim) ? 65536 : IntToFixed(anim->endframe + 1 - anim->startframe);
+    j = (ownerActor->spsmooth.mdsmooth || !anim) ? 65536 : IntToFixed(anim->endframe + 1 - anim->startframe);
 
     // XXX: Just in case you play the game for a VERY long time...
-    if (i < 0) { i = 0; sprext->mdanimtims = mdtims; }
+    if (i < 0) { i = 0; ownerActor->sprext.mdanimtims = mdtims; }
     //compare with j*2 instead of j to ensure i stays > j-65536 for MDANIM_ONESHOT
     if (anim && (i >= j+j) && (fps) && !mdpause) //Keep mdanimtims close to mdtims to avoid the use of MOD
-        sprext->mdanimtims += j/((fps*120)/120);
+        ownerActor->sprext.mdanimtims += j/((fps*120)/120);
 
     k = i;
 
@@ -506,20 +498,20 @@ static void updateanimation(md2model_t *m, tspriteptr_t tspr, uint8_t lpal)
         { if (i > j-65536) i = j-65536; }
     else { if (i >= j) { i -= j; if (i >= j) i %= j; } }
 
-    if (hw_animsmoothing && smooth->mdsmooth)
+    if (hw_animsmoothing && ownerActor->spsmooth.mdsmooth)
     {
-        m->nframe = anim ? anim->startframe : smooth->mdcurframe;
-        m->cframe = smooth->mdoldframe;
+        m->nframe = anim ? anim->startframe : ownerActor->spsmooth.mdcurframe;
+        m->cframe = ownerActor->spsmooth.mdoldframe;
 
         //Printf("smoothing... cframe %i nframe %i\n", m->cframe, m->nframe);
         if (k > 65535)
         {
-            sprext->mdanimtims = mdtims;
+            ownerActor->sprext.mdanimtims = mdtims;
             m->interpol = 0;
-            smooth->mdsmooth = 0;
-            m->cframe = m->nframe; // = anim ? anim->startframe : smooth->mdcurframe;
+            ownerActor->spsmooth.mdsmooth = 0;
+            m->cframe = m->nframe; // = anim ? anim->startframe : ownerActor->spsmooth.mdcurframe;
 
-            smooth->mdoldframe = m->cframe;
+            ownerActor->spsmooth.mdoldframe = m->cframe;
             //Printf("smooth stopped !\n");
             goto prep_return;
         }
@@ -532,15 +524,13 @@ static void updateanimation(md2model_t *m, tspriteptr_t tspr, uint8_t lpal)
 
         m->nframe = m->cframe+1;
 
-        if (anim && m->nframe > anim->endframe)  // VERIFY: (!(hw_animsmoothing && smooth->mdsmooth)) implies (anim!=NULL) ?
+        if (anim && m->nframe > anim->endframe)  // VERIFY: (!(hw_animsmoothing && ownerActor->spsmooth.mdsmooth)) implies (anim!=NULL) ?
             m->nframe = anim->startframe;
 
-        smooth->mdoldframe = m->cframe;
-        //Printf("not smoothing... cframe %i nframe %i\n", m->cframe, m->nframe);
+        ownerActor->spsmooth.mdoldframe = m->cframe;
     }
 
     m->interpol = clamp(i, 0, 65535) / 65536.f;
-    //Printf("interpol %f\n", m->interpol);
 
 prep_return:
     if (m->cframe >= m->numframes)
@@ -566,7 +556,7 @@ static md2model_t *md2load(FileReader & fil, const char *filnam)
     m->mdnum = 2; m->scale = .01f;
 
     fil.Read((char *)&head,sizeof(md2head_t));
-#if B_BIG_ENDIAN != 0
+#if WORDS_BIGENDIAN
     head.id = LittleLong(head.id);                 head.vers = LittleLong(head.vers);
     head.skinxsiz = LittleLong(head.skinxsiz);     head.skinysiz = LittleLong(head.skinysiz);
     head.framebytes = LittleLong(head.framebytes); head.numskins = LittleLong(head.numskins);
@@ -613,7 +603,7 @@ static md2model_t *md2load(FileReader & fil, const char *filnam)
     if (fil.Read((char *)m->uv,head.numuv*sizeof(md2uv_t)) != (int32_t)(head.numuv*sizeof(md2uv_t)))
         { M_Free(m->uv); M_Free(m->tris); M_Free(m->glcmds); M_Free(m->frames); M_Free(m); return 0; }
 
-#if B_BIG_ENDIAN != 0
+#if WORDS_BIGENDIAN
     {
         char *f = (char *)m->frames;
         int32_t *l,j;
@@ -685,7 +675,7 @@ static md2model_t *md2load(FileReader & fil, const char *filnam)
     m3->numframes = m3->head.numframes;
 
     m3->head.frames = (md3frame_t *)M_Calloc(m3->head.numframes, sizeof(md3frame_t));
-    m3->muladdframes = (vec3f_t *)M_Calloc(m->numframes * 2, sizeof(vec3f_t));
+    m3->muladdframes = (FVector3 *)M_Calloc(m->numframes * 2, sizeof(FVector3));
 
     f = (md2frame_t *)(m->frames);
 
@@ -751,9 +741,9 @@ static md2model_t *md2load(FileReader & fil, const char *filnam)
             while (k < m->numframes)
             {
                 f = (md2frame_t *)&m->frames[k*m->framebytes];
-                s->xyzn[(k*s->numverts) + (i*3) + j].x = (int16_t) (((f->verts[m->tris[i].v[j]].v[0] * f->mul.x) + f->add.x) * 64.f);
-                s->xyzn[(k*s->numverts) + (i*3) + j].y = (int16_t) (((f->verts[m->tris[i].v[j]].v[1] * f->mul.y) + f->add.y) * 64.f);
-                s->xyzn[(k*s->numverts) + (i*3) + j].z = (int16_t) (((f->verts[m->tris[i].v[j]].v[2] * f->mul.z) + f->add.z) * 64.f);
+                s->xyzn[(k*s->numverts) + (i*3) + j].x = (int16_t) (((f->verts[m->tris[i].v[j]].v[0] * f->mul.X) + f->add.X) * 64.f);
+                s->xyzn[(k*s->numverts) + (i*3) + j].y = (int16_t) (((f->verts[m->tris[i].v[j]].v[1] * f->mul.Y) + f->add.Y) * 64.f);
+                s->xyzn[(k*s->numverts) + (i*3) + j].z = (int16_t) (((f->verts[m->tris[i].v[j]].v[2] * f->mul.Z) + f->add.Z) * 64.f);
 
                 k++;
             }
@@ -848,7 +838,7 @@ static md3model_t *md3load(FileReader & fil)
 
     fil.Read(&m->head,SIZEOF_MD3HEAD_T);
 
-#if B_BIG_ENDIAN != 0
+#if WORDS_BIGENDIAN
     m->head.id = LittleLong(m->head.id);             m->head.vers = LittleLong(m->head.vers);
     m->head.flags = LittleLong(m->head.flags);       m->head.numframes = LittleLong(m->head.numframes);
     m->head.numtags = LittleLong(m->head.numtags);   m->head.numsurfs = LittleLong(m->head.numsurfs);
@@ -883,7 +873,7 @@ static md3model_t *md3load(FileReader & fil)
     // surfs[i].geometry is for FREE_SURFS_GEOMETRY.
     assert(m->head.surfs[0].geometry == NULL);
 
-#if B_BIG_ENDIAN != 0
+#if WORDS_BIGENDIAN
     {
         int32_t j, *l;
 
@@ -908,7 +898,7 @@ static md3model_t *md3load(FileReader & fil)
         s = &m->head.surfs[surfi];
         fil.Seek(ofsurf,FileReader::SeekSet); fil.Read(s,SIZEOF_MD3SURF_T);
 
-#if B_BIG_ENDIAN != 0
+#if WORDS_BIGENDIAN
         {
             int32_t j, *l;
             s->id = LittleLong(s->id);
@@ -941,7 +931,7 @@ static md3model_t *md3load(FileReader & fil)
         fil.Seek(offs[2],FileReader::SeekSet); fil.Read(s->uv     ,leng[2]);
         fil.Seek(offs[3],FileReader::SeekSet); fil.Read(s->xyzn   ,leng[3]);
 
-#if B_BIG_ENDIAN != 0
+#if WORDS_BIGENDIAN
         {
             int32_t j, *l;
 
@@ -996,8 +986,8 @@ static void      md3postload_common(md3model_t *m)
     {
         frame = &m->head.frames[framei];
 
-        memset(&frame->min, 0, sizeof(vec3f_t));
-        memset(&frame->max, 0, sizeof(vec3f_t));
+        memset(&frame->min, 0, sizeof(FVector3));
+        memset(&frame->max, 0, sizeof(FVector3));
 
         frame->r        = 0.0f;
 
@@ -1013,9 +1003,9 @@ static void      md3postload_common(md3model_t *m)
                 {
                     md3xyzn_t const & framevert = frameverts[0];
 
-                    frame->min.x    = framevert.x;
-                    frame->min.y    = framevert.y;
-                    frame->min.z    = framevert.z;
+                    frame->min.X    = framevert.x;
+                    frame->min.Y    = framevert.y;
+                    frame->min.Z    = framevert.z;
 
                     frame->max      = frame->min;
                 }
@@ -1023,20 +1013,20 @@ static void      md3postload_common(md3model_t *m)
                 {
                     md3xyzn_t const & framevert = frameverts[verti];
 
-                    if (frame->min.x > framevert.x)
-                        frame->min.x = framevert.x;
-                    if (frame->max.x < framevert.x)
-                        frame->max.x = framevert.x;
+                    if (frame->min.X > framevert.x)
+                        frame->min.X = framevert.x;
+                    if (frame->max.X < framevert.x)
+                        frame->max.X = framevert.x;
 
-                    if (frame->min.y > framevert.y)
-                        frame->min.y = framevert.y;
-                    if (frame->max.y < framevert.y)
-                        frame->max.y = framevert.y;
+                    if (frame->min.Y > framevert.y)
+                        frame->min.Y = framevert.y;
+                    if (frame->max.Y < framevert.y)
+                        frame->max.Y = framevert.y;
 
-                    if (frame->min.z > framevert.z)
-                        frame->min.z = framevert.z;
-                    if (frame->max.z < framevert.z)
-                        frame->max.z = framevert.z;
+                    if (frame->min.Z > framevert.z)
+                        frame->min.Z = framevert.z;
+                    if (frame->max.Z < framevert.z)
+                        frame->max.Z = framevert.z;
                 }
 
                 ++verti;
@@ -1045,9 +1035,9 @@ static void      md3postload_common(md3model_t *m)
             ++surfi;
         }
 
-        frame->cen.x = (frame->min.x + frame->max.x) * .5f;
-        frame->cen.y = (frame->min.y + frame->max.y) * .5f;
-        frame->cen.z = (frame->min.z + frame->max.z) * .5f;
+        frame->cen.X = (frame->min.X + frame->max.X) * .5f;
+        frame->cen.Y = (frame->min.Y + frame->max.Y) * .5f;
+        frame->cen.Z = (frame->min.Z + frame->max.Z) * .5f;
 
         surfi = 0;
         while (surfi < m->head.numsurfs)
@@ -1061,9 +1051,9 @@ static void      md3postload_common(md3model_t *m)
             {
                 md3xyzn_t const & framevert = frameverts[verti];
 
-                vec1[0] = framevert.x - frame->cen.x;
-                vec1[1] = framevert.y - frame->cen.y;
-                vec1[2] = framevert.z - frame->cen.z;
+                vec1[0] = framevert.x - frame->cen.X;
+                vec1[1] = framevert.y - frame->cen.Y;
+                vec1[2] = framevert.z - frame->cen.Z;
 
                 dist = vec1[0] * vec1[0] + vec1[1] * vec1[1] + vec1[2] * vec1[2];
 
@@ -1083,14 +1073,15 @@ static void      md3postload_common(md3model_t *m)
 }
 
 
-void md3_vox_calcmat_common(tspriteptr_t tspr, const vec3f_t *a0, float f, float mat[16])
+void md3_vox_calcmat_common(tspritetype* tspr, const FVector3 *a0, float f, float mat[16])
 {
     float k0, k1, k2, k3, k4, k5, k6, k7;
 
-    k0 = ((float)(tspr->x+spriteext[tspr->owner].position_offset.x-globalposx))*f*(1.f/1024.f);
-    k1 = ((float)(tspr->y+spriteext[tspr->owner].position_offset.y-globalposy))*f*(1.f/1024.f);
-    k4 = -bsinf(tspr->ang+spriteext[tspr->owner].angoff, -14);
-    k5 = bcosf(tspr->ang+spriteext[tspr->owner].angoff, -14);
+    auto ownerActor = tspr->ownerActor;
+    k0 = ((float)(tspr->pos.X+ownerActor->sprext.position_offset.X-globalposx))*f*(1.f/1024.f);
+    k1 = ((float)(tspr->pos.Y+ownerActor->sprext.position_offset.Y-globalposy))*f*(1.f/1024.f);
+    k4 = -bsinf(tspr->ang+ownerActor->sprext.angoff, -14);
+    k5 = bcosf(tspr->ang+ownerActor->sprext.angoff, -14);
     k2 = k0*(1-k4)+k1*k5;
     k3 = k1*(1-k4)-k0*k5;
     k6 = - gsinang; 
@@ -1098,7 +1089,7 @@ void md3_vox_calcmat_common(tspriteptr_t tspr, const vec3f_t *a0, float f, float
     mat[0] = k4*k6 + k5*k7; mat[4] = 0; mat[ 8] = k4*k7 - k5*k6; mat[12] = k2*k6 + k3*k7;
 
     mat[1] = 0; mat[5] = 1; mat[ 9] = 0; mat[13] = 0;
-    
+
     k6 = gcosang2; 
     k7 = gsinang2;
     mat[2] = k4*k6 + k5*k7; 
@@ -1106,9 +1097,9 @@ void md3_vox_calcmat_common(tspriteptr_t tspr, const vec3f_t *a0, float f, float
     mat[10] = k4*k7 - k5*k6; 
     mat[14] = k2*k6 + k3*k7;
 
-    mat[12] = (mat[12] + a0->y*mat[0]) + (a0->z*mat[4] + a0->x*mat[ 8]);
-    mat[13] = (mat[13] + a0->y*mat[1]) + (a0->z*mat[5] + a0->x*mat[ 9]);
-    mat[14] = (mat[14] + a0->y*mat[2]) + (a0->z*mat[6] + a0->x*mat[10]);
+    mat[12] = (mat[12] + a0->Y*mat[0]) + (a0->Z*mat[4] + a0->X*mat[ 8]);
+    mat[13] = (mat[13] + a0->Y*mat[1]) + (a0->Z*mat[5] + a0->X*mat[ 9]);
+    mat[14] = (mat[14] + a0->Y*mat[2]) + (a0->Z*mat[6] + a0->X*mat[10]);
 }
 
 static void md3draw_handle_triangles(const md3surf_t *s, uint16_t *indexhandle,
@@ -1130,24 +1121,23 @@ static void md3draw_handle_triangles(const md3surf_t *s, uint16_t *indexhandle,
 
             vt->SetTexCoord(s->uv[k].u, s->uv[k].v);
 
-            vt->SetVertex(vertlist[k].x, vertlist[k].y, vertlist[k].z);
+            vt->SetVertex(vertlist[k].X, vertlist[k].Y, vertlist[k].Z);
         }
     }
 	GLInterface.Draw(DT_Triangles, data.second, s->numtris *3);
 }
 
-static int32_t polymost_md3draw(md3model_t *m, tspriteptr_t tspr)
+static int32_t polymost_md3draw(md3model_t *m, tspritetype* tspr)
 {
-    vec3f_t m0, m1, a0;
+    FVector3 m0, m1, a0;
     md3xyzn_t *v0, *v1;
     int32_t i, surfi;
     float f, g, k0, k1, k2=0, k3=0, mat[16];  // inits: compiler-happy
     float pc[4];
  //   int32_t texunits = GL_TEXTURE0;
 
-    const int32_t owner = tspr->owner;
-    const spriteext_t *const sext = &spriteext[((unsigned)owner < MAXSPRITES) ? owner : MAXSPRITES-1];
-    const uint8_t lpal = ((unsigned)owner < MAXSPRITES) ? sprite[tspr->owner].pal : tspr->pal;
+    auto ownerActor = tspr->ownerActor;
+    const uint8_t lpal = ownerActor->spr.pal;
     const int32_t sizyrep = tileHeight(tspr->picnum) * tspr->yrepeat;
 
     updateanimation((md2model_t *)m, tspr, lpal);
@@ -1170,44 +1160,44 @@ static int32_t polymost_md3draw(md3model_t *m, tspriteptr_t tspr)
         m->nframe = clamp(m->nframe, 0, m->numframes-1);
     }
 
-    m0.z = m0.y = m0.x = g *= m->scale * (1.f/64.f);
-    m1.z = m1.y = m1.x = f *= m->scale * (1.f/64.f);
+    m0.Z = m0.Y = m0.X = g *= m->scale * (1.f/64.f);
+    m1.Z = m1.Y = m1.X = f *= m->scale * (1.f/64.f);
 
-    a0.x = a0.y = 0;
-    a0.z = m->zadd * m->scale;
+    a0.X = a0.Y = 0;
+    a0.Z = m->zadd * m->scale;
 
     // Parkar: Moved up to be able to use k0 for the y-flipping code
-    k0 = (float)tspr->z+spriteext[tspr->owner].position_offset.z;
-    f = ((globalorientation&8) && (sprite[tspr->owner].cstat&48)!=0) ? -4.f : 4.f;
+    k0 = (float)tspr->pos.Z+ownerActor->sprext.position_offset.Z;
+    f = ((globalorientation & 8) && (ownerActor->spr.cstat & CSTAT_SPRITE_ALIGNMENT_MASK) != CSTAT_SPRITE_ALIGNMENT_FACING) ? -4.f : 4.f;
     k0 -= (tspr->yoffset*tspr->yrepeat)*f;
-    if ((globalorientation&128) && !((globalorientation&48)==32))
+    if ((globalorientation&128) && !((globalorientation & CSTAT_SPRITE_ALIGNMENT_MASK) == CSTAT_SPRITE_ALIGNMENT_FLOOR))
         k0 += (float)(sizyrep<<1);
 
     // Parkar: Changed to use the same method as centeroriented sprites
     if (globalorientation&8) //y-flipping
     {
-        m0.z = -m0.z; m1.z = -m1.z; a0.z = -a0.z;
+        m0.Z = -m0.Z; m1.Z = -m1.Z; a0.Z = -a0.Z;
         k0 -= (float)(sizyrep<<2);
     }
-    if (globalorientation&4) { m0.y = -m0.y; m1.y = -m1.y; a0.y = -a0.y; } //x-flipping
+    if (globalorientation&4) { m0.Y = -m0.Y; m1.Y = -m1.Y; a0.Y = -a0.Y; } //x-flipping
 
-    // yoffset differs from zadd in that it does not follow cstat&8 y-flipping
-    a0.z += m->yoffset*m->scale;
+    // yoffset differs from zadd in that it does not follow cstat & CSTAT_SPRITE_YFLIP y-flipping
+    a0.Z += m->yoffset*m->scale;
 
     f = ((float)tspr->xrepeat) * (1.f/64.f) * m->bscale;
-    m0.x *= f; m0.y *= -f;
-    m1.x *= f; m1.y *= -f;
-    a0.x *= f; a0.y *= -f;
+    m0.X *= f; m0.Y *= -f;
+    m1.X *= f; m1.Y *= -f;
+    a0.X *= f; a0.Y *= -f;
     f = ((float)tspr->yrepeat) * (1.f/64.f) * m->bscale;
-    m0.z *= f; m1.z *= f; a0.z *= f;
+    m0.Z *= f; m1.Z *= f; a0.Z *= f;
 
     // floor aligned
-    k1 = (float)tspr->y+spriteext[tspr->owner].position_offset.y;
-    if ((globalorientation&48)==32)
+    k1 = (float)tspr->pos.Y+ ownerActor->sprext.position_offset.Y;
+    if ((globalorientation & CSTAT_SPRITE_ALIGNMENT_MASK) == CSTAT_SPRITE_ALIGNMENT_FLOOR)
     {
-        m0.z = -m0.z; m1.z = -m1.z; a0.z = -a0.z;
-        m0.y = -m0.y; m1.y = -m1.y; a0.y = -a0.y;
-        f = a0.x; a0.x = a0.z; a0.z = f;
+        m0.Z = -m0.Z; m1.Z = -m1.Z; a0.Z = -a0.Z;
+        m0.Y = -m0.Y; m1.Y = -m1.Y; a0.Y = -a0.Y;
+        f = a0.X; a0.X = a0.Z; a0.Z = f;
         k1 += (float)(sizyrep>>3);
     }
 
@@ -1215,14 +1205,14 @@ static int32_t polymost_md3draw(md3model_t *m, tspriteptr_t tspr)
     // calculations below again, but are needed for the base offsets.
     f = (65536.f*512.f)/(fxdimen*fviewingrange);
     g = 32.f/(fxdimen*gxyaspect);
-    m0.y *= f; m1.y *= f; a0.y = (((float)(tspr->x+spriteext[tspr->owner].position_offset.x-globalposx))*  (1.f/1024.f) + a0.y)*f;
-    m0.x *=-f; m1.x *=-f; a0.x = ((k1     -fglobalposy) * -(1.f/1024.f) + a0.x)*-f;
-    m0.z *= g; m1.z *= g; a0.z = ((k0     -fglobalposz) * -(1.f/16384.f) + a0.z)*g;
+    m0.Y *= f; m1.Y *= f; a0.Y = (((float)(tspr->pos.X+ ownerActor->sprext.position_offset.X-globalposx))*  (1.f/1024.f) + a0.Y)*f;
+    m0.X *=-f; m1.X *=-f; a0.X = ((k1     -fglobalposy) * -(1.f/1024.f) + a0.X)*-f;
+    m0.Z *= g; m1.Z *= g; a0.Z = ((k0     -fglobalposz) * -(1.f/16384.f) + a0.Z)*g;
 
     md3_vox_calcmat_common(tspr, &a0, f, mat);
 
     // floor aligned
-    if ((globalorientation&48)==32)
+    if ((globalorientation & CSTAT_SPRITE_ALIGNMENT_MASK) == CSTAT_SPRITE_ALIGNMENT_FLOOR)
     {
         f = mat[4]; mat[4] = mat[8]*16.f; mat[8] = -f*(1.f/16.f);
         f = mat[5]; mat[5] = mat[9]*16.f; mat[9] = -f*(1.f/16.f);
@@ -1237,11 +1227,9 @@ static int32_t polymost_md3draw(md3model_t *m, tspriteptr_t tspr)
     // to use Z-buffer hacks to hide overdraw problems with the flat-tsprite-on-floor shadows,
     // also disabling detail, glow, normal, and specular maps.
 
-    // WTF??? This should be done with proper math.
     if (tspr->clipdist & TSPR_FLAGS_MDHACK)
     {
-        double f = (double) (tspr->owner + 1) * (std::numeric_limits<double>::epsilon() * 8.0);
-        if (f != 0.0) f *= 1.0/(double) (FindDistance2D(globalposx - tspr->x, globalposy - tspr->y)>>5);
+        // What once was here had been neutered in EDuke32 already.
 		GLInterface.SetDepthFunc(DF_LEqual);
     }
 
@@ -1251,10 +1239,10 @@ static int32_t polymost_md3draw(md3model_t *m, tspriteptr_t tspr)
     // tinting
     pc[0] = pc[1] = pc[2] = ((float)numshades - min(max((globalshade * hw_shadescale) + m->shadeoff, 0.f), (float)numshades)) / (float)numshades;
 
-    pc[3] = (tspr->cstat&2) ? glblend[tspr->blend].def[!!(tspr->cstat&512)].alpha : 1.0f;
-    pc[3] *= 1.0f - sext->alpha;
+    pc[3] = (tspr->cstat & CSTAT_SPRITE_TRANSLUCENT) ? glblend[tspr->blend].def[!!(tspr->cstat & CSTAT_SPRITE_TRANS_FLIP)].alpha : 1.0f;
+    pc[3] *= 1.0f - ownerActor->sprext.alpha;
 
-    SetRenderStyleFromBlend(!!(tspr->cstat & 2), tspr->blend, !!(tspr->cstat & 512));
+    SetRenderStyleFromBlend(!!(tspr->cstat & CSTAT_SPRITE_TRANSLUCENT), tspr->blend, !!(tspr->cstat & CSTAT_SPRITE_TRANS_FLIP));
 
     if (m->usesalpha) //Sprites with alpha in texture
     {
@@ -1265,7 +1253,7 @@ static int32_t polymost_md3draw(md3model_t *m, tspriteptr_t tspr)
     }
     else
     {
-        if ((tspr->cstat&2) || sext->alpha > 0.f || pc[3] < 1.0f)
+        if ((tspr->cstat & CSTAT_SPRITE_TRANSLUCENT) || ownerActor->sprext.alpha > 0.f || pc[3] < 1.0f)
             GLInterface.EnableBlend(true); //else GLInterface.EnableBlend(false);
     }
     GLInterface.SetColor(pc[0],pc[1],pc[2],pc[3]);
@@ -1274,24 +1262,24 @@ static int32_t polymost_md3draw(md3model_t *m, tspriteptr_t tspr)
     //------------
 
     // PLAG: Cleaner model rotation code
-    if (sext->pitch || sext->roll)
+    if (ownerActor->sprext.pitch || ownerActor->sprext.roll)
     {
-        float f = 1.f/((fxdimen * fviewingrange) * (256.f/(65536.f*128.f)) * (m0.x+m1.x));
+        float factor = 1.f/((fxdimen * fviewingrange) * (256.f/(65536.f*128.f)) * (m0.X+m1.X));
         memset(&a0, 0, sizeof(a0));
 
-        if (sext->pivot_offset.x)
-            a0.x = (float) sext->pivot_offset.x * f;
+        if (ownerActor->sprext.pivot_offset.X)
+            a0.X = (float) ownerActor->sprext.pivot_offset.X * factor;
 
-        if (sext->pivot_offset.y)  // Compare with SCREEN_FACTORS above
-            a0.y = (float) sext->pivot_offset.y * f;
+        if (ownerActor->sprext.pivot_offset.Y)  // Compare with SCREEN_FACTORS above
+            a0.Y = (float) ownerActor->sprext.pivot_offset.Y * factor;
 
-        if ((sext->pivot_offset.z) && !(tspr->clipdist & TSPR_FLAGS_MDHACK))  // Compare with SCREEN_FACTORS above
-            a0.z = (float)sext->pivot_offset.z / (gxyaspect * fxdimen * (65536.f/128.f) * (m0.z+m1.z));
+        if ((ownerActor->sprext.pivot_offset.Z) && !(tspr->clipdist & TSPR_FLAGS_MDHACK))  // Compare with SCREEN_FACTORS above
+            a0.Z = (float)ownerActor->sprext.pivot_offset.Z / (gxyaspect * fxdimen * (65536.f/128.f) * (m0.Z+m1.Z));
 
-        k0 = bcosf(sext->pitch, -14);
-        k1 = bsinf(sext->pitch, -14);
-        k2 = bcosf(sext->roll, -14);
-        k3 = bsinf(sext->roll, -14);
+        k0 = bcosf(ownerActor->sprext.pitch, -14);
+        k1 = bsinf(ownerActor->sprext.pitch, -14);
+        k2 = bcosf(ownerActor->sprext.roll, -14);
+        k3 = bsinf(ownerActor->sprext.roll, -14);
     }
 
     VSMatrix imat = 0;
@@ -1302,37 +1290,37 @@ static int32_t polymost_md3draw(md3model_t *m, tspriteptr_t tspr)
     {
         //PLAG : sorting stuff
         uint16_t           *indexhandle;
-        vec3f_t fp;
+        FVector3 fp;
 
         const md3surf_t *const s = &m->head.surfs[surfi];
 
         v0 = &s->xyzn[m->cframe*s->numverts];
         v1 = &s->xyzn[m->nframe*s->numverts];
 
-        if (sext->pitch || sext->roll)
+        if (ownerActor->sprext.pitch || ownerActor->sprext.roll)
         {
-            vec3f_t fp1, fp2;
+            FVector3 fp1, fp2;
 
             for (i=s->numverts-1; i>=0; i--)
             {
-                fp.z = v0[i].x + a0.x;
-                fp.x = v0[i].y + a0.y;
-                fp.y = v0[i].z + a0.z;
+                fp.Z = v0[i].x + a0.X;
+                fp.X = v0[i].y + a0.Y;
+                fp.Y = v0[i].z + a0.Z;
 
-                fp1.x = fp.x*k2 +       fp.y*k3;
-                fp1.y = fp.x*k0*(-k3) + fp.y*k0*k2 + fp.z*(-k1);
-                fp1.z = fp.x*k1*(-k3) + fp.y*k1*k2 + fp.z*k0;
+                fp1.X = fp.X*k2 +       fp.Y*k3;
+                fp1.Y = fp.X*k0*(-k3) + fp.Y*k0*k2 + fp.Z*(-k1);
+                fp1.Z = fp.X*k1*(-k3) + fp.Y*k1*k2 + fp.Z*k0;
 
-                fp.z = v1[i].x + a0.x;
-                fp.x = v1[i].y + a0.y;
-                fp.y = v1[i].z + a0.z;
+                fp.Z = v1[i].x + a0.X;
+                fp.X = v1[i].y + a0.Y;
+                fp.Y = v1[i].z + a0.Z;
 
-                fp2.x = fp.x*k2 +       fp.y*k3;
-                fp2.y = fp.x*k0*(-k3) + fp.y*k0*k2 + fp.z*(-k1);
-                fp2.z = fp.x*k1*(-k3) + fp.y*k1*k2 + fp.z*k0;
-                fp.z = (fp1.z - a0.x)*m0.x + (fp2.z - a0.x)*m1.x;
-                fp.x = (fp1.x - a0.y)*m0.y + (fp2.x - a0.y)*m1.y;
-                fp.y = (fp1.y - a0.z)*m0.z + (fp2.y - a0.z)*m1.z;
+                fp2.X = fp.X*k2 +       fp.Y*k3;
+                fp2.Y = fp.X*k0*(-k3) + fp.Y*k0*k2 + fp.Z*(-k1);
+                fp2.Z = fp.X*k1*(-k3) + fp.Y*k1*k2 + fp.Z*k0;
+                fp.Z = (fp1.Z - a0.X)*m0.X + (fp2.Z - a0.X)*m1.X;
+                fp.X = (fp1.X - a0.Y)*m0.Y + (fp2.X - a0.Y)*m1.Y;
+                fp.Y = (fp1.Y - a0.Z)*m0.Z + (fp2.Y - a0.Z)*m1.Z;
 
                 vertlist[i] = fp;
             }
@@ -1341,9 +1329,9 @@ static int32_t polymost_md3draw(md3model_t *m, tspriteptr_t tspr)
         {
             for (i=s->numverts-1; i>=0; i--)
             {
-                fp.z = v0[i].x*m0.x + v1[i].x*m1.x;
-                fp.y = v0[i].z*m0.z + v1[i].z*m1.z;
-                fp.x = v0[i].y*m0.y + v1[i].y*m1.y;
+                fp.Z = v0[i].x*m0.X + v1[i].x*m1.X;
+                fp.Y = v0[i].z*m0.Z + v1[i].z*m1.Z;
+                fp.X = v0[i].y*m0.Y + v1[i].y*m1.Y;
 
                 vertlist[i] = fp;
             }
@@ -1351,7 +1339,7 @@ static int32_t polymost_md3draw(md3model_t *m, tspriteptr_t tspr)
 
         //Let OpenGL (and perhaps hardware :) handle the matrix rotation
         mat[3] = mat[7] = mat[11] = 0.f; mat[15] = 1.f;
-        for (int i = 0; i < 15; i++) mat[i] *= 1024.f;
+        for (int mm = 0; mm < 15; mm++) mat[mm] *= 1024.f;
         GLInterface.SetMatrix(Matrix_Model, mat);
         // PLAG: End
 
@@ -1359,9 +1347,9 @@ static int32_t polymost_md3draw(md3model_t *m, tspriteptr_t tspr)
         auto tex = mdloadskin((md2model_t *)m,tile2model[Ptile2tile(tspr->picnum,lpal)].skinnum,globalpal,surfi, &exact);
         if (!tex)
             continue;
-		
+
         int palid = TRANSLATION(Translation_Remap + curbasepal, globalpal);
-        GLInterface.SetFade(sector[tspr->sectnum].floorpal);
+        GLInterface.SetFade(tspr->sectp->floorpal);
         GLInterface.SetTexture(tex, palid, CLAMP_XY);
 
         if (tspr->clipdist & TSPR_FLAGS_MDHACK)
@@ -1376,28 +1364,28 @@ static int32_t polymost_md3draw(md3model_t *m, tspriteptr_t tspr)
             {
                 for (i=0; i<=s->numtris-1; ++i)
                 {
-                    vec3f_t const vlt[3] = { vertlist[s->tris[i].i[0]], vertlist[s->tris[i].i[1]], vertlist[s->tris[i].i[2]] };
+                    FVector3 const vlt[3] = { vertlist[s->tris[i].i[0]], vertlist[s->tris[i].i[1]], vertlist[s->tris[i].i[2]] };
 
                     // Matrix multiplication - ugly but clear
-                    vec3f_t const fp[3] = { { (vlt[0].x * mat[0]) + (vlt[0].y * mat[4]) + (vlt[0].z * mat[8]) + mat[12],
-                                              (vlt[0].x * mat[1]) + (vlt[0].y * mat[5]) + (vlt[0].z * mat[9]) + mat[13],
-                                              (vlt[0].x * mat[2]) + (vlt[0].y * mat[6]) + (vlt[0].z * mat[10]) + mat[14] },
+                    FVector3 const fpmat[3] = { { (vlt[0].X * mat[0]) + (vlt[0].Y * mat[4]) + (vlt[0].Z * mat[8]) + mat[12],
+                                              (vlt[0].X * mat[1]) + (vlt[0].Y * mat[5]) + (vlt[0].Z * mat[9]) + mat[13],
+                                              (vlt[0].X * mat[2]) + (vlt[0].Y * mat[6]) + (vlt[0].Z * mat[10]) + mat[14] },
 
-                                            { (vlt[1].x * mat[0]) + (vlt[1].y * mat[4]) + (vlt[1].z * mat[8]) + mat[12],
-                                              (vlt[1].x * mat[1]) + (vlt[1].y * mat[5]) + (vlt[1].z * mat[9]) + mat[13],
-                                              (vlt[1].x * mat[2]) + (vlt[1].y * mat[6]) + (vlt[1].z * mat[10]) + mat[14] },
+                                            { (vlt[1].X * mat[0]) + (vlt[1].Y * mat[4]) + (vlt[1].Z * mat[8]) + mat[12],
+                                              (vlt[1].X * mat[1]) + (vlt[1].Y * mat[5]) + (vlt[1].Z * mat[9]) + mat[13],
+                                              (vlt[1].X * mat[2]) + (vlt[1].Y * mat[6]) + (vlt[1].Z * mat[10]) + mat[14] },
 
-                                            { (vlt[2].x * mat[0]) + (vlt[2].y * mat[4]) + (vlt[2].z * mat[8]) + mat[12],
-                                              (vlt[2].x * mat[1]) + (vlt[2].y * mat[5]) + (vlt[2].z * mat[9]) + mat[13],
-                                              (vlt[2].x * mat[2]) + (vlt[2].y * mat[6]) + (vlt[2].z * mat[10]) + mat[14] } };
+                                            { (vlt[2].X * mat[0]) + (vlt[2].Y * mat[4]) + (vlt[2].Z * mat[8]) + mat[12],
+                                              (vlt[2].X * mat[1]) + (vlt[2].Y * mat[5]) + (vlt[2].Z * mat[9]) + mat[13],
+                                              (vlt[2].X * mat[2]) + (vlt[2].Y * mat[6]) + (vlt[2].Z * mat[10]) + mat[14] } };
 
-                    f = (fp[0].x * fp[0].x) + (fp[0].y * fp[0].y) + (fp[0].z * fp[0].z);
-                    g = (fp[1].x * fp[1].x) + (fp[1].y * fp[1].y) + (fp[1].z * fp[1].z);
+                    f = (fpmat[0].X * fpmat[0].X) + (fpmat[0].Y * fpmat[0].Y) + (fpmat[0].Z * fpmat[0].Z);
+                    g = (fpmat[1].X * fpmat[1].X) + (fpmat[1].Y * fpmat[1].Y) + (fpmat[1].Z * fpmat[1].Z);
 
                     if (f > g)
                         f = g;
 
-                    g = (fp[2].x * fp[2].x) + (fp[2].y * fp[2].y) + (fp[2].z * fp[2].z);
+                    g = (fpmat[2].X * fpmat[2].X) + (fpmat[2].Y * fpmat[2].Y) + (fpmat[2].Z * fpmat[2].Z);
 
                     if (f > g)
                         f = g;
@@ -1426,7 +1414,7 @@ static int32_t polymost_md3draw(md3model_t *m, tspriteptr_t tspr)
 	GLInterface.SetCull(Cull_None);
 
     GLInterface.SetIdentityMatrix(Matrix_Model);
-    
+
     globalnoeffect=0;
     return 1;
 }
@@ -1451,7 +1439,7 @@ static void md3free(md3model_t *m)
 
     if (m->head.surfs)
     {
-        for (bssize_t surfi=m->head.numsurfs-1; surfi>=0; surfi--)
+        for (int surfi=m->head.numsurfs-1; surfi>=0; surfi--)
         {
             md3surf_t *s = &m->head.surfs[surfi];
             M_Free(s->tris);
@@ -1461,7 +1449,7 @@ static void md3free(md3model_t *m)
     }
     M_Free(m->head.tags);
     M_Free(m->head.frames);
-	
+
     M_Free(m->muladdframes);
 
     M_Free(m->indexes);
@@ -1520,16 +1508,15 @@ static mdmodel_t *mdload(const char *filnam)
 }
 
 
-int32_t polymost_mddraw(tspriteptr_t tspr)
+int32_t polymost_mddraw(tspritetype* tspr)
 {
     if (maxmodelverts > allocmodelverts)
     {
-        vertlist = (vec3f_t *) M_Realloc(vertlist, sizeof(vec3f_t)*maxmodelverts);
+        vertlist = (FVector3 *) M_Realloc(vertlist, sizeof(FVector3)*maxmodelverts);
         allocmodelverts = maxmodelverts;
     }
 
-    mdmodel_t *const vm = models[tile2model[Ptile2tile(tspr->picnum,
-    (tspr->owner >= MAXSPRITES) ? tspr->pal : sprite[tspr->owner].pal)].modelid];
+    mdmodel_t *const vm = models[tile2model[Ptile2tile(tspr->picnum, tspr->ownerActor->spr.pal)].modelid];
     if (vm->mdnum == 1)
         return polymost_voxdraw((voxmodel_t *)vm,tspr, false); // can't access rotating info anymore
     else if (vm->mdnum == 3)
@@ -1553,10 +1540,13 @@ void updateModelInterpolation()
 	// sigh...
 	omdtims = mdtims;
 	mdtims = I_msTime();
-	
-	for (native_t i = 0; i < MAXSPRITES; ++i)
-		if ((mdpause && spriteext[i].mdanimtims) || (spriteext[i].flags & SPREXT_NOMDANIM))
-			spriteext[i].mdanimtims += mdtims - omdtims;
+
+    TSpriteIterator<DCoreActor> it;
+    while (auto actor = it.Next())
+    {
+        if ((mdpause && actor->sprext.mdanimtims) || (actor->sprext.renderflags & SPREXT_NOMDANIM))
+            actor->sprext.mdanimtims += mdtims - omdtims;
+    }
 }
 #endif
 

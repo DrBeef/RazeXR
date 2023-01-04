@@ -165,7 +165,7 @@ STATE s_ZillaRun[5][6] =
     }
 };
 
-STATEp sg_ZillaRun[] =
+STATE* sg_ZillaRun[] =
 {
     &s_ZillaRun[0][0],
     &s_ZillaRun[1][0],
@@ -200,7 +200,7 @@ STATE s_ZillaStand[5][1] =
     }
 };
 
-STATEp sg_ZillaStand[] =
+STATE* sg_ZillaStand[] =
 {
     &s_ZillaStand[0][0],
     &s_ZillaStand[1][0],
@@ -241,7 +241,7 @@ STATE s_ZillaPain[5][2] =
     }
 };
 
-STATEp sg_ZillaPain[] =
+STATE* sg_ZillaPain[] =
 {
     &s_ZillaPain[0][0],
     &s_ZillaPain[1][0],
@@ -343,7 +343,7 @@ STATE s_ZillaRail[5][14] =
     }
 };
 
-STATEp sg_ZillaRail[] =
+STATE* sg_ZillaRail[] =
 {
     &s_ZillaRail[0][0],
     &s_ZillaRail[1][0],
@@ -410,7 +410,7 @@ STATE s_ZillaRocket[5][7] =
     }
 };
 
-STATEp sg_ZillaRocket[] =
+STATE* sg_ZillaRocket[] =
 {
     &s_ZillaRocket[0][0],
     &s_ZillaRocket[1][0],
@@ -528,7 +528,7 @@ STATE s_ZillaUzi[5][17] =
 };
 
 
-STATEp sg_ZillaUzi[] =
+STATE* sg_ZillaUzi[] =
 {
     s_ZillaUzi[0],
     s_ZillaUzi[1],
@@ -560,7 +560,7 @@ STATE s_ZillaDie[] =
     {ZILLA_DEAD, ZILLA_DIE_RATE, DoActorDebris, &s_ZillaDie[8]}
 };
 
-STATEp sg_ZillaDie[] =
+STATE* sg_ZillaDie[] =
 {
     s_ZillaDie
 };
@@ -570,45 +570,10 @@ STATE s_ZillaDead[] =
     {ZILLA_DEAD, ZILLA_DIE_RATE, DoActorDebris, &s_ZillaDead[0]},
 };
 
-STATEp sg_ZillaDead[] =
+STATE* sg_ZillaDead[] =
 {
     s_ZillaDead
 };
-
-/*
-typedef struct
-{
-#define MAX_ACTOR_CLOSE_ATTACK 2
-#define MAX_ACTOR_ATTACK 6
-STATEp *Stand;
-STATEp *Run;
-STATEp *Jump;
-STATEp *Fall;
-STATEp *Crawl;
-STATEp *Swim;
-STATEp *Fly;
-STATEp *Rise;
-STATEp *Sit;
-STATEp *Look;
-STATEp *Climb;
-STATEp *Pain;
-STATEp *Death1;
-STATEp *Death2;
-STATEp *Dead;
-STATEp *DeathJump;
-STATEp *DeathFall;
-
-STATEp *CloseAttack[MAX_ACTOR_CLOSE_ATTACK];
-short  CloseAttackPercent[MAX_ACTOR_CLOSE_ATTACK];
-
-STATEp *Attack[MAX_ACTOR_ATTACK];
-short  AttackPercent[MAX_ACTOR_ATTACK];
-
-STATEp *Special[2];
-STATEp *Duck;
-STATEp *Dive;
-}ACTOR_ACTION_SET,*ACTOR_ACTION_SETp;
-*/
 
 ACTOR_ACTION_SET ZillaActionSet =
 {
@@ -640,62 +605,50 @@ ACTOR_ACTION_SET ZillaActionSet =
 
 int SetupZilla(DSWActor* actor)
 {
-    SPRITEp sp = &actor->s();
-    USERp u;
     ANIMATOR DoActorDecide;
 
-    if (TEST(sp->cstat, CSTAT_SPRITE_RESTORE))
+    if (!(actor->spr.cstat & CSTAT_SPRITE_RESTORE))
     {
-        u = actor->u();
-        ASSERT(u);
-    }
-    else
-    {
-        u = SpawnUser(actor, ZILLA_RUN_R0, s_ZillaRun[0]);
-        u->Health = 6000;
+        SpawnUser(actor, ZILLA_RUN_R0, s_ZillaRun[0]);
+        actor->user.Health = 6000;
     }
 
-    if (Skill == 0) u->Health = 2000;
-    if (Skill == 1) u->Health = 4000;
+    if (Skill == 0) actor->user.Health = 2000;
+    if (Skill == 1) actor->user.Health = 4000;
 
     ChangeState(actor,s_ZillaRun[0]);
-    u->Attrib = &ZillaAttrib;
+    actor->user.Attrib = &ZillaAttrib;
     DoActorSetSpeed(actor, NORM_SPEED);
-    u->StateEnd = s_ZillaDie;
-    u->Rot = sg_ZillaRun;
+    actor->user.StateEnd = s_ZillaDie;
+    actor->user.Rot = sg_ZillaRun;
 
     EnemyDefaults(actor, &ZillaActionSet, &ZillaPersonality);
 
-    sp->clipdist = (512) >> 2;
-    sp->xrepeat = 97;
-    sp->yrepeat = 79;
+    actor->spr.clipdist = (512) >> 2;
+    actor->spr.xrepeat = 97;
+    actor->spr.yrepeat = 79;
 
     return 0;
 }
 
 int NullZilla(DSWActor* actor)
 {
-    USER* u = actor->u();
-    SPRITEp sp = &actor->s();
-
 #if 0
-    if (u->State == s_ZillaDie)
+    if (actor->user.State == s_ZillaDie)
     {
-        getzsofslope(sp->sectnum, sp->x, sp->y, &u->hiz, &u->loz);
-        u->lo_sectp = &sector[sp->sectnum];
-        u->hi_sectp = &sector[sp->sectnum];
-        sp->z = u->loz;
+        getzsofslopeptr(actor->sector(), actor->spr.pos.X, actor->spr.y, &actor->user.hiz, &actor->user.loz);
+        actor->user.lo_sectp = actor->sector();
+        actor->user.hi_sectp = actor->sector();
+        actor->spr.z = actor->user.loz;
     }
 #endif
 
-    //if (!TEST(u->Flags,SPR_CLIMBING))
-    //    KeepActorOnFloor(actor);
-    getzsofslope(sp->sectnum, sp->x, sp->y, &u->hiz, &u->loz);
-    u->lo_sectp = &sector[sp->sectnum];
-    u->hi_sectp = &sector[sp->sectnum];
-    u->lowActor = nullptr;
-    u->highActor = nullptr;
-    sp->z = u->loz;
+    getzsofslopeptr(actor->sector(), actor->spr.pos.X, actor->spr.pos.Y, &actor->user.hiz, &actor->user.loz);
+    actor->user.lo_sectp = actor->sector();
+    actor->user.hi_sectp = actor->sector();
+    actor->user.lowActor = nullptr;
+    actor->user.highActor = nullptr;
+    actor->spr.pos.Z = actor->user.loz;
 
     DoActorSectorDamage(actor);
 
@@ -704,14 +657,12 @@ int NullZilla(DSWActor* actor)
 
 int DoZillaMove(DSWActor* actor)
 {
-    USER* u = actor->u();
-    SPRITEp sp = &actor->s();
     short choose;
 
     // Random Zilla taunts
-    if (!SoundValidAndActive(sp, CHAN_AnimeMad))
+    if (!SoundValidAndActive(actor, CHAN_AnimeMad))
     {
-        choose = STD_RANDOM_RANGE(1000);
+        choose = StdRandomRange(1000);
         if (choose > 990)
             PlaySound(DIGI_Z16004, actor, v3df_none, CHAN_AnimeMad);
         else if (choose > 985)
@@ -723,10 +674,10 @@ int DoZillaMove(DSWActor* actor)
     }
 
 
-    if (u->track >= 0)
+    if (actor->user.track >= 0)
         ActorFollowTrack(actor, ACTORMOVETICS);
     else
-        (*u->ActorActionFunc)(actor);
+        (*actor->user.ActorActionFunc)(actor);
 
     KeepActorOnFloor(actor);
 
@@ -747,16 +698,13 @@ int DoZillaStomp(DSWActor* actor)
 
 int DoZillaDeathMelt(DSWActor* actor)
 {
-    USER* u = actor->u();
-    SPRITEp sp = &actor->s();
-
     if (RandomRange(1000) > 800)
         SpawnGrenadeExp(actor);
 
-    u->ID = ZILLA_RUN_R0;
-    RESET(u->Flags, SPR_JUMPING|SPR_FALLING|SPR_MOVED);
+    actor->user.ID = ZILLA_RUN_R0;
+    actor->user.Flags &= ~(SPR_JUMPING|SPR_FALLING|SPR_MOVED);
 
-    //DoMatchEverything(nullptr, sp->lotag, ON);
+    //DoMatchEverything(nullptr, actor->spr.lotag, ON);
     if (!SW_SHAREWARE)
     {
         // Resume the regular music - in a hack-free fashion.
@@ -764,12 +712,12 @@ int DoZillaDeathMelt(DSWActor* actor)
     }
 
     //KeepActorOnFloor(actor);
-    getzsofslope(sp->sectnum, sp->x, sp->y, &u->hiz, &u->loz);
-    u->lo_sectp = &sector[sp->sectnum];
-    u->hi_sectp = &sector[sp->sectnum];
-    u->lowActor = nullptr;
-    u->highActor = nullptr;
-    sp->z = u->loz;
+    getzsofslopeptr(actor->sector(), actor->spr.pos.X, actor->spr.pos.Y, &actor->user.hiz, &actor->user.loz);
+    actor->user.lo_sectp = actor->sector();
+    actor->user.hi_sectp = actor->sector();
+    actor->user.lowActor = nullptr;
+    actor->user.highActor = nullptr;
+    actor->spr.pos.Z = actor->user.loz;
 
     BossSpriteNum[2] = nullptr;
     return 0;

@@ -21,8 +21,8 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 
 BEGIN_PS_NS
 
-extern short bSubTitles;
-extern DExhumedActor* bestTarget;
+extern bool bSubTitles;
+extern TObjPtr<DExhumedActor*> bestTarget;
 extern bool bCamera;
 
 void DrawStatusBar();
@@ -31,16 +31,16 @@ void ResetView();
 void NoClip();
 void Clip();
 
-extern short dVertPan[];
-extern short nQuake[];
+extern int16_t dVertPan[];
+extern int16_t nQuake[];
 extern int nCamerax;
 extern int nCameray;
 extern int nCameraz;
-extern short bTouchFloor;
-extern short nChunkTotal;
+extern bool bTouchFloor;
+extern int nChunkTotal;
 extern int gFov;
 
-extern spritetype* mytsprite;
+extern tspritetype* mytsprite;
 extern int* myspritesortcnt;
 
 END_PS_NS

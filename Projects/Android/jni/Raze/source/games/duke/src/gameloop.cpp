@@ -71,7 +71,7 @@ void GameInterface::Ticker()
 
 		global_random = krand();
 		movedummyplayers();//ST 13
-		
+
 		for (int i = connecthead; i >= 0; i = connectpoint2[i])
 		{
 			if (playrunning())
@@ -85,7 +85,7 @@ void GameInterface::Ticker()
 				fi.checksectors(i);
 			}
 		}
-		
+
 		fi.think();
 
 		if ((everyothertime & 1) == 0)
@@ -127,9 +127,13 @@ void GameInterface::Render()
 {
 	drawtime.Reset();
 	drawtime.Clock();
+
 	videoSetBrightness(thunder_brightness);
 	double const smoothRatio = !playrunning() || !cl_interpolate || cl_capfps ? MaxSmoothRatio : I_GetTimeFrac() * MaxSmoothRatio;
-	displayrooms(screenpeek, smoothRatio);
+	if (!isRR())
+		moveclouds(smoothRatio);
+
+	displayrooms(screenpeek, smoothRatio, false);
 	drawoverlays(smoothRatio);
 	drawtime.Unclock();
 }

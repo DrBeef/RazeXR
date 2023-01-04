@@ -121,24 +121,23 @@ int SetVisHigh(void);
 int SetVisNorm(void);
 void DoWeapon(void);
 void HeadBobStateControl(void);
-int DoPickTarget(SPRITEp sp, uint32_t max_delta_ang, int skip_targets);
 void DoPlayer(void);
 void domovethings(void);
 void InitAllPlayers(void);
 void InitMultiPlayerInfo(void);
-void MoveScrollMode2D(PLAYERp pp, ControlInfo* const hidInput);
-void DoPlayerDivePalette(PLAYERp pp);
-void DoPlayerNightVisionPalette(PLAYERp pp);
-void DoPlayerStopDiveNoWarp(PLAYERp pp);
-void DoPlayerResetMovement(PLAYERp pp);
-void DoPlayerZrange(PLAYERp pp);
-void DoPlayerSpriteThrow(PLAYERp pp);
-int DoPlayerWadeSuperJump(PLAYERp pp);
-void DoPlayerWarpTeleporter(PLAYERp pp);
-void UpdatePlayerSprite(PLAYERp pp);
-void PlaySOsound(short sectnum,short sound_num);
-void DoSpawnTeleporterEffectPlace(SPRITEp sp);
-void FindMainSector(SECTOR_OBJECTp sop);
+void MoveScrollMode2D(PLAYER* pp, ControlInfo* const hidInput);
+void DoPlayerDivePalette(PLAYER* pp);
+void DoPlayerNightVisionPalette(PLAYER* pp);
+void DoPlayerStopDiveNoWarp(PLAYER* pp);
+void DoPlayerResetMovement(PLAYER* pp);
+void DoPlayerZrange(PLAYER* pp);
+void DoPlayerSpriteThrow(PLAYER* pp);
+int DoPlayerWadeSuperJump(PLAYER* pp);
+void DoPlayerWarpTeleporter(PLAYER* pp);
+void UpdatePlayerSprite(PLAYER* pp);
+void PlaySOsound(sectortype* sect,short sound_num);
+void DoSpawnTeleporterEffectPlace(DSWActor* sp);
+void FindMainSector(SECTOR_OBJECT* sop);
 
 END_SW_NS
 

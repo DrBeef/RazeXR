@@ -30,16 +30,16 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 
 BEGIN_PS_NS
 
-short cPupData[300];
+int16_t cPupData[300];
 uint8_t *Worktile;
 int lHeadStartClock;
-short* pPupData;
+int16_t* pPupData;
 int lNextStateChange;
 int nPixels;
 int nHeadTimeStart;
-short nHeadStage;
-short curx[kSpiritY * kSpiritX];
-short cury[kSpiritY * kSpiritX];
+int nHeadStage;
+int16_t curx[kSpiritY * kSpiritX];
+int16_t cury[kSpiritY * kSpiritX];
 int8_t destvelx[kSpiritY * kSpiritX];
 int8_t destvely[kSpiritY * kSpiritX];
 uint8_t pixelval[kSpiritY * kSpiritX];
@@ -47,37 +47,37 @@ int8_t origy[kSpiritY * kSpiritX];
 int8_t origx[kSpiritY * kSpiritX];
 int8_t velx[kSpiritY * kSpiritX];
 int8_t vely[kSpiritY * kSpiritX];
-short nMouthTile;
+int16_t nMouthTile;
 
-short nPupData = 0;
+int nPupData = 0;
 
-short word_964E8 = 0;
-short word_964EA = 0;
-short word_964EC = 10;
+int word_964E8 = 0;
+int word_964EA = 0;
+int word_964EC = 10;
 
-short nSpiritRepeatX;
-short nSpiritRepeatY;
-DExhumedActor* pSpiritSprite;
-short nPixelsToShow;
-short nTalkTime = 0;
+int nSpiritRepeatX;
+int nSpiritRepeatY;
+TObjPtr<DExhumedActor*> pSpiritSprite;
+int nPixelsToShow;
+int nTalkTime = 0;
 
 
 void InitSpiritHead()
 {
     nPixels = 0;
-    auto pSpiritSpr = &pSpiritSprite->s();
+    auto pSpiritSpr = pSpiritSprite;
 
-    nSpiritRepeatX = pSpiritSpr->xrepeat;
-    nSpiritRepeatY = pSpiritSpr->yrepeat;
+    nSpiritRepeatX = pSpiritSpr->spr.xrepeat;
+    nSpiritRepeatY = pSpiritSpr->spr.yrepeat;
 
     tileLoad(kTileRamsesNormal); // Ramses Normal Head
 
     ExhumedSpriteIterator it;
     while (auto act = it.Next())
     {
-        if (act->s().statnum)
+        if (act->spr.statnum)
         {
-            act->s().cstat |= 0x8000;
+            act->spr.cstat |= CSTAT_SPRITE_INVISIBLE;
         }
     }
 
@@ -117,16 +117,16 @@ void InitSpiritHead()
     }
 
 
-    pSpiritSpr->yrepeat = 140;
-    pSpiritSpr->xrepeat = 140;
-    pSpiritSpr->picnum = kTileRamsesWorkTile;
+    pSpiritSpr->spr.yrepeat = 140;
+    pSpiritSpr->spr.xrepeat = 140;
+    pSpiritSpr->spr.picnum = kTileRamsesWorkTile;
 
     nHeadStage = 0;
 
     // work tile is twice as big as the normal head size
 	Worktile = TileFiles.tileCreate(kTileRamsesWorkTile, kSpiritY * 2, kSpiritX * 2);
 
-    pSpiritSpr->cstat &= 0x7FFF;
+    pSpiritSpr->spr.cstat &= ~CSTAT_SPRITE_INVISIBLE;
 
     nHeadTimeStart = PlayClock;
 
@@ -159,28 +159,25 @@ void InitSpiritHead()
     nTalkTime = 1;
 }
 
-void DimSector(int nSector)
+void DimSector(sectortype* pSector)
 {
-    int startwall = sector[nSector].wallptr;
-    int nWalls = sector[nSector].wallnum;
-
-    for (int i = 0; i < nWalls; i++)
+	for(auto& wal : wallsofsector(pSector))
     {
-        if (wall[startwall+i].shade < 40) {
-            wall[startwall+i].shade++;
+        if (wal.shade < 40) {
+            wal.shade++;
         }
     }
 
-    if (sector[nSector].floorshade < 40) {
-        sector[nSector].floorshade++;
+    if (pSector->floorshade < 40) {
+        pSector->floorshade++;
     }
 
-    if (sector[nSector].ceilingshade < 40) {
-        sector[nSector].ceilingshade++;
+    if (pSector->ceilingshade < 40) {
+        pSector->ceilingshade++;
     }
 }
 
-void CopyHeadToWorkTile(short nTile)
+void CopyHeadToWorkTile(int nTile)
 {
 	const uint8_t* pSrc = tilePtr(nTile);
     uint8_t *pDest = &Worktile[212 * 49 + 53];
@@ -197,8 +194,8 @@ void CopyHeadToWorkTile(short nTile)
 // This is based on BuildGDX's version of this function which was a lot less cryptic than PCExhumed's.
 void DoSpiritHead() 
 {
-    static short dimSectCount = 0;
-    auto pSpiritSpr = &pSpiritSprite->s();
+    static int dimSectCount = 0;
+    auto pSpiritSpr = pSpiritSprite;
 
     sPlayerInput[0].actions |= SB_CENTERVIEW;
     TileFiles.InvalidateTile(kTileRamsesWorkTile);
@@ -214,7 +211,7 @@ void DoSpiritHead()
         {
             if (nPupData != 0) 
             {
-                short clock = *pPupData++;
+                int clock = *pPupData++;
                 nPupData -= 2;
                 if (nPupData > 0) 
                 {
@@ -298,11 +295,11 @@ void DoSpiritHead()
     case 1:
     case 2:
         UpdateSwirlies();
-        if (pSpiritSpr->shade > -127)
-            pSpiritSpr->shade--;
+        if (pSpiritSpr->spr.shade > -127)
+            pSpiritSpr->spr.shade--;
         if (--dimSectCount < 0) 
         {
-            DimSector(pSpiritSpr->sectnum);
+            DimSector(pSpiritSpr->sector());
             dimSectCount = 5;
         }
 
@@ -373,8 +370,8 @@ void DoSpiritHead()
                     vely[i] = 0;
                 }
 
-                curx[i] = (short)(x << 8);
-                cury[i] = (short)(y << 8);
+                curx[i] = (int)(x << 8);
+                cury[i] = (int)(y << 8);
 
                 Worktile[212 * (x + 97) + 106 + y] = pixelval[i++];
             }
@@ -382,17 +379,17 @@ void DoSpiritHead()
 
         if (nHeadStage == 1) 
         {
-            if (pSpiritSpr->xrepeat > nSpiritRepeatX) 
+            if (pSpiritSpr->spr.xrepeat > nSpiritRepeatX) 
             {
-                pSpiritSpr->xrepeat -= 2;
-                if (pSpiritSpr->xrepeat < nSpiritRepeatX)
-                    pSpiritSpr->xrepeat = (uint8_t)nSpiritRepeatX;
+                pSpiritSpr->spr.xrepeat -= 2;
+                if (pSpiritSpr->spr.xrepeat < nSpiritRepeatX)
+                    pSpiritSpr->spr.xrepeat = (uint8_t)nSpiritRepeatX;
             }
-            if (pSpiritSpr->yrepeat > nSpiritRepeatY) 
+            if (pSpiritSpr->spr.yrepeat > nSpiritRepeatY) 
             {
-                pSpiritSpr->yrepeat -= 2;
-                if (pSpiritSpr->yrepeat < nSpiritRepeatY)
-                    pSpiritSpr->yrepeat = (uint8_t)nSpiritRepeatY;
+                pSpiritSpr->spr.yrepeat -= 2;
+                if (pSpiritSpr->spr.yrepeat < nSpiritRepeatY)
+                    pSpiritSpr->spr.yrepeat = (uint8_t)nSpiritRepeatY;
             }
 
             int nCount = 0;
@@ -403,14 +400,14 @@ void DoSpiritHead()
                     dx = ((origx[i] << 8) - curx[i]) >> 3;
                 else {
                     dx = 0;
-                    curx[i] = (short)(origx[i] << 8);
+                    curx[i] = (int)(origx[i] << 8);
                 }
 
                 if (origy[i] << 8 == cury[i] || abs((origy[i] << 8) - cury[i]) >= 8)
                     dy = ((origy[i] << 8) - cury[i]) >> 3;
                 else {
                     dy = 0;
-                    cury[i] = (short)(origy[i] << 8);
+                    cury[i] = (int)(origy[i] << 8);
                 }
 
                 if ((dx | dy) != 0) 
@@ -428,9 +425,8 @@ void DoSpiritHead()
 
             if (nCount < (15 * nPixels) / 16) {
                 SoundBigEntrance();
-                AddGlow(pSpiritSpr->sectnum, 20);
-                AddFlash(pSpiritSpr->sectnum, pSpiritSpr->x, pSpiritSpr->y,
-                    pSpiritSpr->z, 128);
+                AddGlow(pSpiritSpr->sector(), 20);
+                AddFlash(pSpiritSpr->sector(), pSpiritSpr->spr.pos.X, pSpiritSpr->spr.pos.Y, pSpiritSpr->spr.pos.Z, 128);
                 nHeadStage = 3;
                 TintPalette(255, 255, 255);
                 CopyHeadToWorkTile(kTileRamsesNormal);

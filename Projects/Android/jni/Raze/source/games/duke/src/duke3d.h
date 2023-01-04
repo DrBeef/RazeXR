@@ -2,9 +2,6 @@
 
 #include "build.h"
 
-#include "compat.h"
-
-
 #include "polymost.h"
 #include "gamecvars.h"
 #include "razemenu.h"
@@ -63,10 +60,10 @@ struct GameInterface : public ::GameInterface
 	int chaseCamX(binangle ang) { return -ang.bcos(-4); }
 	int chaseCamY(binangle ang) { return -ang.bsin(-4); }
 	int chaseCamZ(fixedhoriz horiz) { return horiz.asq16() >> 9; }
-	void processSprites(spritetype* tsprite, int& spritesortcnt, int viewx, int viewy, int viewz, binangle viewang, double smoothRatio) override;
+	void processSprites(tspritetype* tsprite, int& spritesortcnt, int viewx, int viewy, int viewz, binangle viewang, double smoothRatio) override;
 	void UpdateCameras(double smoothratio) override;
-	void EnterPortal(spritetype* viewer, int type) override;
-	void LeavePortal(spritetype* viewer, int type) override;
+	void EnterPortal(DCoreActor* viewer, int type) override;
+	void LeavePortal(DCoreActor* viewer, int type) override;
 	bool GetGeoEffect(GeoEffect* eff, sectortype* viewsector) override;
 	void AddExcludedEpisode(const FString& episode) override;
 	int GetCurrentSkill() override;
@@ -88,7 +85,7 @@ struct Dispatcher
 	bool (*checkhitceiling)(sectortype* sn);
 	void (*checkhitsprite)(DDukeActor* i, DDukeActor* sn);
 	void (*checksectors)(int low);
-	DDukeActor* (*spawninit)(DDukeActor* actj, DDukeActor* act);
+	DDukeActor* (*spawninit)(DDukeActor* actj, DDukeActor* act, TArray<DDukeActor*>* actors);
 
 	bool (*ceilingspace)(sectortype* sectp);
 	bool (*floorspace)(sectortype* sectp);
@@ -98,12 +95,10 @@ struct Dispatcher
 	void (*lotsofmail)(DDukeActor *s, int n);
 	void (*lotsofpaper)(DDukeActor *s, int n);
 	void (*guts)(DDukeActor* s, int gtype, int n, int p);
-	DDukeActor* (*ifhitsectors)(int sectnum);
 	int  (*ifhitbyweapon)(DDukeActor* sectnum);
 	void (*fall)(DDukeActor* actor, int g_p);
 	bool (*spawnweapondebris)(int picnum, int dnum);
 	void (*respawnhitag)(DDukeActor* g_sp);
-	void (*checktimetosleep)(DDukeActor* actor);
 	void (*move)(DDukeActor* i, int g_p, int g_x);
 
 	// player
@@ -116,12 +111,17 @@ struct Dispatcher
 	void (*displayweapon)(int snum, double smoothratio);
 	void (*displaymasks)(int snum, int p, double smoothratio);
 
-	void (*animatesprites)(spritetype* tsprite, int& spritesortcnt, int x, int y, int a, int smoothratio);
+	void (*animatesprites)(tspritetype* tsprite, int& spritesortcnt, int x, int y, int a, int smoothratio);
 
 
 };
 
 extern Dispatcher fi;
+
+void CallInitialize(DDukeActor* actor);
+void CallTick(DDukeActor* actor);
+void CallAction(DDukeActor* actor);
+
 
 END_DUKE_NS
 

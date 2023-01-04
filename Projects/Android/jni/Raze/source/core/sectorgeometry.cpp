@@ -40,13 +40,13 @@
 #include "texturemanager.h"
 #include "earcut.hpp"
 #include "hw_sections.h"
-#include "nodebuilder/nodebuild.h"
+#include "tesselator.h"
 
-SectorGeometry sectorGeometry;
+SectionGeometry sectionGeometry;
 
 //==========================================================================
 //
-// CalcPlane fixme - this should be stored in the sector, not be recalculated each frame.
+//
 //
 //==========================================================================
 
@@ -54,31 +54,34 @@ static FVector3 CalcNormal(sectortype* sector, int plane)
 {
 	FVector3 pt[3];
 
-	auto wal = &wall[sector->wallptr];
-	auto wal2 = &wall[wal->point2];
+	if (plane == 0 && !(sector->floorstat & CSTAT_SECTOR_SLOPE)) return { 0.f, 1.f, 0.f };
+	if (plane == 1 && !(sector->ceilingstat & CSTAT_SECTOR_SLOPE)) return { 0.f, -1.f, 0.f };
 
-	pt[0] = { (float)WallStartX(wal), (float)WallStartY(wal), 0 };
-	pt[1] = { (float)WallEndX(wal), (float)WallEndY(wal), 0 };
-	PlanesAtPoint(sector, wal->x, wal->y, plane ? &pt[0].Z : nullptr, plane? nullptr : &pt[0].Z);
-	PlanesAtPoint(sector, wal2->x, wal2->y, plane ? &pt[1].Z : nullptr, plane ? nullptr : &pt[1].Z);
+
+	auto wal = sector->firstWall();
+	auto wal2 = wal->point2Wall();
+
+	pt[0] = { (float)WallStartX(wal), 0.f, (float)WallStartY(wal)};
+	pt[1] = { (float)WallStartX(wal2), 0.f, (float)WallStartY(wal2)};
+	PlanesAtPoint(sector, wal->pos.X, wal->pos.Y, plane ? &pt[0].Z : nullptr, plane? nullptr : &pt[0].Y);
+	PlanesAtPoint(sector, wal2->pos.X, wal2->pos.Y, plane ? &pt[1].Z : nullptr, plane ? nullptr : &pt[1].Y);
 
 	if (pt[0].X == pt[1].X)
 	{
-		if (pt[0].Y == pt[1].Y) return { 0.f, 0.f, plane ? -1.f : 1.f };
+		if (pt[0].Z == pt[1].Z) return { 0.f, plane ? -1.f : 1.f, 0.f };
 		pt[2].X = pt[0].X + 4;
-		pt[2].Y = pt[0].Y;
+		pt[2].Z = pt[0].Z;
 	}
 	else
 	{
 		pt[2].X = pt[0].X;
-		pt[2].Y = pt[0].Y + 4;
+		pt[2].Z = pt[0].Z + 4;
 	}
-	PlanesAtPoint(sector, pt[2].X * 16, pt[2].Y * 16, plane ? &pt[2].Z : nullptr, plane ? nullptr : &pt[2].Z);
+	PlanesAtPoint(sector, pt[2].X, -pt[2].Z, plane ? &pt[2].Y : nullptr, plane ? nullptr : &pt[2].Y);
 
-	auto normal = (pt[2] - pt[0]) ^ (pt[1] - pt[0]);
-
-	if ((pt[2].Z < 0 && !plane) || (pt[2].Z > 0 && plane)) return -pt[2];
-	return pt[2];
+	auto normal = ((pt[2] - pt[0]) ^ (pt[1] - pt[0])).Unit();
+	if ((normal.Y < 0 && !plane) || (normal.Y > 0 && plane)) return -normal;
+	return normal;
 }
 
 //==========================================================================
@@ -93,10 +96,10 @@ class UVCalculator
 	int myplane;
 	int stat;
 	float z1;
-	int ix1;
-	int iy1;
-	int ix2;
-	int iy2;
+	float ix1;
+	float iy1;
+	float ix2;
+	float iy2;
 	float sinalign, cosalign;
 	FGameTexture* tex;
 	float xpanning, ypanning;
@@ -105,7 +108,6 @@ class UVCalculator
 
 public:
 
-	// Moved in from pragmas.h
 	UVCalculator(sectortype* sec, int plane, FGameTexture* tx, const FVector2& off)
 	{
 		float xpan, ypan;
@@ -115,11 +117,11 @@ public:
 		myplane = plane;
 		offset = off;
 
-		auto firstwall = &wall[sec->wallptr];
-		ix1 = firstwall->x;
-		iy1 = firstwall->y;
-		ix2 = wall[firstwall->point2].x;
-		iy2 = wall[firstwall->point2].y;
+		auto firstwall = sec->firstWall();
+		ix1 = firstwall->pos.X;
+		iy1 = firstwall->pos.Y;
+		ix2 = firstwall->point2Wall()->pos.X;
+		iy2 = firstwall->point2Wall()->pos.Y;
 
 		if (plane == 0)
 		{
@@ -136,22 +138,19 @@ public:
 			PlanesAtPoint(sec, ix1, iy1, &z1, nullptr);
 		}
 
-		DVector2 dv = { double(ix2 - ix1), -double(iy2 - iy1) };
+		DVector2 dv = { (ix2 - ix1), -(iy2 - iy1) };
 		auto vang = dv.Angle() - 90.;
 
 		cosalign = float(vang.Cos());
 		sinalign = float(vang.Sin());
 
 		int pow2width = 1 << sizeToBits((int)tx->GetDisplayWidth());
-		if (pow2width < (int)tx->GetDisplayWidth()) pow2width *= 2;
-
 		int pow2height = 1 << sizeToBits((int)tx->GetDisplayHeight());
-		if (pow2height < (int)tx->GetDisplayHeight()) pow2height *= 2;
 
-		xpanning = pow2width * xpan / (256.f * tx->GetDisplayWidth());
-		ypanning = pow2height * ypan / (256.f * tx->GetDisplayHeight());
+		xpanning = xpan / 256.f;
+		ypanning = ypan / 256.f;
 
-		float scalefactor = (stat & CSTAT_SECTOR_TEXHALF) ? 8.0f : 16.0f;
+		float scalefactor = (stat & CSTAT_SECTOR_TEXHALF) ? 0.5f : 1.f;
 
 		if ((stat & (CSTAT_SECTOR_SLOPE | CSTAT_SECTOR_ALIGN)) == (CSTAT_SECTOR_ALIGN))
 		{
@@ -167,25 +166,25 @@ public:
 			}
 		}
 
-		xscaled = scalefactor * (int)tx->GetDisplayWidth();
-		yscaled = scalefactor * (int)tx->GetDisplayHeight();
+		xscaled = scalefactor * pow2width;
+		yscaled = scalefactor * pow2height;
 	}
 
-	FVector2 GetUV(int x, int y, float z)
+	FVector2 GetUV(float x, float y, float z)
 	{
 		float tv, tu;
 
 		if (stat & CSTAT_SECTOR_ALIGN)
 		{
-			float dx = (float)(x - ix1);
-			float dy = (float)(y - iy1);
+			float dx = (x - ix1);
+			float dy = (y - iy1);
 
 			tu = -(dx * sinalign + dy * cosalign);
 			tv = (dx * cosalign - dy * sinalign);
 
 			if (stat & CSTAT_SECTOR_SLOPE)
 			{
-				float dz = (z - z1) * 16;
+				float dz = (z - z1);
 				float newtv = sqrt(tv * tv + dz * dz);
 				tv = tv < 0 ? -newtv : newtv;
 			}
@@ -210,330 +209,139 @@ public:
 };
 
 
-//==========================================================================
-//
-//
-//
-//==========================================================================
-
-bool SectorGeometry::MakeVertices(unsigned int secnum, int plane, const FVector2& offset)
+enum class ETriangulateResult
 {
-	auto sec = &sections[secnum];
-	auto sectorp = &sector[sec->sector];
-	int numvertices = sec->lines.Size();
-	
-	TArray<FVector3> points(numvertices, true);
-	using Point = std::pair<float, float>;
-	std::vector<std::vector<Point>> polygon;
-	std::vector<Point>* curPoly;
+	Ok = 0,
+	Failed = 1,		// unable to triangulate
+	Invalid = 2,	// input data invalid.
+};
 
-	polygon.resize(1);
-	curPoly = &polygon.back();
-	FixedBitArray<MAXWALLSB> done;
+//==========================================================================
+//
+// Convert the outline to render coordinates.
+//
+//==========================================================================
 
-	int fz = sectorp->floorz, cz = sectorp->ceilingz;
-
-	int vertstoadd = numvertices;
-
-	done.Zero();
-	while (vertstoadd > 0)
+static int OutlineToFloat(Outline& outl, FOutline& polygon)
+{
+	polygon.resize(outl.Size());
+	unsigned count = 0;
+	for (unsigned i = 0; i < outl.Size(); i++)
 	{
-		int start = 0;
-		while (done[start] && start < numvertices) start++;
-		int s = start;
-		if (start >= 0 && start < numvertices)
+		polygon[i].resize(outl[i].Size());
+		count += outl[i].Size();
+		for (unsigned j = 0; j < outl[i].Size(); j++)
 		{
-			while (start >= 0 && start < numvertices && !done[start])
+			float X = RenderX(outl[i][j].X);
+			float Y = RenderY(outl[i][j].Y);
+			if (fabs(X) > 32768.f || fabs(Y) > 32768.f)
 			{
-				auto sline = &sectionLines[sec->lines[start]];
-				auto wallp = &wall[sline->startpoint];
-				float X = float(WallStartX(wallp));
-				float Y = float(WallStartY(wallp));
-				if (fabs(X) > 32768.f || fabs(Y) > 32768.f)
-				{
-					// If we get here there's some fuckery going around with the coordinates. Let's better abort and wait for things to realign.
-					// Do not try alternative methods if this happens.
-					return true;
-				}
-				curPoly->push_back(std::make_pair(X, Y));
-				done.Set(start);
-				vertstoadd--;
-				start = sline->point2index;
+				// If we get here there's some fuckery going around with the coordinates. Let's better abort and wait for things to realign.
+				// Do not try alternative methods if this happens.
+				return -1;
 			}
-			polygon.resize(polygon.size() + 1);
-			curPoly = &polygon.back();
-			if (start != s) return false; // means the sector is badly defined. RRRA'S E1L3 triggers this.
-		}
-	}
-	// Now make sure that the outer boundary is the first polygon by picking a point that's as much to the outside as possible.
-	int outer = 0;
-	float minx = FLT_MAX;
-	float miny = FLT_MAX;
-	for (size_t a = 0; a < polygon.size(); a++)
-	{
-		for (auto& pt : polygon[a])
-		{
-			if (pt.first < minx || (pt.first == minx && pt.second < miny))
-			{
-				minx = pt.first;
-				miny = pt.second;
-				outer = int(a);
+			polygon[i][j] = { X, Y };
 			}
 		}
-	}
-	if (outer != 0) std::swap(polygon[0], polygon[outer]);
+	return count;
+}
+
+//==========================================================================
+//
+// Try to triangulate a given outline with Earcut.
+//
+//==========================================================================
+
+ETriangulateResult TriangulateOutlineEarcut(const FOutline& polygon, int count, TArray<FVector2>& points, TArray<int>& indicesOut)
+{
+	// Sections are already validated so we can assume that the data is well defined here.
+
 	auto indices = mapbox::earcut(polygon);
-	if (indices.size() < 3 * (sec->lines.Size() - 2))
+	size_t numtriangles = count + (polygon.size() - 1) * 2 - 2; // accout for the extra connections needed to turn the polygon into s single loop.
+	if (indices.size() < numtriangles * 3)
 	{
 		// this means that full triangulation failed.
-		return false;
+		return ETriangulateResult::Failed;
 	}
-	sectorp->floorz = sectorp->ceilingz = 0;
-
+	points.Resize(count);
 	int p = 0;
 	for (size_t a = 0; a < polygon.size(); a++)
 	{
 		for (auto& pt : polygon[a])
 		{
-			float planez = 0;
-			PlanesAtPoint(sectorp, (pt.first * 16), (pt.second * -16), plane ? &planez : nullptr, !plane ? &planez : nullptr);
-			FVector3 point = { pt.first, pt.second, planez };
-			points[p++] = point;
+			points[p++] = { pt.first, pt.second };
 		}
 	}
-	
-	auto& entry = data[secnum].planes[plane];
-	entry.vertices.Resize((unsigned)indices.size());
-	entry.texcoords.Resize((unsigned)indices.size());
-	entry.normal = CalcNormal(sectorp, plane);
-
-	auto texture = tileGetTexture(plane ? sectorp->ceilingpicnum : sectorp->floorpicnum);
-
-	UVCalculator uvcalc(sectorp, plane, texture, offset);
-	
-	for(unsigned i = 0; i < entry.vertices.Size(); i++)
+	indicesOut.Resize((unsigned)indices.size());
+	for (unsigned i = 0; i < indices.size(); i++)
 	{
-		auto& pt = points[indices[i]];
-		entry.vertices[i] = pt;
-		entry.texcoords[i] = uvcalc.GetUV(int(pt.X * 16), int(pt.Y * -16), pt.Z);
+		indicesOut[i] = indices[i];
 	}
-
-	sectorp->floorz = fz;
-	sectorp->ceilingz = cz;
-	return true;
+	return ETriangulateResult::Ok;
 }
 
 //==========================================================================
 //
-// Use ZDoom's node builder if the simple approach fails.
-// This will create something usable in the vast majority of cases, 
-// even if the result is less efficient.
+// Try to triangulate a given outline with libtess2.
 //
 //==========================================================================
+FMemArena tessArena(100000);
 
-bool SectorGeometry::MakeVertices2(unsigned int secnum, int plane, const FVector2& offset)
+ETriangulateResult TriangulateOutlineLibtess(const FOutline& polygon, int count, TArray<FVector2>& points, TArray<int>& indicesOut)
 {
-	auto sec = &sections[secnum];
-	auto sectorp = &sector[sec->sector];
-	int numvertices = sec->lines.Size();
+	tessArena.FreeAll();
 
-	// Convert our sector into something the node builder understands
-	TArray<vertex_t> vertexes(sectorp->wallnum, true);
-	TArray<line_t> lines(numvertices, true);
-	TArray<side_t> sides(numvertices, true);
-	int j = 0;
-
-	for (int i = 0; i < numvertices; i++)
+	auto poolAlloc = [](void* userData, unsigned int size) -> void*
 	{
-		auto sline = &sectionLines[sec->lines[i]];
-		if (sline->point2index < 0) continue; // Exhumed LEV14 triggers this on sector 169.
-
-		auto wallp = &wall[sline->startpoint];
-		vertexes[j].p = { wallp->x * (1 / 16.), wallp->y * (1 / -16.) };
-
-		if (fabs(vertexes[j].p.X) > 32768.f || fabs(vertexes[j].p.Y) > 32768.f)
-		{
-			// If we get here there's some fuckery going around with the coordinates. Let's better abort and wait for things to realign.
-			return true;
-		}
-
-		lines[j].backsector = nullptr;
-		lines[j].frontsector = sectorp;
-		lines[j].linenum = j;
-		lines[j].wallnum = sline->wall;
-		lines[j].sidedef[0] = &sides[j];
-		lines[j].sidedef[1] = nullptr;
-		lines[j].v1 = &vertexes[j];
-		lines[j].v2 = &vertexes[sline->point2index + j - i];
-
-		sides[j].sidenum = j;
-		sides[j].sector = sectorp;
-		j++;
-	}
-
-	vertexes.Clamp(j);
-	lines.Clamp(j);
-	sides.Clamp(j);
-	// Weed out any overlaps. These often happen with door setups and can lead to bad subsectors
-	for (unsigned i = 0; i < lines.Size(); i++)
-	{
-		auto p1 = lines[i].v1->p, p2 = lines[i].v2->p;
-
-		// Throw out any line with zero length.
-		if (p1 == p2)
-		{
-			lines.Delete(i);
-			i--;
-			continue;
-		}
-
-		for (unsigned j = i + 1; j < lines.Size(); j++)
-		{
-			auto pp1 = lines[j].v1->p, pp2 = lines[j].v2->p;
-
-			if (pp1 == p2 && pp2 == p1)
-			{
-				// handle the simple case first, i.e. line j is the inverse of line i.
-				// in this case both lines need to be deleted.
-				lines.Delete(j);
-				lines.Delete(i);
-				i--;
-				goto nexti;
-			}
-			else if (pp1 == p2)
-			{
-				// only the second line's start point matches.
-				// In this case we have to delete the shorter line and truncate the other one.
-
-				// check if the second line's end point is on the line we are checking
-				double d1 = PointOnLineSide(pp2, p1, p2);
-				if (fabs(d1) > FLT_EPSILON) continue; // not colinear
-				bool vert = p1.X == p2.X;
-				double p1x = vert ? p1.X : p1.Y;
-				double p2x = vert ? p2.X : p2.Y;
-				double pp1x = vert ? pp1.X : pp1.Y;
-				double pp2x = vert ? pp2.X : pp2.Y;
-
-				if (pp2x > min(p1x, p2x) && pp2x < max(p1x, p2x))
-				{
-					// pp2 is on line i.
-					lines[i].v2 = lines[j].v2;
-					lines.Delete(j);
-					continue;
-				}
-				else if (p1x > min(pp1x, pp2x) && p1x < max(pp1x, pp2x))
-				{
-					// p1 is on line j
-					lines[j].v1 = lines[j].v2;
-					lines.Delete(i);
-					goto nexti;
-				}
-			}
-			else if (pp2 == p1)
-			{
-				// only the second line's start point matches.
-				// In this case we have to delete the shorter line and truncate the other one.
-
-				// check if the second line's end point is on the line we are checking
-				double d1 = PointOnLineSide(pp1, p1, p2);
-				if (fabs(d1) > FLT_EPSILON) continue; // not colinear
-				bool vert = p1.X == p2.X;
-				double p1x = vert ? p1.X : p1.Y;
-				double p2x = vert ? p2.X : p2.Y;
-				double pp1x = vert ? pp1.X : pp1.Y;
-				double pp2x = vert ? pp2.X : pp2.Y;
-
-				if (pp1x > min(p1x, p2x) && pp1x < max(p1x, p2x))
-				{
-					// pp1 is on line i.
-					lines[i].v1 = lines[j].v1;
-					lines.Delete(j);
-					continue;
-				}
-				else if (p2x > min(pp1x, pp2x) && p2x < max(pp1x, pp2x))
-				{
-					// p2 is on line j
-					lines[j].v2 = lines[j].v1;
-					lines.Delete(i);
-					goto nexti;
-				}
-			}
-			else
-			{
-				// no idea if we should do further checks here. Blood's doors do not need them. We'll see.
-			}
-		}
-nexti:;
-	}
-
-	if (lines.Size() < 4)
-	{
-		// nothing to generate. If line count is < 4 this sector is degenerate and should not be processed further.
-		auto& entry = data[secnum].planes[plane];
-		entry.vertices.Clear();
-		entry.texcoords.Clear();
-		return true;
-	}
-
-
-	FNodeBuilder::FLevel leveldata =
-	{
-		&vertexes[0], (int)vertexes.Size(),
-		&sides[0], (int)sides.Size(),
-		&lines[0], (int)lines.Size(),
-		0, 0, 0, 0
+		FMemArena* pool = (FMemArena*)userData;
+		return pool->Alloc(size);
 	};
-	leveldata.FindMapBounds();
-	FNodeBuilder builder(leveldata);
 
-	FLevelLocals Level;
-	builder.Extract(Level);
-
-	// Now turn the generated subsectors into triangle meshes
-
-	auto& entry = data[secnum].planes[plane];
-	entry.vertices.Clear();
-	entry.texcoords.Clear();
-
-	int fz = sectorp->floorz, cz = sectorp->ceilingz;
-	sectorp->floorz = sectorp->ceilingz = 0;
-
-	for (auto& sub : Level.subsectors)
+	auto poolFree = [](void*, void*)
 	{
-		if (sub.numlines <= 2) continue;
-		auto v0 = sub.firstline->v1;
-		for (unsigned i = 1; i < sub.numlines - 1; i++)
-		{
-			auto v1 = sub.firstline[i].v1;
-			auto v2 = sub.firstline[i].v2;
+	};
 
-			entry.vertices.Push({ (float)v0->fX(), (float)v0->fY(), 0 });
-			entry.vertices.Push({ (float)v1->fX(), (float)v1->fY(), 0 });
-			entry.vertices.Push({ (float)v2->fX(), (float)v2->fY(), 0 });
+	TESSalloc ma{};
+	ma.memalloc = poolAlloc;
+	ma.memfree = poolFree;
+	ma.userData = (void*)&tessArena;
+	ma.extraVertices = 256; // realloc not provided, allow 256 extra vertices.
 
-		}
+	auto tess = tessNewTess(&ma);
+	if (!tess)
+		return ETriangulateResult::Failed;
 
+	tessSetOption(tess, TESS_CONSTRAINED_DELAUNAY_TRIANGULATION, 0);
+	tessSetOption(tess, TESS_REVERSE_CONTOURS, 1);
+
+	// Add contours.
+	for (auto& loop : polygon)
+		tessAddContour(tess, 2, &loop.data()->first, (int)sizeof(*loop.data()), (int)loop.size());
+
+	int result = tessTesselate(tess, TESS_WINDING_POSITIVE, TESS_POLYGONS, 3, 2, nullptr);
+	if (!result)
+	{
+		tessDeleteTess(tess);
+		return ETriangulateResult::Failed;
 	}
 
-	// calculate the rest.
-	auto texture = tileGetTexture(plane ? sectorp->ceilingpicnum : sectorp->floorpicnum);
+	const float* verts = tessGetVertices(tess);
+	const int* vinds = tessGetVertexIndices(tess);
+	const int* elems = tessGetElements(tess);
+	const int nverts = tessGetVertexCount(tess);
+	const int nelems = tessGetElementCount(tess) * 3;	// an 'element' here is a full triangle, not a single vertex like in OpenGL...
 
-	UVCalculator uvcalc(sectorp, plane, texture, offset);
-
-	entry.texcoords.Resize(entry.vertices.Size());
-	for (unsigned i = 0; i < entry.vertices.Size(); i++)
+	points.Resize(nverts);
+	indicesOut.Resize(nelems);
+	for (int i = 0; i < nverts; i++)
 	{
-		auto& pt = entry.vertices[i];
-
-		float planez = 0;
-		PlanesAtPoint(sectorp, (pt.X * 16), (pt.Y * -16), plane ? &planez : nullptr, !plane ? &planez : nullptr);
-		entry.vertices[i].Z = planez;
-		entry.texcoords[i] = uvcalc.GetUV(int(pt.X * 16.), int(pt.Y * -16.), pt.Z);
+		points[i] = { verts[i * 2], verts[i * 2 + 1] };
 	}
-	entry.normal = CalcNormal(sectorp, plane);
-	sectorp->floorz = fz;
-	sectorp->ceilingz = cz;
-	return true;
+	for (int i = 0; i < nelems; i++)
+	{
+		indicesOut[i] = elems[i];
+	}
+	return ETriangulateResult::Ok;
 }
 
 //==========================================================================
@@ -542,11 +350,12 @@ nexti:;
 //
 //==========================================================================
 
-void SectorGeometry::ValidateSector(unsigned int secnum, int plane, const FVector2& offset)
+bool SectionGeometry::ValidateSection(Section* section, int plane)
 {
-	auto sec = &sector[sections[secnum].sector];
+	auto sec = &sector[section->sector];
+	auto& sdata = data[section->index];
 
-	auto compare = &data[secnum].compare[plane];
+	auto compare = &sdata.compare[plane];
 	if (plane == 0)
 	{
 		if (sec->floorheinum == compare->floorheinum &&
@@ -554,11 +363,11 @@ void SectorGeometry::ValidateSector(unsigned int secnum, int plane, const FVecto
 			((sec->floorstat ^ compare->floorstat) & (CSTAT_SECTOR_ALIGN | CSTAT_SECTOR_YFLIP | CSTAT_SECTOR_XFLIP | CSTAT_SECTOR_TEXHALF | CSTAT_SECTOR_SWAPXY)) == 0 &&
 			sec->floorxpan_ == compare->floorxpan_ &&
 			sec->floorypan_ == compare->floorypan_ &&
-			wall[sec->wallptr].pos == data[secnum].poscompare[0] &&
-			wall[wall[sec->wallptr].point2].pos == data[secnum].poscompare2[0] &&
-			!(sec->dirty & 1) && data[secnum].planes[plane].vertices.Size() ) return;
+			sec->firstWall()->pos == sdata.poscompare[0] &&
+			sec->firstWall()->point2Wall()->pos == sdata.poscompare2[0] &&
+			!(section->dirty & EDirty::FloorDirty) && sdata.planes[plane].vertices.Size() ) return true;
 
-		sec->dirty &= ~1;
+		section->dirty &= ~EDirty::FloorDirty;
 	}
 	else
 	{
@@ -567,19 +376,129 @@ void SectorGeometry::ValidateSector(unsigned int secnum, int plane, const FVecto
 			((sec->ceilingstat ^ compare->ceilingstat) & (CSTAT_SECTOR_ALIGN | CSTAT_SECTOR_YFLIP | CSTAT_SECTOR_XFLIP | CSTAT_SECTOR_TEXHALF | CSTAT_SECTOR_SWAPXY)) == 0 &&
 			sec->ceilingxpan_ == compare->ceilingxpan_ &&
 			sec->ceilingypan_ == compare->ceilingypan_ &&
-			wall[sec->wallptr].pos == data[secnum].poscompare[1] &&
-			wall[wall[sec->wallptr].point2].pos == data[secnum].poscompare2[1] &&
-			!(sec->dirty & 2) && data[secnum].planes[1].vertices.Size()) return;
+			sec->firstWall()->pos == sdata.poscompare[1] &&
+			sec->firstWall()->point2Wall()->pos == sdata.poscompare2[1] &&
+			!(section->dirty & EDirty::CeilingDirty) && sdata.planes[1].vertices.Size()) return true;
 
-		sec->dirty &= ~2;
+		section->dirty &= ~EDirty::CeilingDirty;
 	}
-	*compare = *sec;
-	data[secnum].poscompare[plane] = wall[sec->wallptr].pos;
-	data[secnum].poscompare2[plane] = wall[wall[sec->wallptr].point2].pos;
-	if (data[secnum].degenerate || !MakeVertices(secnum, plane, offset))
+	compare->copy(sec);
+	sdata.poscompare[plane] = sec->firstWall()->pos;
+	sdata.poscompare2[plane] = sec->firstWall()->point2Wall()->pos;
+	return false;
+}
+
+
+//==========================================================================
+//
+//
+//
+//==========================================================================
+
+bool SectionGeometry::CreateMesh(Section* section)
+{
+	auto outline = BuildOutline(section);
+	FOutline foutline;
+	int count = OutlineToFloat(outline, foutline);
+	if (count == -1) return false; // gotta wait...
+	TArray<FVector2> meshVertices;
+	TArray<int> meshIndices;
+	ETriangulateResult result = ETriangulateResult::Failed;
+
+	auto& sdata = data[section->index];
+
+	if (!(section->flags & NoEarcut))
 	{
-		data[secnum].degenerate = true;
-		//Printf(TEXTCOLOR_YELLOW "Normal triangulation failed for sector %d. Retrying with alternative approach\n", secnum);
-		MakeVertices2(secnum, plane, offset);
+		result = TriangulateOutlineEarcut(foutline, count, sdata.meshVertices, sdata.meshIndices);
 	}
+	if (result == ETriangulateResult::Failed && !(section->geomflags & NoLibtess))
+	{
+		section->geomflags |= NoEarcut;
+		result = TriangulateOutlineLibtess(foutline, count, sdata.meshVertices, sdata.meshIndices);
+	}
+
+	sdata.planes[0].vertices.Clear();
+	sdata.planes[1].vertices.Clear();
+	section->dirty &= ~EDirty::GeometryDirty;
+	section->dirty |= EDirty::FloorDirty | EDirty::CeilingDirty;
+	return true;
+}
+
+//==========================================================================
+//
+// assumes that the geometry has already been validated.
+//
+//==========================================================================
+
+void SectionGeometry::CreatePlaneMesh(Section* section, int plane, const FVector2& offset)
+{
+	auto sectorp = &sector[section->sector];
+	// calculate the rest.
+	auto texture = tileGetTexture(plane ? sectorp->ceilingpicnum : sectorp->floorpicnum);
+	auto& sdata = data[section->index];
+	auto& entry = sdata.planes[plane];
+	int fz = sectorp->floorz, cz = sectorp->ceilingz;
+	sectorp->setfloorz(0, true);
+	sectorp->setceilingz(0, true);
+
+	UVCalculator uvcalc(sectorp, plane, texture, offset);
+
+	entry.vertices.Resize(sdata.meshVertices.Size());
+	entry.texcoords.Resize(entry.vertices.Size());
+
+	for (unsigned i = 0; i < entry.vertices.Size(); i++)
+	{
+		auto& org = sdata.meshVertices[i];
+		auto& pt = entry.vertices[i];
+		auto& tc = entry.texcoords[i];
+
+		pt.X = org.X; pt.Y = org.Y;
+		PlanesAtPoint(sectorp, pt.X, -pt.Y, plane ? &pt.Z : nullptr, !plane ? &pt.Z : nullptr);
+		tc = uvcalc.GetUV(pt.X, -pt.Y, pt.Z);
+	}
+	sectorp->setfloorz(fz, true);
+	sectorp->setceilingz(cz, true);
+	entry.normal = CalcNormal(sectorp, plane);
+}
+
+//==========================================================================
+//
+//
+//
+//==========================================================================
+
+void SectionGeometry::MarkDirty(sectortype* sector)
+{
+	for (auto section : sectionsPerSector[sectnum(sector)])
+	{
+		sections[section].dirty = sector->dirty;
+	}
+	sector->dirty = 0;
+}
+
+//==========================================================================
+//
+//
+//
+//==========================================================================
+
+SectionGeometryPlane* SectionGeometry::get(Section* section, int plane, const FVector2& offset, TArray<int>** pIndices)
+{
+	if (!section || section->index >= data.Size()) return nullptr;
+	auto sectp = &sector[section->sector];
+	if (sectp->dirty) MarkDirty(sectp);
+	if (section->dirty & EDirty::GeometryDirty)
+	{
+		bool res = CreateMesh(section);
+		if (!res)
+		{
+			section->dirty &= ~EDirty::GeometryDirty;	// sector is in an invalid state, so pretend the old setup is still valid. Happens in some SW maps.
+		}
+	}
+	if (!ValidateSection(section, plane))
+	{
+		CreatePlaneMesh(section, plane, offset);
+	}
+	*pIndices = &data[section->index].meshIndices;
+	return &data[section->index].planes[plane];
 }

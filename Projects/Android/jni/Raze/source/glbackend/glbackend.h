@@ -62,14 +62,14 @@ public:
 	int MatrixChange = 0;
 
 	PolymostRenderState renderState;
-	
-	
+
+
 public:
 	float mProjectionM5 = 1.0f; // needed by ssao
 	glinfo_t glinfo;
-	
+
 	void Init(int y);
-	
+
 	static int GetTexDimension(int value)
 	{
 		//if (value > gl.max_texturesize) return gl.max_texturesize;
@@ -310,4 +310,4 @@ void renderSetVisibility(float v);
 void renderSetViewpoint(float x, float y, float z);
 void renderBeginScene();
 void renderFinishScene();
-void videoShowFrame(int32_t);
+void videoShowFrame();

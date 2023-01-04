@@ -11,14 +11,10 @@
 class ClipNode
 {
 	friend class Clipper;
-	
+
 	ClipNode *prev, *next;
 	int start, end;
-
-	bool operator== (const ClipNode &other)
-	{
-		return other.start == start && other.end == end;
-	}
+	float topclip, bottomclip;
 };
 
 
@@ -27,15 +23,13 @@ class Clipper
 	FMemArena nodearena;
 	ClipNode * freelist = nullptr;
 
-	ClipNode * clipnodes = nullptr;
 	ClipNode * cliphead = nullptr;
-	vec2_t viewpoint;
-	void RemoveRange(ClipNode* cn);
 	binangle visibleStart, visibleEnd;
 
 public:
 	bool IsRangeVisible(int startangle, int endangle);
 	void AddClipRange(int startangle, int endangle);
+	void AddWindowRange(int startangle, int endangle, float topclip, float bottomclip, float viewz);
 	void RemoveClipRange(int startangle, int endangle);
 
 public:
@@ -60,22 +54,25 @@ private:
 		else return (ClipNode*)nodearena.Alloc(sizeof(ClipNode));
 	}
 
-	ClipNode * NewRange(int start, int end)
+	ClipNode * NewRange(int start, int end, float top, float bottom)
 	{
 		ClipNode * c = GetNew();
 
 		c->start = start;
 		c->end = end;
+		c->topclip = top;
+		c->bottomclip = bottom;
 		c->next = c->prev = NULL;
 		return c;
 	}
 
+	void RemoveRange(ClipNode* cn, bool free = true);
+	bool InsertRange(ClipNode* prev, ClipNode* node);
+	bool InsertBlockingRange(ClipNode* prev, ClipNode* node, int start, int end);
+	void SplitRange(ClipNode* node, int start, int end, float topclip, float bottomclip);
+	void ValidateList();
+
 public:
-    
-    void SetViewpoint(const vec2_t &vp)
-    {
-        viewpoint = vp;
-    }
 
 	void SetVisibleRange(angle_t a1, angle_t a2)
 	{
@@ -102,14 +99,6 @@ public:
 	}
 
 	void DumpClipper();
-    
-	binangle PointToAngle(const vec2_t& pos)
-	{
-		vec2_t vec = pos - viewpoint;
-		return bvectangbam(vec.x, vec.y);
-	}
-
-
 };
 
 #endif

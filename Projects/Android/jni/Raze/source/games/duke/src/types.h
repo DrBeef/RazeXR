@@ -1,4 +1,5 @@
 #pragma once
+#include "coreactor.h"
 #include "names.h"
 #include "packet.h"
 #include "d_net.h"
@@ -20,15 +21,36 @@ struct STATUSBARTYPE
 	bool gotweapon[MAX_WEAPONS];
 };
 
-struct DDukeActor
+struct FireProj
 {
+	vec3_t pos, vel;
+};
+
+// Todo - put more state in here
+struct ActorInfo
+{
+	uint32_t scriptaddress;
+	EDukeFlags1 flags;
+	EDukeFlags2 flags2;
+	int aimoffset;
+	int falladjustz;
+	int gutsoffset;
+};
+
+class DDukeActor : public DCoreActor
+{
+	DECLARE_CLASS(DDukeActor, DCoreActor)
+	HAS_OBJECT_POINTERS
+public:
+	TObjPtr<DDukeActor*> ownerActor, hitOwnerActor;
+
 	uint8_t cgg;
 	uint8_t spriteextra;	// moved here for easier maintenance. This was originally a hacked in field in the sprite structure called 'filler'.
-	short owner; // todo: make a pointer.
-	short picnum, ang, extra, movflag;
-	short tempang, dispicnum;
+	short attackertype, hitang, hitextra, movflag;
+	short tempang, dispicnum, basepicnum;
 	short timetosleep;
-	int floorz, ceilingz, lastvx, lastvy, aflags;
+	vec2_t ovel;
+	int floorz, ceilingz;
 	union
 	{
 		int saved_ammo;
@@ -38,88 +60,86 @@ struct DDukeActor
 	// Some SE's stored indices in temp_data. For purposes of clarity avoid that. These variables are meant to store these elements now
 	walltype* temp_walls[2]; // SE20 + SE128
 	sectortype* temp_sect, *actorstayput;
-	
-	DDukeActor* temp_actor, *seek_actor;
-	spritetype* s;	// direct reference to the corresponding sprite.
 
-	static DDukeActor* array();	// this is necessary to allow define inline functions referencing the global array inside the definition itself.
+	TObjPtr<DDukeActor*> temp_actor, seek_actor;
 
-	DDukeActor() : s(&sprite[this - array()]) {}
-	DDukeActor(const DDukeActor& other) = delete;				// we also do not want to allow copies.
-	DDukeActor& operator=(const DDukeActor& other) = delete;
-	void clear()
-	{
-		actorstayput = nullptr;
-		cgg = spriteextra = 0;
-		picnum = ang = extra = owner = movflag = tempang = dispicnum = timetosleep = 0;
-		floorz = ceilingz = lastvx = lastvy = aflags = saved_ammo = 0;
-		memset(temp_data, 0, sizeof(temp_data));
-	}
-	int GetSpriteIndex() const { return int(this - array()); }
+	TArray<GameVarValue> uservars;
 
-	// Wrapper around some ugliness. The 'owner' field gets abused by some actors, so better wrap its real use in access functions to keep things in order.
+	EDukeFlags1 flags1;
+	EDukeFlags2 flags2;
+
+	// Todo: Once we start assigning subclasses to actors, this one needs to be moved to the proper FIREBALL subclass.
+	FireProj fproj;
+
+	DDukeActor() = default;
+	size_t PropagateMark() override;
+	const ActorInfo* actorInfo() const;
+
+	// This once was stored in the owner field of the sprite
 	inline DDukeActor* GetOwner()
 	{
-		return s->owner < 0 ? nullptr : &array()[s->owner];
+		return ownerActor;
 	}
 
 	inline void SetOwner(DDukeActor* a)
 	{
-		s->owner = a? a->GetSpriteIndex() : -1;
+		ownerActor = a;
 	}
 
-	// same for the 'hittype' owner - which is normally the shooter in an attack.
 	inline DDukeActor* GetHitOwner()
 	{
-		return owner < 0 ? nullptr : &array()[owner];
+		return hitOwnerActor;
 	}
 
 	inline void SetHitOwner(DDukeActor* a)
 	{
-		owner = a ? a->GetSpriteIndex() : -1;
+		hitOwnerActor = a;
 	}
 
-	// This used the Owner field - better move this to something more safe.
 	inline bool IsActiveCrane()
 	{
-		return s->owner == -2;
+		return spr.intowner == -2;
 	}
 
 	inline void SetActiveCrane(bool yes)
 	{
-		s->owner = yes ? -2 : -1;
+		ownerActor = nullptr;
+		spr.intowner = yes ? -2 : -1;
 	}
 
 	int PlayerIndex() const
 	{
 		// only valid for real players - just here to abstract yvel.
-		return s->yvel;
+		return spr.yvel;
 	}
 
-	sectortype* getSector() const
+	bool isPlayer() const
 	{
-		return s->sector();
+		return spr.picnum == TILE_APLAYER;
 	}
 
+	void Serialize(FSerializer& arc) override;
+
+	void ChangeType(PClass* newtype)
+	{
+		if (newtype->IsDescendantOf(RUNTIME_CLASS(DDukeActor)) && newtype->Size == RUNTIME_CLASS(DDukeActor)->Size && GetClass()->Size == RUNTIME_CLASS(DDukeActor)->Size)
+		{
+			// It sucks having to do this but the game heavily depends on being able to swap out the class type and often uses this to manage actor state.
+			// We'll allow this only for classes that do not add their own data, though.
+			SetClass(newtype);
+		}
+	}
 
 };
-extern DDukeActor hittype[MAXSPRITES + 1];
-inline DDukeActor* DDukeActor::array() { return hittype; }
+
+// subclassed to add a game specific actor() method
+using HitInfo = THitInfo<DDukeActor>;
+using Collision = TCollision<DDukeActor>;
 
 struct animwalltype
 {
 	walltype* wall;
 	int tag;
-};
-
-// Todo - put more state in here
-struct ActorInfo
-{
-	uint32_t scriptaddress;
-	uint32_t flags;
-	int aimoffset;
-	int falladjustz;
-	int gutsoffset;
 };
 
 // for now just flags not related to actors, may get more info later.
@@ -152,30 +172,30 @@ struct user_defs
 	int m_ffire, ffire, m_player_skill, multimode;
 	int player_skill, marker;
 
-	DDukeActor* cameraactor;
+	TObjPtr<DDukeActor*> cameraactor;
 
 };
 
 struct player_orig
 {
-	int ox, oy, oz;
+	vec3_t opos;
 	short oa;
-	int os;
+	sectortype* os;
 };
 
 struct CraneDef
 {
-	int x, y, z;
-	int polex, poley;
-	DDukeActor* poleactor;
+	vec3_t pos;
+	vec2_t pole;
+	TObjPtr<DDukeActor*> poleactor;
 };
 
 struct player_struct 
 {
 	// This is basically the version from JFDuke but this first block contains a few changes to make it work with other parts of Raze.
-	
+
 	// The sound code wants to read a vector out of this so we need to define one for the main coordinate.
-	vec3_t pos;
+	vec3_t pos, opos, vel;
 
 	// player's horizon and angle structs.
 	PlayerHorizon horizon;
@@ -189,7 +209,7 @@ struct player_struct
 	PalEntry pals;
 
 	// this was a global variable originally.
-	vec2_t fric;
+	vec2_t fric, exit, loogie[64], bobpos;
 
 	// weapon drawer variables and their interpolation counterparts.
 	int weapon_sway;
@@ -198,39 +218,40 @@ struct player_struct
 	short oweapon_pos, okickback_pic, orandom_club_frame;
 	uint8_t hard_landing;
 	uint8_t ohard_landing;
+	int fistsign, ofistsign;
 
 	// Store current psectlotag as determined in processinput() for use with scaling angle aiming.
 	short psectlotag;
 
 	// From here on it is unaltered from JFDuke with the exception of a few fields that are no longer needed and were removed.
-	int exitx, exity, loogiex[64], loogiey[64], numloogs, loogcnt;
+	int numloogs, oloogcnt, loogcnt;
 	int invdisptime;
-	int bobposx, bobposy, oposx, oposy, oposz, pyoff, opyoff;
-	int posxv, posyv, poszv, last_pissed_time, truefz, truecz;
+	int pyoff, opyoff;
+	int last_pissed_time, truefz, truecz;
 	int player_par, visibility;
 	int bobcounter;
 	int randomflamex, crack_time;
 
 	int aim_mode, ftt;
 
-	int cursectnum;
+	sectortype* cursector;
 	sectortype* one_parallax_sectnum; // wall + sector references. Make them pointers later?
 	walltype* access_wall;
+	DDukeActor* actor;
+	TObjPtr<DDukeActor*> actorsqu, wackedbyactor, on_crane, holoduke_on, somethingonplayer, access_spritenum, dummyplayersprite, newOwner;
 
 	short last_extra, subweapon;
 	short ammo_amount[MAX_WEAPONS], frag, fraggedself;
 
-	short curr_weapon, last_weapon, tipincs, wantweaponfire;
+	short curr_weapon, last_weapon, otipincs, tipincs, wantweaponfire;
 	short holoduke_amount, hurt_delay, hbomb_hold_delay;
-	short jumping_counter, airleft, knee_incs, access_incs;
+	short jumping_counter, airleft, oknee_incs, knee_incs, oaccess_incs, access_incs;
 	short ftq;
 	short got_access, weapon_ang, firstaid_amount;
-	short i;
-	short over_shoulder_on, fist_incs;
+	short over_shoulder_on, ofist_incs, fist_incs;
 	short cheat_phase;
 	short extra_extra8, quick_kick, last_quick_kick;
 	short heat_amount, timebeforeexit, customexitsound;
-	DDukeActor* actorsqu, *wackedbyactor, *on_crane, *holoduke_on, *somethingonplayer, *access_spritenum, *dummyplayersprite, *newOwner;
 
 	short weaprecs[256], weapreccnt;
 	unsigned int interface_toggle_flag;
@@ -264,7 +285,8 @@ struct player_struct
 	// Items were reordered by size.
 	int stairs;
 	int detonate_count; // at57e
-	int noise_x, noise_y, noise_radius; // at286, at28a, at290
+	vec2_t noise;
+	int noise_radius; // at286, at28a, at290
 	int drink_timer; // at58e
 	int eat_timer; // at592
 	int SlotWin;
@@ -294,6 +316,9 @@ struct player_struct
 	double vehForwardScale, vehReverseScale, MotoSpeed;
 	bool vehTurnLeft, vehTurnRight, vehBraking;
 
+	TArray<GameVarValue> uservars;
+
+
 	// input stuff.
 	InputPacket sync;
 
@@ -311,21 +336,15 @@ struct player_struct
 		return (psectlotag == ST_2_UNDERWATER)? avel * 0.875f : avel;
 	}
 
-	sectortype* cursector() const
+	void setCursector(sectortype* sect)
 	{
-#ifdef _DEBUG	// this is an aid for detecting invalid sector access during development as it will cause the game to crash when sector -1 is being accessed.
-		return cursectnum < 0 ? nullptr : &::sector[cursectnum];
-#else
-		return &::sector[cursectnum];
-#endif
+		cursector = sect;
 	}
 
 	bool insector() const
 	{
-		assert(cursectnum >= -1 && cursectnum < numsectors);	// check for truly invalid values.
-		return validSectorIndex(cursectnum);
+		return cursector != nullptr;
 	}
-
 };
 
 struct Cycler
@@ -338,74 +357,9 @@ struct Cycler
 	bool state;
 };
 
-// Wrapper around the insane collision info mess from Build.
-struct Collision
+
+struct DukeLevel
 {
-	int type;
-	int index;
-	int legacyVal;	// should be removed later, but needed for converting back for unadjusted code.
-	DDukeActor* actor;
-
-	Collision() = default;
-	explicit Collision(int v)
-	{
-		setFromEngine(v);
-	}
-	int setNone()
-	{
-		type = kHitNone;
-		index = -1;
-		legacyVal = 0;
-		actor = nullptr;
-		return kHitNone;
-	}
-
-	int setSector(int num)
-	{
-		type = kHitSector;
-		index = num;
-		legacyVal = type | index;
-		actor = nullptr;
-		return kHitSector;
-	}
-	int setWall(int num)
-	{
-		type = kHitWall;
-		index = num;
-		legacyVal = type | index;
-		actor = nullptr;
-		return kHitWall;
-	}
-	int setSprite(DDukeActor* num)
-	{
-		type = kHitSprite;
-		index = -1;
-		legacyVal = type | int(num - hittype);
-		actor = num;
-		return kHitSprite;
-	}
-
-	int setFromEngine(int value)
-	{
-		legacyVal = value;
-		type = value & kHitTypeMask;
-		if (type == 0) { index = -1; actor = nullptr; }
-		else if (type != kHitSprite) { index = value & kHitIndexMask; actor = nullptr; }
-		else { index = -1; actor = &hittype[value & kHitIndexMask]; }
-		return type;
-	}
-
-	walltype* wall() const
-	{
-		assert(type == kHitWall);
-		return &::wall[index];
-	}
-
-	sectortype* sector() const
-	{
-		assert(type == kHitSector);
-		return &::sector[index];
-	}
 
 };
 

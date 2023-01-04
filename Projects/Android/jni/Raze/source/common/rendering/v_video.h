@@ -43,6 +43,7 @@
 #include "v_2ddrawer.h"
 #include "intrect.h"
 #include "hw_shadowmap.h"
+#include "hw_levelmesh.h"
 #include "buffers.h"
 
 
@@ -151,17 +152,20 @@ public:
 
 	int mPipelineNbr = 1;						// Number of HW buffers to pipeline
 	int mPipelineType = 0;
-	
+
 public:
 	DFrameBuffer (int width=1, int height=1);
 	virtual ~DFrameBuffer();
 	virtual void InitializeState() = 0;	// For stuff that needs 'screen' set.
 	virtual bool IsVulkan() { return false; }
 	virtual bool IsPoly() { return false; }
+	virtual int GetShaderCount();
+	virtual bool CompileNextShader() { return true; }
 	void SetAABBTree(hwrenderer::LevelAABBTree * tree)
 	{
 		mShadowMap.SetAABBTree(tree);
 	}
+	virtual void SetLevelMesh(hwrenderer::LevelMesh *mesh) { }
 	bool allowSSBO()
 	{
 #ifndef HW_BLOCK_SSBO
@@ -219,7 +223,9 @@ public:
 	virtual int GetClientWidth() = 0;
 	virtual int GetClientHeight() = 0;
 	virtual void BlurScene(float amount) {}
-    
+
+	virtual void InitLightmap(int LMTextureSize, int LMTextureCount, TArray<uint16_t>& LMTextureData) {}
+
     // Interface to hardware rendering resources
 	virtual IVertexBuffer *CreateVertexBuffer() { return nullptr; }
 	virtual IIndexBuffer *CreateIndexBuffer() { return nullptr; }
@@ -288,7 +294,6 @@ extern DFrameBuffer *screen;
 
 #define SCREENWIDTH (screen->GetWidth ())
 #define SCREENHEIGHT (screen->GetHeight ())
-#define SCREENPITCH (screen->GetPitch ())
 
 EXTERN_CVAR (Float, vid_gamma)
 

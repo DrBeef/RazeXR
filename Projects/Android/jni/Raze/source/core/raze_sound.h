@@ -10,7 +10,7 @@ inline FVector3 GetSoundPos(const vec3_t *pos)
     const float xmul = 1 / 16.f;
     const float ymul = -1 / 16.f;
     const float zmul = -1 / 256.f;
-    return { pos->x* xmul, pos->z* zmul, pos->y* ymul };
+    return { pos->X* xmul, pos->Z* zmul, pos->Y* ymul };
 }
 
 
@@ -38,3 +38,11 @@ inline void FX_SetReverbDelay(int delay)
 int S_LookupSound(const char* fn);
 class FSerializer;
 void S_SerializeSounds(FSerializer& arc);
+
+class RazeSoundEngine : public SoundEngine
+{
+public:
+	virtual bool SourceIsActor(FSoundChan* chan) { return chan->SourceType == SOURCE_Actor; }
+	virtual int SoundSourceIndex(FSoundChan* chan) { return 0; }
+	virtual void SetSource(FSoundChan* chan, int index) {}
+};

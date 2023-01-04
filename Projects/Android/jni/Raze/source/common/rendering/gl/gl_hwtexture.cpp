@@ -148,6 +148,7 @@ unsigned int FHardwareTexture::CreateTexture(unsigned char * buffer, int w, int 
 	{
 		sourcetype = GL_BGRA;
 	}
+
 #ifdef __MOBILE__
 	texformat = sourcetype = GL_BGRA;
 
@@ -163,6 +164,7 @@ unsigned int FHardwareTexture::CreateTexture(unsigned char * buffer, int w, int 
 		texformat = GL_BGRA;
 	}
 #endif
+
 	if (!firstCall && glBufferID > 0)
 		glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, rw, rh, sourcetype, GL_UNSIGNED_BYTE, buffer);
 	else
@@ -336,7 +338,7 @@ bool FHardwareTexture::BindOrCreate(FTexture *tex, int texunit, int clampmode, i
 		int w = 0, h = 0;
 
 		// Create this texture
-		
+
 		FTextureBuffer texbuffer;
 
 		if (!tex->isHardwareCanvas())

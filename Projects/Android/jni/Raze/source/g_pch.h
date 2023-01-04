@@ -9,6 +9,7 @@
 #include <ctype.h>
 #include <stdint.h>
 #include <new>
+#include <type_traits>
 #include <algorithm>
 #include <forward_list>
 #include <sys/stat.h>

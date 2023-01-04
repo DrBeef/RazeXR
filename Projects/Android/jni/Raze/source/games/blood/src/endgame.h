@@ -28,20 +28,19 @@ BEGIN_BLD_NS
 
 class CKillMgr {
 public:
-    int TotalKills, Kills;
-    void SetCount(int);
-    void AddNewKill(int);
-    void AddKill(spritetype *pSprite);
-    void CountTotalKills(void);
-    void Clear(void);
+	int TotalKills, Kills;
+	void SetCount(int);
+	void AddKill(DBloodActor* actor);
+	void CountTotalKills(void);
+	void Clear(void);
 };
 
 class CSecretMgr {
 public:
-    int Total, Founds, Super;
-    void SetCount(int);
-    void Found(int);
-    void Clear(void);
+	int Total, Founds, Super;
+	void SetCount(int);
+	void Found(int);
+	void Clear(void);
 };
 
 extern CSecretMgr gSecretMgr;

@@ -6,7 +6,7 @@
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Lesser General Public License as published by
-// the Free Software Foundation, either version 3 of the License, or
+// the Free Software Foundation, either version 2 of the License, or
 // (at your option) any later version.
 //
 // This program is distributed in the hope that it will be useful,
@@ -57,6 +57,7 @@ EXTERN_CVAR(Bool, cl_capfps)
 PalEntry GlobalMapFog;
 float GlobalFogDensity = 350.f;
 TArray<PortalDesc> allPortals;
+void Draw2D(F2DDrawer* drawer, FRenderState& state);
 
 
 #if 0
@@ -90,7 +91,6 @@ void CollectLights(FLevelLocals* Level)
 	}
 }
 #endif
-
 
 float RazeXR_GetFOV();
 void VR_GetMove(float *joy_forward, float *joy_side, float *hmd_forward, float *hmd_side, float *up,
@@ -138,12 +138,13 @@ void RenderViewpoint(FRenderViewpoint& mainvp, IntRect* bounds, float fov, float
 		}
 
 		auto di = HWDrawInfo::StartDrawInfo(nullptr, mainvp, nullptr);
+		di->SetVisibility();
 		auto& vp = di->Viewpoint;
 		vp = mainvp;
 
 		di->Set3DViewport(RenderState);
-		float flash = 1.f;
-		di->Viewpoint.FieldOfView = RazeXR_GetFOV();	// Set the real FOV for the current scene (it's not necessarily the same as the global setting in r_viewpoint)
+		float flash = 8.f / (r_scenebrightness + 8.f);
+		di->Viewpoint.FieldOfView = fov;	// Set the real FOV for the current scene (it's not necessarily the same as the global setting in r_viewpoint)
 
 		// Stereo mode specific perspective projection
 		di->VPUniforms.mProjectionMatrix = eye.GetProjection(fov, ratio, fovratio);
@@ -164,7 +165,12 @@ void RenderViewpoint(FRenderViewpoint& mainvp, IntRect* bounds, float fov, float
 				RenderState.EnableDrawBuffers(1);
 			}
 
-			screen->PostProcessScene(false, CM_DEFAULT, flash, [&]() { });
+			screen->PostProcessScene(false, CM_DEFAULT, flash, []() { 
+				hw_int_useindexedcolortextures = false;
+				PostProcess.Unclock();
+				Draw2D(&twodpsp, *screen->RenderState()); // draws the weapon sprites
+				PostProcess.Clock();
+				});
 			PostProcess.Unclock();
 		}
 		di->EndDrawInfo();
@@ -180,19 +186,19 @@ void RenderViewpoint(FRenderViewpoint& mainvp, IntRect* bounds, float fov, float
 //
 //===========================================================================
 
-FRenderViewpoint SetupViewpoint(spritetype* cam, const vec3_t& position, int sectnum, binangle angle, fixedhoriz horizon, binangle rollang)
+FRenderViewpoint SetupViewpoint(DCoreActor* cam, const vec3_t& position, int sectnum, binangle angle, fixedhoriz horizon, binangle rollang)
 {
+	float dummy, pitch, roll;
+	VR_GetMove(&dummy, &dummy, &dummy, &dummy, &dummy, &dummy, &pitch, &roll);
+
 	FRenderViewpoint r_viewpoint{};
-	r_viewpoint.CameraSprite = cam;
+	r_viewpoint.CameraActor = cam;
 	r_viewpoint.SectNums = nullptr;
 	r_viewpoint.SectCount = sectnum;
-	r_viewpoint.Pos = { position.x / 16.f, position.y / -16.f, position.z / -256.f };
-
-	float dummy, yaw, pitch, roll;
-	VR_GetMove(&dummy, &dummy, &dummy, &dummy, &dummy, &yaw, &pitch, &roll);
+	r_viewpoint.Pos = { position.X / 16.f, position.Y / -16.f, position.Z / -256.f };
 	r_viewpoint.HWAngles.Yaw = -90.f + angle.asdeg();
-	r_viewpoint.HWAngles.Pitch = pitch;//-horizon.aspitch();
-	r_viewpoint.HWAngles.Roll = roll;//-rollang.asdeg();
+	r_viewpoint.HWAngles.Pitch = pitch;
+	r_viewpoint.HWAngles.Roll = roll;
 	r_viewpoint.FieldOfView = (float)RazeXR_GetFOV();
 	r_viewpoint.RotAngle = angle.asbam();
 	double FocalTangent = tan(r_viewpoint.FieldOfView.Radians() / 2);
@@ -230,11 +236,11 @@ bool writingsavepic;
 FileWriter* savefile;
 int savewidth, saveheight;
 void PM_WriteSavePic(FileWriter* file, int width, int height);
-EXTERN_CVAR(Bool, testnewrenderer);
+EXTERN_CVAR(Bool, vid_renderer);
 
 void WriteSavePic(FileWriter* file, int width, int height)
 {
-	if (!testnewrenderer)
+	if (!vid_renderer)
 	{
 		PM_WriteSavePic(file, width, height);
 		return;
@@ -256,7 +262,7 @@ void WriteSavePic(FileWriter* file, int width, int height)
 	writingsavepic = false;
 	xdim = oldx;
 	ydim = oldy;
-	videoSetViewableArea(oldwindowxy1.x, oldwindowxy1.y, oldwindowxy2.x, oldwindowxy2.y);
+	videoSetViewableArea(oldwindowxy1.X, oldwindowxy1.Y, oldwindowxy2.X, oldwindowxy2.Y);
 }
 
 void RenderToSavePic(FRenderViewpoint& vp, FileWriter* file, int width, int height)
@@ -314,13 +320,12 @@ static void CheckTimer(FRenderState &state, uint64_t ShaderStartTime)
 
 void animatecamsprite(double s);
 
-void render_drawrooms(spritetype* playersprite, const vec3_t& position, int sectnum, binangle angle, fixedhoriz horizon, binangle rollang, double smoothratio)
+
+void render_drawrooms(DCoreActor* playersprite, const vec3_t& position, int sectnum, binangle angle, fixedhoriz horizon, binangle rollang, double smoothratio)
 {
 	checkRotatedWalls();
 
-	if (gl_fogmode == 1) gl_fogmode = 2;	// still needed?
-
-	updatesector(position.x, position.y, &sectnum);
+	updatesector(position.X, position.Y, &sectnum);
 	if (sectnum < 0) return;
 
 	iter_dlightf = iter_dlight = draw_dlight = draw_dlightf = 0;
@@ -371,17 +376,17 @@ void render_drawrooms(spritetype* playersprite, const vec3_t& position, int sect
 	All.Unclock();
 }
 
-void render_camtex(spritetype* playersprite, const vec3_t& position, int sectnum, binangle angle, fixedhoriz horizon, binangle rollang, FGameTexture* camtex, IntRect& rect, double smoothratio)
+void render_camtex(DCoreActor* playersprite, const vec3_t& position, sectortype* sect, binangle angle, fixedhoriz horizon, binangle rollang, FGameTexture* camtex, IntRect& rect, double smoothratio)
 {
-	updatesector(position.x, position.y, &sectnum);
-	if (sectnum < 0) return;
+	updatesector(position.X, position.Y, &sect);
+	if (!sect) return;
 
 	screen->RenderState()->SetVertexBuffer(screen->mVertexData);
 
 	// now render the main view
 	float ratio = camtex->GetDisplayWidth() / camtex->GetDisplayHeight();
 
-	FRenderViewpoint r_viewpoint = SetupViewpoint(playersprite, position, sectnum, angle, horizon, rollang);
+	FRenderViewpoint r_viewpoint = SetupViewpoint(playersprite, position, sectnum(sect), angle, horizon, rollang);
 	if (cl_capfps) r_viewpoint.TicFrac = smoothratio;
 
 	RenderViewpoint(r_viewpoint, &rect, r_viewpoint.FieldOfView.Degrees, ratio, ratio, false, false);

@@ -32,41 +32,39 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 BEGIN_BLD_NS
 
 enum BUSYID {
-    BUSYID_0 = 0,
-    BUSYID_1,
-    BUSYID_2,
-    BUSYID_3,
-    BUSYID_4,
-    BUSYID_5,
-    BUSYID_6,
-    BUSYID_7,
+	BUSYID_0 = 0,
+	BUSYID_1,
+	BUSYID_2,
+	BUSYID_3,
+	BUSYID_4,
+	BUSYID_5,
+	BUSYID_6,
+	BUSYID_7,
 };
 
-#define kMaxBusyCount 128
 struct BUSY {
-    int index;
-    int delta;
-    int busy;
-    int/*BUSYID*/ type;
+	sectortype* sect;
+	int delta;
+	int busy;
+	int/*BUSYID*/ type;
 };
 
-extern BUSY gBusy[kMaxBusyCount];
-extern int gBusyCount;
+extern TArray<BUSY> gBusy;
 
-void trTriggerSector(unsigned int nSector, XSECTOR *pXSector, int command);
-void trMessageSector(unsigned int nSector, EVENT event);
-void trTriggerWall(unsigned int nWall, XWALL *pXWall, int command);
-void trMessageWall(unsigned int nWall, EVENT event);
+void trTriggerSector(sectortype* pSector, int command);
+void trMessageSector(sectortype* pSector, EVENT event);
+void trTriggerWall(walltype*, int command);
+void trMessageWall(walltype* pWall, EVENT& event);
 void trTriggerSprite(DBloodActor* actor, int command);
 void trMessageSprite(DBloodActor* actor, EVENT event);
 void trProcessBusy(void);
-void trInit(void);
+void trInit(TArray<DBloodActor*>& actors);
 void trTextOver(int nId);
 bool SetSpriteState(DBloodActor* actor, int nState);
-bool SetWallState(int nWall, XWALL* pXWall, int nState);
-bool SetSectorState(int nSector, XSECTOR* pXSector, int nState);
-void TeleFrag(DBloodActor* killer, int nSector);
-void SectorStartSound(int nSector, int nState);
-void SectorEndSound(int nSector, int nState);
+bool SetWallState(walltype* pWall, int nState);
+bool SetSectorState(sectortype* pSector, int nState);
+void TeleFrag(DBloodActor* killer, sectortype* pSector);
+void SectorStartSound(sectortype* pSector, int nState);
+void SectorEndSound(sectortype* pSector, int nState);
 
 END_BLD_NS

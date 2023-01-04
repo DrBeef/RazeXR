@@ -36,8 +36,18 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 BEGIN_BLD_NS
 
 
-void GameInterface::LevelCompleted(MapRecord *map, int skill)
+void GameInterface::LevelCompleted(MapRecord* map, int skill)
 {
+	// Save the player state before taking down anything.
+	for (int i = connecthead; i >= 0; i = connectpoint2[i])
+	{
+		if (gPlayer[i].actor)
+		{
+			memcpy(&gPlayerTemp[i], &gPlayer[i], sizeof(PLAYER));
+			gHealthTemp[i] = gPlayer[i].actor->xspr.health;
+		}
+	}
+
 	EndLevel();
 	Mus_Stop();
 
@@ -53,7 +63,7 @@ void GameInterface::LevelCompleted(MapRecord *map, int skill)
 	ShowIntermission(currentLevel, map, &info, [=](bool)
 		{
 			soundEngine->StopAllChannels();
-			gameaction = map? ga_nextlevel : ga_creditsmenu;
+			gameaction = map ? ga_nextlevel : ga_creditsmenu;
 		});
 }
 
@@ -63,14 +73,9 @@ void CKillMgr::SetCount(int nCount)
 	TotalKills = nCount;
 }
 
-void CKillMgr::AddNewKill(int nCount)
+void CKillMgr::AddKill(DBloodActor* actor)
 {
-	TotalKills += nCount;
-}
-
-void CKillMgr::AddKill(spritetype* pSprite)
-{
-	if (pSprite->statnum == kStatDude && pSprite->type != kDudeBat && pSprite->type != kDudeRat && pSprite->type != kDudeInnocent && pSprite->type != kDudeBurningInnocent)
+	if (actor->spr.statnum == kStatDude && actor->spr.type != kDudeBat && actor->spr.type != kDudeRat && actor->spr.type != kDudeInnocent && actor->spr.type != kDudeBurningInnocent)
 		Kills++;
 }
 
@@ -80,10 +85,9 @@ void CKillMgr::CountTotalKills(void)
 	BloodStatIterator it(kStatDude);
 	while (auto actor = it.Next())
 	{
-		spritetype* pSprite = &actor->s();
-		if (pSprite->type < kDudeBase || pSprite->type >= kDudeMax)
+		if (actor->spr.type < kDudeBase || actor->spr.type >= kDudeMax)
 			I_Error("Non-enemy sprite (%d) in the enemy sprite list.", actor->GetIndex());
-		if (pSprite->statnum == kStatDude && pSprite->type != kDudeBat && pSprite->type != kDudeRat && pSprite->type != kDudeInnocent && pSprite->type != kDudeBurningInnocent)
+		if (actor->spr.statnum == kStatDude && actor->spr.type != kDudeBat && actor->spr.type != kDudeRat && actor->spr.type != kDudeInnocent && actor->spr.type != kDudeBurningInnocent)
 			TotalKills++;
 	}
 }

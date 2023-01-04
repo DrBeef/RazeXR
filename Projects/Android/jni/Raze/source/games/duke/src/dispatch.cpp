@@ -70,8 +70,6 @@ void lotsofpaper_d(DDukeActor* s, int n);
 void lotsoffeathers_r(DDukeActor* s, int n);
 void guts_d(DDukeActor* s, int gtype, int n, int p);
 void guts_r(DDukeActor* s, int gtype, int n, int p);
-DDukeActor* ifhitsectors_d(int sectnum);
-DDukeActor* ifhitsectors_r(int sectnum);
 int ifhitbyweapon_r(DDukeActor* sn);
 int ifhitbyweapon_d(DDukeActor* sn);
 void fall_d(DDukeActor* i, int g_p);
@@ -80,8 +78,6 @@ bool spawnweapondebris_d(int picnum, int dnum);
 bool spawnweapondebris_r(int picnum, int dnum);
 void respawnhitag_d(DDukeActor* g_sp);
 void respawnhitag_r(DDukeActor* g_sp);
-void checktimetosleep_d(DDukeActor* actor);
-void checktimetosleep_r(DDukeActor* actor);
 void move_d(DDukeActor* i, int g_p, int g_x);
 void move_r(DDukeActor* i, int g_p, int g_x);
 void incur_damage_d(struct player_struct* p);
@@ -102,8 +98,8 @@ void displaymasks_d(int snum, int p, double smoothratio);
 void displaymasks_r(int snum, int p, double smoothratio);
 void think_d();
 void think_r();
-void animatesprites_d(spritetype* tsprite, int& spritesortcnt, int x, int y, int a, int smoothratio);
-void animatesprites_r(spritetype* tsprite, int& spritesortcnt, int x, int y, int a, int smoothratio);
+void animatesprites_d(tspritetype* tsprite, int& spritesortcnt, int x, int y, int a, int smoothratio);
+void animatesprites_r(tspritetype* tsprite, int& spritesortcnt, int x, int y, int a, int smoothratio);
 
 Dispatcher fi;
 
@@ -134,12 +130,10 @@ void SetDispatcher()
 		lotsofmail_d,
 		lotsofpaper_d,
 		guts_d,
-		ifhitsectors_d,
 		ifhitbyweapon_d,
 		fall_d,
 		spawnweapondebris_d,
 		respawnhitag_d,
-		checktimetosleep_d,
 		move_d,
 
 		incur_damage_d,
@@ -178,12 +172,10 @@ void SetDispatcher()
 		lotsoffeathers_r,
 		lotsoffeathers_r,
 		guts_r,
-		ifhitsectors_r,
 		ifhitbyweapon_r,
 		fall_r,
 		spawnweapondebris_r,
 		respawnhitag_r,
-		checktimetosleep_r,
 		move_r,
 
 		incur_damage_r,
@@ -206,14 +198,12 @@ int TILE_TREE2;
 int TILE_TIRE;
 int TILE_CONE;
 int TILE_W_FORCEFIELD;
-int TILE_CAMERA1;
 int TILE_SCRAP6;
 int TILE_APLAYER;
 int TILE_DRONE;
 int TILE_MENUSCREEN;
 int TILE_SCREENBORDER;
 int TILE_VIEWBORDER;
-int TILE_LASERLINE;
 int TILE_APLAYERTOP;
 int TILE_CAMCORNER;
 int TILE_CAMLIGHT;
@@ -222,7 +212,6 @@ int TILE_BOTTOMSTATUSBAR;
 int TILE_THREEDEE;
 int TILE_INGAMEDUKETHREEDEE;
 int TILE_ATOMICHEALTH;
-int TILE_FLOORSLIME;
 int TILE_JIBS6;
 int TILE_FIRE;
 int TILE_WATERBUBBLE;
@@ -247,8 +236,6 @@ int TILE_LA;
 int TILE_LOADSCREEN;
 int TILE_CROSSHAIR;
 int TILE_BIGORBIT1;
-int TILE_HURTRAIL;
-int TILE_FLOORPLASMA;
 int TILE_EGG;
 
 END_DUKE_NS

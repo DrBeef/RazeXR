@@ -206,7 +206,7 @@ struct ExpVal
 		int regtype = Type->GetRegType();
 		return regtype == REGT_INT ? !!Int : regtype == REGT_FLOAT ? Float!=0. : false;
 	}
-	
+
 	FName GetName() const
 	{
 		if (Type == TypeString)
@@ -325,7 +325,7 @@ protected:
 public:	
 	virtual ~FxExpression() {}
 	virtual FxExpression *Resolve(FCompileContext &ctx);
-	
+
 	virtual bool isConstant() const;
 	virtual bool RequestAddress(FCompileContext &ctx, bool *writable);
 	virtual PPrototype *ReturnProto();
@@ -336,7 +336,9 @@ public:
 	bool IsFloat() const { return ValueType->isFloat(); }
 	bool IsInteger() const { return ValueType->isNumeric() && ValueType->isIntCompatible(); }
 	bool IsPointer() const { return ValueType->isPointer(); }
-	bool IsVector() const { return ValueType == TypeVector2 || ValueType == TypeVector3; };
+	bool IsVector() const { return ValueType == TypeVector2 || ValueType == TypeVector3 || ValueType == TypeFVector2 || ValueType == TypeFVector3; };
+	bool IsVector2() const { return ValueType == TypeVector2 || ValueType == TypeFVector2; };
+	bool IsVector3() const { return ValueType == TypeVector3 || ValueType == TypeFVector3; };
 	bool IsBoolCompat() const { return ValueType->isScalar(); }
 	bool IsObject() const { return ValueType->isObjectPointer(); }
 	bool IsArray() const { return ValueType->isArray() || (ValueType->isPointer() && ValueType->toPointer()->PointedType->isArray()); }
@@ -525,7 +527,7 @@ public:
 		}
 		ValueType = value.Type = type;
 	}
-	
+
 	static FxExpression *MakeConstant(PSymbol *sym, const FScriptPosition &pos);
 
 	bool isConstant() const
@@ -1864,7 +1866,7 @@ protected:
 	: FxExpression(etype, pos)
 	{
 	}
-	
+
 	void Backpatch(VMFunctionBuilder *build, size_t loopstart, size_t loopend);
 	FxExpression *Resolve(FCompileContext&) final;
 	virtual FxExpression *DoResolve(FCompileContext&) = 0;

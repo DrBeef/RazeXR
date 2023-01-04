@@ -10,6 +10,8 @@
 #include "hw_bunchdrawer.h"
 //#include "r_viewpoint.h"
 
+EXTERN_CVAR(Int, hw_lightmode)
+
 enum EDrawMode
 {
 	DM_MAINVIEW,
@@ -34,7 +36,7 @@ class FRenderState;
 
 struct FRenderViewpoint
 {
-	spritetype* CameraSprite;
+	DCoreActor* CameraActor;
 	DVector3 Pos;
 	FRotator HWAngles;
 	FAngle FieldOfView;
@@ -53,12 +55,12 @@ struct FRenderViewpoint
 
 enum SectorRenderFlags
 {
-    // This is used to merge several subsectors into a single draw item
-    SSRF_RENDERFLOOR = 1,
-    SSRF_RENDERCEILING = 2,
-    SSRF_RENDERALL = 7,
-    SSRF_PROCESSED = 8,
-    SSRF_SEEN = 16,
+	// This is used to merge several subsectors into a single draw item
+	SSRF_RENDERFLOOR = 1,
+	SSRF_RENDERCEILING = 2,
+	SSRF_RENDERALL = 7,
+	SSRF_PROCESSED = 8,
+	SSRF_SEEN = 16,
 };
 
 enum EPortalClip
@@ -73,10 +75,12 @@ enum DrawListType
 	GLDL_PLAINWALLS,
 	GLDL_PLAINFLATS,
 	GLDL_MASKEDWALLS,
-	GLDL_MASKEDWALLSS,	// arbitrary wall sprites.
+	GLDL_MASKEDWALLSS,	// arbitrary wall sprites, not attached to walls
+	GLDL_MASKEDWALLSD,	// arbitrary wall sprites, attached to walls.
 	GLDL_MASKEDWALLSV,	// vertical wall sprites
 	GLDL_MASKEDWALLSH,  // horizontal wall sprites. These two lists merely exist for easier sorting.
 	GLDL_MASKEDFLATS,
+	GLDL_MASKEDSLOPEFLATS,
 	GLDL_MODELS,
 
 	GLDL_TRANSLUCENT,
@@ -108,22 +112,26 @@ struct HWDrawInfo
 	FRenderViewpoint Viewpoint;
 	HWViewpointUniforms VPUniforms;	// per-viewpoint uniform state
 	TArray<HWPortal *> Portals;
-	spritetype tsprite[MAXSPRITESONSCREEN];
+	tspritetype tsprite[MAXSPRITESONSCREEN];
 	int spritesortcnt;
+	TArray<FFlatVertex> SlopeSpriteVertices;	// we need to cache these in system memory in case of translucency splits.
 
 	// This is needed by the BSP traverser.
 	bool multithread;
 	bool ingeo;
 	FVector2 geoofs;
 
+	int rellight;
+	float visibility;
+
 private:
-    bool inview;
+	bool inview;
 	sectortype *currentsector;
 
 	void WorkerThread();
 
 	void UnclipSubsector(sectortype *sub);
-	
+
 	void AddLine(walltype *seg, bool portalclip);
 	void AddLines(sectortype* sector);
 	void AddSpecialPortalLines(sectortype * sector, walltype* line);
@@ -131,6 +139,13 @@ private:
 	//void RenderThings(sectortype * sub, sectortype * sector);
 	//void RenderParticles(sectortype *sub, sectortype *front);
 	void SetColor(FRenderState &state, int sectorlightlevel, int rellight, bool fullbright, const FColormap &cm, float alpha, bool weapon = false);
+	int CalcLightLevel(int lightlevel, int rellight, bool weapon, int blendfactor);
+	PalEntry CalcLightColor(int light, PalEntry pe, int blendfactor);
+	void SetShaderLight(FRenderState& state, float level, float olight);
+	void SetFog(FRenderState& state, int lightlevel, float visibility, bool fullbright, const FColormap* cmap, bool isadditive);
+
+	float GetFogDensity(int lightlevel, PalEntry fogcolor, int sectorfogdensity, int blendfactor);
+
 public:
 
 	void SetCameraPos(const DVector3 &pos)
@@ -167,6 +182,7 @@ public:
 	void EndDrawScene(FRenderState &state);
 	void Set3DViewport(FRenderState &state);
 	void ProcessScene(bool toscreen);
+	void SetVisibility();
 
 	//void GetDynSpriteLight(AActor *self, float x, float y, float z, FLightNode *node, int portalgroup, float *out);
 	//void GetDynSpriteLight(AActor *thing, particle_t *particle, float *out);
@@ -177,44 +193,30 @@ public:
 
 	void DrawPlayerSprites(bool hudModelStep, FRenderState &state);
 
-    //void AddSubsectorToPortal(FSectorPortalGroup *portal, sectortype *sub);
-    
-    void AddWall(HWWall *w);
-    void AddMirrorSurface(HWWall *w);
+	//void AddSubsectorToPortal(FSectorPortalGroup *portal, sectortype *sub);
+
+	void AddWall(HWWall *w);
+	void AddMirrorSurface(HWWall *w);
 	void AddFlat(HWFlat *flat);
 	void AddSprite(HWSprite *sprite, bool translucent);
 
 
-	bool isSoftwareLighting() const
-	{
-		return true;// lightmode == ELightMode::ZDoomSoftware || lightmode == ELightMode::DoomSoftware || lightmode == ELightMode::Build;
-	}
-
 	bool isBuildSoftwareLighting() const
 	{
-		return true;// lightmode == ELightMode::Build;
-	}
-
-	bool isDoomSoftwareLighting() const
-	{
-		return false;// lightmode == ELightMode::ZDoomSoftware || lightmode == ELightMode::DoomSoftware;
+		return hw_lightmode == 0 || hw_int_useindexedcolortextures;
 	}
 
 	bool isDarkLightMode() const
 	{
-		return false;// lightmode == ELightMode::Doom || lightmode == ELightMode::DoomDark;
+		return hw_lightmode == 2;
 	}
-
-	void SetFallbackLightMode()
-	{
-		//lightmode = ELightMode::Doom;
-	}
-
 };
 
 void CleanSWDrawer();
-//sectortype* RenderViewpoint(FRenderViewpoint& mainvp, AActor* camera, IntRect* bounds, float fov, float ratio, float fovratio, bool mainview, bool toscreen);
-//void WriteSavePic(player_t* player, FileWriter* file, int width, int height);
-//sectortype* RenderView(player_t* player);
+
+inline int hw_ClampLight(int lightlevel)
+{
+	return clamp(lightlevel, 0, 255);
+}
 
 

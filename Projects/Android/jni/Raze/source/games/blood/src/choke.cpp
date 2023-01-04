@@ -24,11 +24,16 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 #include "ns.h"	// Must come before everything else!
 
 #include "build.h"
-#include "compat.h"
 #include "blood.h"
 #include "choke.h"
 
 BEGIN_BLD_NS
+
+//---------------------------------------------------------------------------
+//
+//
+//
+//---------------------------------------------------------------------------
 
 void CChoke::init(int a1, void(*a2)(PLAYER*))
 {
@@ -44,6 +49,12 @@ void CChoke::init(int a1, void(*a2)(PLAYER*))
 		time = 0;
 	}
 }
+
+//---------------------------------------------------------------------------
+//
+//
+//
+//---------------------------------------------------------------------------
 
 void CChoke::animateChoke(int x, int y, int smoothratio)
 {
@@ -64,6 +75,12 @@ void CChoke::animateChoke(int x, int y, int smoothratio)
 	qav->Draw(vdi, 10, 0, 0, true);
 }
 
+
+//---------------------------------------------------------------------------
+//
+//
+//
+//---------------------------------------------------------------------------
 
 void chokeCallback(PLAYER* pPlayer)
 {

@@ -6,6 +6,43 @@ BEGIN_DUKE_NS
 
 // gamedef.c
 
+class DDukeActor;
+
+// Game vars can reference actors, we need a type-safe way to handle that so that index values won't get misappropriated and actors can be GC'd.
+class GameVarValue
+{
+	enum EType
+	{
+		Actor = 0,
+		Value = 1
+	};
+	union
+	{
+		DDukeActor* ActorP;
+		uint64_t index;
+	};
+
+public:
+	GameVarValue() = default;
+	explicit GameVarValue(DDukeActor* actor_) { ActorP = actor_; assert(isActor()); }
+	explicit GameVarValue(int val) { index = (val << 8) | Value; }
+
+	bool isActor() const { return (index & 7) == Actor; }
+	bool isValue() const { return (index & 7) == Value; }
+
+	DDukeActor* actor() { assert(isActor()); return GC::ReadBarrier(ActorP); }
+	int value() { assert(isValue()); return index >> 8; }
+	int safeValue() { return isValue() ? value() : actor() == nullptr ? 0 : -1; }	// return -1 for valid actors and 0 for null. This allows most comparisons to work.
+	DDukeActor* safeActor() { return isActor() ? actor() : nullptr; }
+
+	bool operator==(const GameVarValue& other) const { return index == other.index; }
+	bool operator!=(const GameVarValue& other) const { return index != other.index; }
+	void Mark()
+	{
+		if (isActor()) GC::Mark(ActorP);
+	}
+};
+
 enum
 {
 	// store global game definitions
@@ -37,21 +74,23 @@ enum
 	NAM_GRENADE_LIFETIME_VAR = 30,
 };
 
-extern int* aplWeaponClip[MAX_WEAPONS];		// number of items in clip
-extern int* aplWeaponReload[MAX_WEAPONS];		// delay to reload (include fire)
-extern int* aplWeaponFireDelay[MAX_WEAPONS];	// delay to fire
-extern int* aplWeaponHoldDelay[MAX_WEAPONS];	// delay after release fire button to fire (0 for none)
-extern int* aplWeaponTotalTime[MAX_WEAPONS];	// The total time the weapon is cycling before next fire.
-extern int* aplWeaponFlags[MAX_WEAPONS];		// Flags for weapon
-extern int* aplWeaponShoots[MAX_WEAPONS];		// what the weapon shoots
-extern int* aplWeaponSpawnTime[MAX_WEAPONS];	// the frame at which to spawn an item
-extern int* aplWeaponSpawn[MAX_WEAPONS];		// the item to spawn
-extern int* aplWeaponShotsPerBurst[MAX_WEAPONS];	// number of shots per 'burst' (one ammo per 'burst'
-extern int* aplWeaponWorksLike[MAX_WEAPONS];	// What original the weapon works like
-extern int* aplWeaponInitialSound[MAX_WEAPONS];	// Sound made when initialy firing. zero for no sound
-extern int* aplWeaponFireSound[MAX_WEAPONS];	// Sound made when firing (each time for automatic)
-extern int* aplWeaponSound2Time[MAX_WEAPONS];	// Alternate sound time
-extern int* aplWeaponSound2Sound[MAX_WEAPONS];	// Alternate sound sound ID
+// Keep the gory details away from the main game code.
+
+int aplWeaponClip(int weapon, int player);		// number of items in clip
+int aplWeaponReload(int weapon, int player);		// delay to reload (include fire)
+int aplWeaponFireDelay(int weapon, int player);	// delay to fire
+int aplWeaponHoldDelay(int weapon, int player);	// delay after release fire button to fire (0 for none)
+int aplWeaponTotalTime(int weapon, int player);	// The total time the weapon is cycling before next fire.
+int aplWeaponFlags(int weapon, int player);		// Flags for weapon
+int aplWeaponShoots(int weapon, int player);		// what the weapon shoots
+int aplWeaponSpawnTime(int weapon, int player);	// the frame at which to spawn an item
+int aplWeaponSpawn(int weapon, int player);		// the item to spawn
+int aplWeaponShotsPerBurst(int weapon, int player);	// number of shots per 'burst' (one ammo per 'burst'
+int aplWeaponWorksLike(int weapon, int player);	// What original the weapon works like
+int aplWeaponInitialSound(int weapon, int player);	// Sound made when initialy firing. zero for no sound
+int aplWeaponFireSound(int weapon, int player);	// Sound made when firing (each time for automatic)
+int aplWeaponSound2Time(int weapon, int player);	// Alternate sound time
+int aplWeaponSound2Sound(int weapon, int player);	// Alternate sound sound ID
 
 
 enum
@@ -89,19 +128,20 @@ enum
 };
 
 
-typedef struct
+struct MATTGAMEVAR
 {
 	union
 	{
-		int lValue;
+		GameVarValue lValue;
+		int indexValue;
 		int* plValue;
 		int (*getter)();
 	};
-	int defaultValue;
+	GameVarValue defaultValue;
+	GameVarValue initValue;	// this is what gets copied to players/actors upon spawn. This is not the same as the default!
 	unsigned int dwFlags;
 	char szLabel[MAXVARLABEL];
-	TArray<int> plArray;
-} MATTGAMEVAR;
+};
 
 extern MATTGAMEVAR aGameVars[MAXGAMEVARS];
 extern int iGameVarCount;
@@ -124,15 +164,21 @@ int GetDefID(const char *szGameLabel);
 void ClearGameVars(void);
 void AddSystemVars();
 void ResetGameVars(void);
-struct DDukeActor;
-int GetGameVarID(int id, DDukeActor* sActor, int sPlayer);
+class DDukeActor;
+class GameVarValue;
+GameVarValue GetGameVarID(int id, DDukeActor* sActor, int sPlayer);
+void SetGameVarID(int id, GameVarValue lValue, DDukeActor* sActor, int sPlayer);
+GameVarValue GetGameVar(const char* szGameLabel, GameVarValue lDefault, DDukeActor* sActor, int sPlayer);
+GameVarValue GetGameVar(const char* szGameLabel, int lDefault, DDukeActor* sActor, int sPlayer);
 void SetGameVarID(int id, int lValue, DDukeActor* sActor, int sPlayer);
-int GetGameVar(const char* szGameLabel, int lDefault, DDukeActor* sActor, int sPlayer);
+void SetGameVarID(int id, DDukeActor* lValue, DDukeActor* sActor, int sPlayer);
+
 
 void ClearGameEvents();
 bool IsGameEvent(int i);
 void InitGameVarPointers(void);
-void ResetSystemDefaults(void);
+void FinalizeGameVars(void);
+void SetupGameVarsForActor(DDukeActor* actor);
 
 
 

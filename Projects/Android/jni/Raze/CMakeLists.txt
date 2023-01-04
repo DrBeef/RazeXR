@@ -237,11 +237,11 @@ if( MSVC )
 
 	# Disable warnings for unsecure CRT functions from VC8+
 	set( ALL_C_FLAGS "${ALL_C_FLAGS} /DUNICODE /D_UNICODE /D_WIN32_WINNT=0x0600 /D_CRT_SECURE_NO_DEPRECATE /D_CRT_SECURE_NO_WARNINGS /D_CRT_NONSTDC_NO_WARNINGS" )
-	
+
 	# These must be silenced because the code is full of them. Expect some of undefined behavior hidden in this mess. :(
 	#set( ALL_C_FLAGS "${ALL_C_FLAGS} /wd4244 /wd4018 /wd4267" )
-	
-	
+
+
 	# Most of these need to be cleaned out. The source is currently infested with far too much conditional compilation which is a constant source of problems.
 	set( ALL_C_FLAGS "${ALL_C_FLAGS} /DUSE_OPENGL=1 /DNOASM=1 /DWIN32" )
 
@@ -327,6 +327,11 @@ if (HAVE_VULKAN)
 	add_subdirectory( libraries/glslang/OGLCompilersDLL )
 endif()
 
+add_subdirectory( libraries/discordrpc )
+set( DRPC_INCLUDE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/libraries/discordrpc/include" )
+set( DRPC_LIBRARIES discord-rpc )
+set( DRPC_LIBRARY discord-rpc )
+
 if( ZLIB_FOUND AND NOT FORCE_INTERNAL_ZLIB )
 	message( STATUS "Using system zlib, includes found at ${ZLIB_INCLUDE_DIR}" )
 else()
@@ -374,6 +379,12 @@ else()
 	set( JPEG_LIBRARIES jpeg )
 	set( JPEG_LIBRARY jpeg )
 endif()
+
+add_subdirectory( libraries/libtess )
+set( TESS_INCLUDE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/libraries/libtess/Include )
+set( TESS_LIBRARIES tess2 )
+set( TESS_LIBRARY tess2 )
+
 
 if( BZIP2_FOUND AND NOT FORCE_INTERNAL_BZIP2 )
 	message( STATUS "Using system bzip2 library, includes found at ${BZIP2_INCLUDE_DIR}" )

@@ -38,36 +38,32 @@ void precache()
 {
     if (!r_precache) return;
 
-    int i;
-
-    for (i = 0; i < numsectors; i++)
+    for (auto& sect: sector)
     {
-        auto sectp = &sector[i];
-        int j = sectp->ceilingpicnum;
-        markTileForPrecache(j, sectp->ceilingpal);
+        int j = sect.ceilingpicnum;
+        markTileForPrecache(j, sect.ceilingpal);
         if (picanm[j].sf & PICANM_ANIMTYPE_MASK)
-            for (int k = 1; k <= picanm[j].num; k++)  markTileForPrecache(j + k, sectp->ceilingpal);
+            for (int k = 1; k <= picanm[j].num; k++)  markTileForPrecache(j + k, sect.ceilingpal);
 
-        j = sectp->floorpicnum;
-        markTileForPrecache(j, sectp->floorpal);
+        j = sect.floorpicnum;
+        markTileForPrecache(j, sect.floorpal);
         if (picanm[j].sf & PICANM_ANIMTYPE_MASK)
-            for (int k = 1; k <= picanm[j].num; k++)  markTileForPrecache(j + k, sectp->floorpal);
+            for (int k = 1; k <= picanm[j].num; k++)  markTileForPrecache(j + k, sect.floorpal);
     }
 
-    for (i = 0; i < numwalls; i++)
+    for(auto& wal : wall)
     {
-        auto wallp = &wall[i];
-        int j = wallp->picnum;
-        markTileForPrecache(j, wallp->pal);
+        int j = wal.picnum;
+        markTileForPrecache(j, wal.pal);
         if (picanm[j].sf & PICANM_ANIMTYPE_MASK)
-            for (int k = 1; k <= picanm[j].num; k++)  markTileForPrecache(j + k, wallp->pal);
+            for (int k = 1; k <= picanm[j].num; k++)  markTileForPrecache(j + k, wal.pal);
 
-        if (wallp->nextsector != -1)
+        if (wal.twoSided())
         {
-            int j = wallp->overpicnum;
-            markTileForPrecache(j, wallp->pal);
+            j = wal.overpicnum;
+            markTileForPrecache(j, wal.pal);
             if (picanm[j].sf & PICANM_ANIMTYPE_MASK)
-                for (int k = 1; k <= picanm[j].num; k++)  markTileForPrecache(j + k, wallp->pal);
+                for (int k = 1; k <= picanm[j].num; k++)  markTileForPrecache(j + k, wal.pal);
 
         }
     }
@@ -75,11 +71,10 @@ void precache()
 	ExhumedSpriteIterator it;
 	while (auto ac = it.Next())
     {
-		auto sp = &ac->s();
-        int j = sp->picnum;
-        markTileForPrecache(j, sp->pal);
+        int j = ac->spr.picnum;
+        markTileForPrecache(j, ac->spr.pal);
         if (picanm[j].sf & PICANM_ANIMTYPE_MASK)
-            for (int k = 1; k <= picanm[j].num; k++)  markTileForPrecache(j + k, sp->pal);
+            for (int k = 1; k <= picanm[j].num; k++)  markTileForPrecache(j + k, ac->spr.pal);
     }
     precacheMarkedTiles();
 }

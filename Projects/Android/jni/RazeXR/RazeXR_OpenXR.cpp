@@ -212,8 +212,6 @@ void VR_GetMove(float *joy_forward, float *joy_side, float *hmd_forward, float *
 	*roll = cinemamode ? 0.0f : hmdorientation[ROLL];
 }
 
-void VR_DoomMain(int argc, char** argv);
-
 void VR_Init()
 {
 	//Initialise all our variables
@@ -258,8 +256,7 @@ void * AppThreadFunction(void * parm ) {
 	//Set device defaults
 	if (SS_MULTIPLIER == 0.0f)
 	{
-		//GB Override as refresh is now 72 by default as we decided a higher res is better as 90hz has stutters
-		SS_MULTIPLIER = 1.25f;
+		SS_MULTIPLIER = 1.0f;
 	}
 	else if (SS_MULTIPLIER > 1.5f)
 	{

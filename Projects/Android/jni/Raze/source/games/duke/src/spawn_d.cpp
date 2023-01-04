@@ -41,138 +41,134 @@ source as it is released.
 BEGIN_DUKE_NS
 
 
-DDukeActor* spawninit_d(DDukeActor* actj, DDukeActor* act)
+DDukeActor* spawninit_d(DDukeActor* actj, DDukeActor* act, TArray<DDukeActor*>* actors)
 {
-	auto sp = act->s;
-	auto spj = actj == nullptr ? nullptr : actj->s;
-	auto t = act->temp_data;
-	auto sectp = sp->sector();
-
+	auto sectp = act->sector();
 
 	if (isWorldTour())
 	{
-		switch (sp->picnum)
+		switch (act->spr.picnum)
 		{
 		case BOSS2STAYPUT:
 		case BOSS3STAYPUT:
 		case BOSS5STAYPUT:
-			act->actorstayput = sp->sector();
+			act->actorstayput = act->sector();
 			[[fallthrough]];
 		case FIREFLY:
 		case BOSS5:
-			if (sp->picnum != FIREFLY)
+			if (act->spr.picnum != FIREFLY)
 			{
-				if (spj && spj->picnum == RESPAWN)
-					sp->pal = spj->pal;
-				if (sp->pal != 0)
+				if (actj && actj->spr.picnum == RESPAWN)
+					act->spr.pal = actj->spr.pal;
+				if (act->spr.pal != 0)
 				{
-					sp->clipdist = 80;
-					sp->xrepeat = 40;
-					sp->yrepeat = 40;
+					act->spr.clipdist = 80;
+					act->spr.xrepeat = 40;
+					act->spr.yrepeat = 40;
 				}
 				else
 				{
-					sp->xrepeat = 80;
-					sp->yrepeat = 80;
-					sp->clipdist = 164;
+					act->spr.xrepeat = 80;
+					act->spr.yrepeat = 80;
+					act->spr.clipdist = 164;
 				}
 			}
 			else
 			{
-				sp->xrepeat = 40;
-				sp->yrepeat = 40;
-				sp->clipdist = 80;
+				act->spr.xrepeat = 40;
+				act->spr.yrepeat = 40;
+				act->spr.clipdist = 80;
 			}
 
-			if (spj)
-				sp->lotag = 0;
+			if (actj)
+				act->spr.lotag = 0;
 
-			if ((sp->lotag > ud.player_skill) || ud.monsters_off)
+			if ((act->spr.lotag > ud.player_skill) || ud.monsters_off)
 			{
-				sp->xrepeat = sp->yrepeat = 0;
-				changeactorstat(act, STAT_MISC);
+				act->spr.xrepeat = act->spr.yrepeat = 0;
+				ChangeActorStat(act, STAT_MISC);
 				break;
 			}
 			else
 			{
 				makeitfall(act);
 
-				sp->cstat |= 257;
+				act->spr.cstat |= CSTAT_SPRITE_BLOCK_ALL;
 				ps[connecthead].max_actors_killed++;
 
-				if (spj) {
+				if (actj) {
 					act->timetosleep = 0;
 					check_fta_sounds_d(act);
-					changeactorstat(act, 1);
+					ChangeActorStat(act, 1);
 				}
 				else
-					changeactorstat(act, 2);
+					ChangeActorStat(act, 2);
 			}
 			return act;
 		case FIREFLYFLYINGEFFECT:
 			act->SetOwner(actj);
-			changeactorstat(act, STAT_MISC);
-			sp->xrepeat = 16;
-			sp->yrepeat = 16;
+			ChangeActorStat(act, STAT_MISC);
+			act->spr.xrepeat = 16;
+			act->spr.yrepeat = 16;
 			return act;
 		case LAVAPOOLBUBBLE:
-			if (spj->xrepeat < 30)
+			if (actj->spr.xrepeat < 30)
 				return act;
 			act->SetOwner(actj);
-			changeactorstat(act, STAT_MISC);
-			sp->x += krand() % 512 - 256;
-			sp->y += krand() % 512 - 256;
-			sp->xrepeat = 16;
-			sp->yrepeat = 16;
+			ChangeActorStat(act, STAT_MISC);
+			act->spr.pos.X += krand() % 512 - 256;
+			act->spr.pos.Y += krand() % 512 - 256;
+			act->spr.xrepeat = 16;
+			act->spr.yrepeat = 16;
 			return act;
 		case WHISPYSMOKE:
-			changeactorstat(act, STAT_MISC);
-			sp->x += krand() % 256 - 128;
-			sp->y += krand() % 256 - 128;
-			sp->xrepeat = 20;
-			sp->yrepeat = 20;
+			ChangeActorStat(act, STAT_MISC);
+			act->spr.pos.X += krand() % 256 - 128;
+			act->spr.pos.Y += krand() % 256 - 128;
+			act->spr.xrepeat = 20;
+			act->spr.yrepeat = 20;
 			return act;
 		case SERIOUSSAM:
-			changeactorstat(act, 2);
-			sp->cstat = 257;
-			sp->extra = 150;
+			ChangeActorStat(act, 2);
+			act->spr.cstat = CSTAT_SPRITE_BLOCK_ALL;
+			act->spr.extra = 150;
 			return act;
 		}
 	}
 
-	switch (sp->picnum)
+	switch (act->spr.picnum)
 	{
 	default:
 		spawninitdefault(actj, act);
 		break;
 	case FOF:
-		sp->xrepeat = sp->yrepeat = 0;
-		changeactorstat(act, STAT_MISC);
+		act->spr.xrepeat = act->spr.yrepeat = 0;
+		ChangeActorStat(act, STAT_MISC);
 		break;
 	case WATERSPLASH2:
-		if (spj)
+		if (actj)
 		{
-			setsprite(act, spj->x, spj->y, spj->z);
-			sp->xrepeat = sp->yrepeat = 8 + (krand() & 7);
+			SetActor(act, actj->spr.pos);
+			act->spr.xrepeat = act->spr.yrepeat = 8 + (krand() & 7);
 		}
-		else sp->xrepeat = sp->yrepeat = 16 + (krand() & 15);
+		else act->spr.xrepeat = act->spr.yrepeat = 16 + (krand() & 15);
 
-		sp->shade = -16;
-		sp->cstat |= 128;
-		if (spj)
+		act->spr.shade = -16;
+		act->spr.cstat |= CSTAT_SPRITE_YCENTER;
+		if (actj)
 		{
-			if (spj->sector()->lotag == 2)
+			if (actj->sector()->lotag == 2)
 			{
-				sp->z = getceilzofslope(sp->sectnum, sp->x, sp->y) + (16 << 8);
-				sp->cstat |= 8;
+				act->spr.pos.Z = getceilzofslopeptr(act->sector(), act->spr.pos.X, act->spr.pos.Y) + (16 << 8);
+				act->spr.cstat |= CSTAT_SPRITE_YFLIP;
 			}
-			else if (spj->sector()->lotag == 1)
-				sp->z = getflorzofslope(sp->sectnum, sp->x, sp->y);
+			else if (actj->sector()->lotag == 1)
+				act->spr.pos.Z = getflorzofslopeptr(act->sector(), act->spr.pos.X, act->spr.pos.Y);
 		}
 
 		if (sectp->floorpicnum == FLOORSLIME ||
 			sectp->ceilingpicnum == FLOORSLIME)
-			sp->pal = 7;
+			act->spr.pal = 7;
 		[[fallthrough]];
 	case NEON1:
 	case NEON2:
@@ -181,12 +177,12 @@ DDukeActor* spawninit_d(DDukeActor* actj, DDukeActor* act)
 	case NEON5:
 	case NEON6:
 	case DOMELITE:
-		if (sp->picnum != WATERSPLASH2)
-			sp->cstat |= 257;
+		if (act->spr.picnum != WATERSPLASH2)
+			act->spr.cstat |= CSTAT_SPRITE_BLOCK_ALL;
 		[[fallthrough]];
 	case NUKEBUTTON:
-		if (sp->picnum == DOMELITE)
-			sp->cstat |= 257;
+		if (act->spr.picnum == DOMELITE)
+			act->spr.cstat |= CSTAT_SPRITE_BLOCK_ALL;
 		[[fallthrough]];
 	case JIBS1:
 	case JIBS2:
@@ -203,75 +199,75 @@ DDukeActor* spawninit_d(DDukeActor* actj, DDukeActor* act)
 	case DUKETORSO:
 	case DUKEGUN:
 	case DUKELEG:
-		changeactorstat(act, STAT_MISC);
+		ChangeActorStat(act, STAT_MISC);
 		break;
 	case TONGUE:
-		if (spj)
-			sp->ang = spj->ang;
-		sp->z -= PHEIGHT_DUKE;
-		sp->zvel = 256 - (krand() & 511);
-		sp->xvel = 64 - (krand() & 127);
-		changeactorstat(act, 4);
+		if (actj)
+			act->spr.ang = actj->spr.ang;
+		act->spr.pos.Z -= PHEIGHT_DUKE;
+		act->spr.zvel = 256 - (krand() & 511);
+		act->spr.xvel = 64 - (krand() & 127);
+		ChangeActorStat(act, 4);
 		break;
 	case NATURALLIGHTNING:
-		sp->cstat &= ~257;
-		sp->cstat |= 32768;
+		act->spr.cstat &= ~CSTAT_SPRITE_BLOCK_ALL;
+		act->spr.cstat |= CSTAT_SPRITE_INVISIBLE;
 		break;
 	case TRANSPORTERSTAR:
 	case TRANSPORTERBEAM:
-		spawntransporter(actj, act, sp->picnum == TRANSPORTERBEAM);
+		spawntransporter(actj, act, act->spr.picnum == TRANSPORTERBEAM);
 		break;
 
 	case FRAMEEFFECT1:
-		if (spj)
+		if (actj)
 		{
-			sp->xrepeat = spj->xrepeat;
-			sp->yrepeat = spj->yrepeat;
-			t[1] = spj->picnum;
+			act->spr.xrepeat = actj->spr.xrepeat;
+			act->spr.yrepeat = actj->spr.yrepeat;
+			act->temp_data[1] = actj->spr.picnum;
 		}
-		else sp->xrepeat = sp->yrepeat = 0;
+		else act->spr.xrepeat = act->spr.yrepeat = 0;
 
-		changeactorstat(act, STAT_MISC);
+		ChangeActorStat(act, STAT_MISC);
 
 		break;
 
 	case LASERLINE:
-		sp->yrepeat = 6;
-		sp->xrepeat = 32;
+		act->spr.yrepeat = 6;
+		act->spr.xrepeat = 32;
 
 		if (gs.lasermode == 1)
-			sp->cstat = 16 + 2;
+			act->spr.cstat = CSTAT_SPRITE_ALIGNMENT_WALL | CSTAT_SPRITE_TRANSLUCENT;
 		else if (gs.lasermode == 0 || gs.lasermode == 2)
-			sp->cstat = 16;
+			act->spr.cstat = CSTAT_SPRITE_ALIGNMENT_WALL;
 		else
 		{
-			sp->xrepeat = 0;
-			sp->yrepeat = 0;
+			act->spr.xrepeat = 0;
+			act->spr.yrepeat = 0;
 		}
 
-		if (spj) sp->ang = actj->temp_data[5] + 512;
-		changeactorstat(act, STAT_MISC);
+		if (actj) act->spr.ang = actj->temp_data[5] + 512;
+		ChangeActorStat(act, STAT_MISC);
 		break;
 
 	case FORCESPHERE:
-		if (!spj)
+		if (!actj)
 		{
-			sp->cstat = 32768;
-			changeactorstat(act, 2);
+			act->spr.cstat = CSTAT_SPRITE_INVISIBLE;
+			ChangeActorStat(act, 2);
 		}
 		else
 		{
-			sp->xrepeat = sp->yrepeat = 1;
-			changeactorstat(act, STAT_MISC);
+			act->spr.xrepeat = act->spr.yrepeat = 1;
+			ChangeActorStat(act, STAT_MISC);
 		}
 		break;
 
 	case BLOOD:
-		sp->xrepeat = sp->yrepeat = 16;
-		sp->z -= (26 << 8);
-		if (spj && spj->pal == 6)
-			sp->pal = 6;
-		changeactorstat(act, STAT_MISC);
+		act->spr.xrepeat = act->spr.yrepeat = 16;
+		act->spr.pos.Z -= (26 << 8);
+		if (actj && actj->spr.pal == 6)
+			act->spr.pal = 6;
+		ChangeActorStat(act, STAT_MISC);
 		break;
 	case LAVAPOOL:
 		if (!isWorldTour()) // Twentieth Anniversary World Tour
@@ -282,80 +278,80 @@ DDukeActor* spawninit_d(DDukeActor* actj, DDukeActor* act)
 	case PUKE:
 		if (spawnbloodpoolpart1(act)) break;
 
-		if (spj && sp->picnum != PUKE)
+		if (actj && act->spr.picnum != PUKE)
 		{
-			if (spj->pal == 1)
-				sp->pal = 1;
-			else if (spj->pal != 6 && spj->picnum != NUKEBARREL && spj->picnum != TIRE)
+			if (actj->spr.pal == 1)
+				act->spr.pal = 1;
+			else if (actj->spr.pal != 6 && actj->spr.picnum != NUKEBARREL && actj->spr.picnum != TIRE)
 			{
-				if (spj->picnum == FECES)
-					sp->pal = 7; // Brown
-				else sp->pal = 2; // Red
+				if (actj->spr.picnum == FECES)
+					act->spr.pal = 7; // Brown
+				else act->spr.pal = 2; // Red
 			}
-			else sp->pal = 0;  // green
+			else act->spr.pal = 0;  // green
 
-			if (spj->picnum == TIRE)
-				sp->shade = 127;
+			if (actj->spr.picnum == TIRE)
+				act->spr.shade = 127;
 		}
-		sp->cstat |= 32;
-		if (sp->picnum == LAVAPOOL)  // Twentieth Anniversary World Tour
+		act->spr.cstat |= CSTAT_SPRITE_ALIGNMENT_FLOOR;
+		if (act->spr.picnum == LAVAPOOL)  // Twentieth Anniversary World Tour
 		{
-			int fz = getflorzofslope(sp->sectnum, sp->x, sp->y);
-			if (fz != sp->z)
-				sp->z = fz;
-			sp->z -= 200;
+			int fz = getflorzofslopeptr(act->sector(), act->spr.pos.X, act->spr.pos.Y);
+			if (fz != act->spr.pos.Z)
+				act->spr.pos.Z = fz;
+			act->spr.pos.Z -= 200;
 		}
 		[[fallthrough]];
 
 	case FECES:
-		if (spj)
-			sp->xrepeat = sp->yrepeat = 1;
-		changeactorstat(act, STAT_MISC);
+		if (actj)
+			act->spr.xrepeat = act->spr.yrepeat = 1;
+		ChangeActorStat(act, STAT_MISC);
 		break;
 
 	case BLOODSPLAT1:
 	case BLOODSPLAT2:
 	case BLOODSPLAT3:
 	case BLOODSPLAT4:
-		sp->cstat |= 16;
-		sp->xrepeat = 7 + (krand() & 7);
-		sp->yrepeat = 7 + (krand() & 7);
-		sp->z -= (16 << 8);
-		if (spj && spj->pal == 6)
-			sp->pal = 6;
+		act->spr.cstat |= CSTAT_SPRITE_ALIGNMENT_WALL;
+		act->spr.xrepeat = 7 + (krand() & 7);
+		act->spr.yrepeat = 7 + (krand() & 7);
+		act->spr.pos.Z -= (16 << 8);
+		if (actj && actj->spr.pal == 6)
+			act->spr.pal = 6;
 		insertspriteq(act);
-		changeactorstat(act, STAT_MISC);
+		ChangeActorStat(act, STAT_MISC);
 		break;
 
 	case TRIPBOMB:
-		if (sp->lotag > ud.player_skill)
+		if (act->spr.lotag > ud.player_skill)
 		{
-			sp->xrepeat = sp->yrepeat = 0;
-			changeactorstat(act, STAT_MISC);
+			act->spr.xrepeat = act->spr.yrepeat = 0;
+			ChangeActorStat(act, STAT_MISC);
 			break;
 		}
 
-		sp->xrepeat = 4;
-		sp->yrepeat = 5;
+		act->spr.xrepeat = 4;
+		act->spr.yrepeat = 5;
 
 		act->SetOwner(act);
 		ud.bomb_tag = (ud.bomb_tag + 1) & 32767;
-		sp->hitag = ud.bomb_tag;
+		act->spr.hitag = ud.bomb_tag;
 
-		sp->xvel = 16;
+		act->spr.xvel = 16;
 		ssp(act, CLIPMASK0);
 		act->temp_data[0] = 17;
 		act->temp_data[2] = 0;
-		act->temp_data[5] = sp->ang;
+		act->temp_data[5] = act->spr.ang;
 		[[fallthrough]];
 
 	case SPACEMARINE:
-		if (sp->picnum == SPACEMARINE)
+		if (act->spr.picnum == SPACEMARINE)
 		{
-			sp->extra = 20;
-			sp->cstat |= 257;
+			act->spr.extra = 20;
+			act->spr.cstat |= CSTAT_SPRITE_BLOCK_ALL;
 		}
-		changeactorstat(act, 2);
+		ChangeActorStat(act, 2);
 		break;
 
 	case HYDRENT:
@@ -423,26 +419,26 @@ DDukeActor* spawninit_d(DDukeActor* actj, DDukeActor* act)
 	case PIPE4:
 	case PIPE5:
 	case PIPE6:
-		sp->clipdist = 32;
-		sp->cstat |= 257;
+		act->spr.clipdist = 32;
+		act->spr.cstat |= CSTAT_SPRITE_BLOCK_ALL;
 		[[fallthrough]];
 	case OCEANSPRITE4:
-		changeactorstat(act, 0);
+		ChangeActorStat(act, 0);
 		break;
 	case FEMMAG1:
 	case FEMMAG2:
-		sp->cstat &= ~257;
-		changeactorstat(act, 0);
+		act->spr.cstat &= ~CSTAT_SPRITE_BLOCK_ALL;
+		ChangeActorStat(act, 0);
 		break;
 	case DUKETAG:
 	case SIGN1:
 	case SIGN2:
-		if (ud.multimode < 2 && sp->pal)
+		if (ud.multimode < 2 && act->spr.pal)
 		{
-			sp->xrepeat = sp->yrepeat = 0;
-			changeactorstat(act, STAT_MISC);
+			act->spr.xrepeat = act->spr.yrepeat = 0;
+			ChangeActorStat(act, STAT_MISC);
 		}
-		else sp->pal = 0;
+		else act->spr.pal = 0;
 		break;
 	case MASKWALL1:
 	case MASKWALL2:
@@ -460,9 +456,9 @@ DDukeActor* spawninit_d(DDukeActor* actj, DDukeActor* act)
 	case MASKWALL14:
 	case MASKWALL15:
 	{
-		int j = sp->cstat & 60;
-		sp->cstat = j | 1;
-		changeactorstat(act, 0);
+		auto j = act->spr.cstat & (CSTAT_SPRITE_ALIGNMENT_MASK | CSTAT_SPRITE_XFLIP | CSTAT_SPRITE_YFLIP);
+		act->spr.cstat = j | CSTAT_SPRITE_BLOCK;
+		ChangeActorStat(act, 0);
 		break;
 	}
 	case FOOTPRINTS:
@@ -486,9 +482,9 @@ DDukeActor* spawninit_d(DDukeActor* actj, DDukeActor* act)
 	case NAKED1:
 	case STATUE:
 	case TOUGHGAL:
-		sp->yvel = sp->hitag;
-		sp->hitag = -1;
-		if (sp->picnum == PODFEM1) sp->extra <<= 1;
+		act->spr.yvel = act->spr.hitag;
+		act->spr.hitag = -1;
+		if (act->spr.picnum == PODFEM1) act->spr.extra <<= 1;
 		[[fallthrough]];
 
 	case BLOODYPOLE:
@@ -496,106 +492,106 @@ DDukeActor* spawninit_d(DDukeActor* actj, DDukeActor* act)
 	case QUEBALL:
 	case STRIPEBALL:
 
-		if (sp->picnum == QUEBALL || sp->picnum == STRIPEBALL)
+		if (act->spr.picnum == QUEBALL || act->spr.picnum == STRIPEBALL)
 		{
-			sp->cstat = 256;
-			sp->clipdist = 8;
+			act->spr.cstat = CSTAT_SPRITE_BLOCK_HITSCAN;
+			act->spr.clipdist = 8;
 		}
 		else
 		{
-			sp->cstat |= 257;
-			sp->clipdist = 32;
+			act->spr.cstat |= CSTAT_SPRITE_BLOCK_ALL;
+			act->spr.clipdist = 32;
 		}
 
-		changeactorstat(act, 2);
+		ChangeActorStat(act, 2);
 		break;
 
 	case DUKELYINGDEAD:
-		if (spj && spj->picnum == APLAYER)
+		if (actj && actj->spr.picnum == APLAYER)
 		{
-			sp->xrepeat = spj->xrepeat;
-			sp->yrepeat = spj->yrepeat;
-			sp->shade = spj->shade;
-			sp->pal = ps[spj->yvel].palookup;
+			act->spr.xrepeat = actj->spr.xrepeat;
+			act->spr.yrepeat = actj->spr.yrepeat;
+			act->spr.shade = actj->spr.shade;
+			act->spr.pal = ps[actj->spr.yvel].palookup;
 		}
 		[[fallthrough]];
 	case DUKECAR:
 	case HELECOPT:
-		//                if(sp->picnum == HELECOPT || sp->picnum == DUKECAR) sp->xvel = 1024;
-		sp->cstat = 0;
-		sp->extra = 1;
-		sp->xvel = 292;
-		sp->zvel = 360;
+		//                if(act->spr.picnum == HELECOPT || act->spr.picnum == DUKECAR) act->spr.xvel = 1024;
+		act->spr.cstat = 0;
+		act->spr.extra = 1;
+		act->spr.xvel = 292;
+		act->spr.zvel = 360;
 		[[fallthrough]];
 	case RESPAWNMARKERRED:
 	case BLIMP:
 
-		if (sp->picnum == RESPAWNMARKERRED)
+		if (act->spr.picnum == RESPAWNMARKERRED)
 		{
-			sp->xrepeat = sp->yrepeat = 24;
-			if (spj) sp->z = actj->floorz; // -(1<<4);
+			act->spr.xrepeat = act->spr.yrepeat = 24;
+			if (actj) act->spr.pos.Z = actj->floorz; // -(1<<4);
 		}
 		else
 		{
-			sp->cstat |= 257;
-			sp->clipdist = 128;
+			act->spr.cstat |= CSTAT_SPRITE_BLOCK_ALL;
+			act->spr.clipdist = 128;
 		}
 		[[fallthrough]];
 	case MIKE:
-		if (sp->picnum == MIKE)
-			sp->yvel = sp->hitag;
+		if (act->spr.picnum == MIKE)
+			act->spr.yvel = act->spr.hitag;
 		[[fallthrough]];
 	case WEATHERWARN:
-		changeactorstat(act, 1);
+		ChangeActorStat(act, 1);
 		break;
 
 	case SPOTLITE:
-		t[0] = sp->x;
-		t[1] = sp->y;
+		act->temp_data[0] = act->spr.pos.X;
+		act->temp_data[1] = act->spr.pos.Y;
 		break;
 	case BULLETHOLE:
-		sp->xrepeat = sp->yrepeat = 3;
-		sp->cstat = 16 + (krand() & 12);
+		act->spr.xrepeat = act->spr.yrepeat = 3;
+		act->spr.cstat = CSTAT_SPRITE_ALIGNMENT_WALL | randomFlip();
 		insertspriteq(act);
 		[[fallthrough]];
 	case MONEY:
 	case MAIL:
 	case PAPER:
-		if (sp->picnum == MONEY || sp->picnum == MAIL || sp->picnum == PAPER)
+		if (act->spr.picnum == MONEY || act->spr.picnum == MAIL || act->spr.picnum == PAPER)
 		{
 			act->temp_data[0] = krand() & 2047;
-			sp->cstat = krand() & 12;
-			sp->xrepeat = sp->yrepeat = 8;
-			sp->ang = krand() & 2047;
+			act->spr.cstat = randomFlip();
+			act->spr.xrepeat = act->spr.yrepeat = 8;
+			act->spr.ang = krand() & 2047;
 		}
-		changeactorstat(act, STAT_MISC);
+		ChangeActorStat(act, STAT_MISC);
 		break;
 
 	case VIEWSCREEN:
 	case VIEWSCREEN2:
 		act->SetOwner(act);
-		sp->lotag = 1;
-		sp->extra = 1;
-		changeactorstat(act, 6);
+		act->spr.lotag = 1;
+		act->spr.extra = 1;
+		ChangeActorStat(act, 6);
 		break;
 
 	case SHELL: //From the player
 	case SHOTGUNSHELL:
-		initshell(actj, act, sp->picnum == SHELL);
+		initshell(actj, act, act->spr.picnum == SHELL);
 		break;
 
 	case RESPAWN:
-		sp->extra = 66 - 13;
+		act->spr.extra = 66 - 13;
 		[[fallthrough]];
 	case MUSICANDSFX:
-		if (ud.multimode < 2 && sp->pal == 1)
+		if (ud.multimode < 2 && act->spr.pal == 1)
 		{
-			sp->xrepeat = sp->yrepeat = 0;
-			changeactorstat(act, STAT_MISC);
+			act->spr.xrepeat = act->spr.yrepeat = 0;
+			ChangeActorStat(act, STAT_MISC);
 			break;
 		}
-		sp->cstat = 32768;
-		changeactorstat(act, 11);
+		act->spr.cstat = CSTAT_SPRITE_INVISIBLE;
+		ChangeActorStat(act, 11);
 		break;
 
 	case ONFIRE:
@@ -611,92 +607,92 @@ DDukeActor* spawninit_d(DDukeActor* actj, DDukeActor* act)
 	case SHRINKEREXPLOSION:
 	case COOLEXPLOSION1:
 
-		if (spj)
+		if (actj)
 		{
-			sp->ang = spj->ang;
-			sp->shade = -64;
-			sp->cstat = 128 | (krand() & 4);
+			act->spr.ang = actj->spr.ang;
+			act->spr.shade = -64;
+			act->spr.cstat = CSTAT_SPRITE_YCENTER | randomXFlip();
 		}
 
-		if (sp->picnum == EXPLOSION2 || sp->picnum == EXPLOSION2BOT)
+		if (act->spr.picnum == EXPLOSION2 || act->spr.picnum == EXPLOSION2BOT)
 		{
-			sp->xrepeat = 48;
-			sp->yrepeat = 48;
-			sp->shade = -127;
-			sp->cstat |= 128;
+			act->spr.xrepeat = 48;
+			act->spr.yrepeat = 48;
+			act->spr.shade = -127;
+			act->spr.cstat |= CSTAT_SPRITE_YCENTER;
 		}
-		else if (sp->picnum == SHRINKEREXPLOSION)
+		else if (act->spr.picnum == SHRINKEREXPLOSION)
 		{
-			sp->xrepeat = 32;
-			sp->yrepeat = 32;
+			act->spr.xrepeat = 32;
+			act->spr.yrepeat = 32;
 		}
-		else if (sp->picnum == SMALLSMOKE || sp->picnum == ONFIRE)
+		else if (act->spr.picnum == SMALLSMOKE || act->spr.picnum == ONFIRE)
 		{
 			// 64 "money"
-			sp->xrepeat = 24;
-			sp->yrepeat = 24;
+			act->spr.xrepeat = 24;
+			act->spr.yrepeat = 24;
 		}
-		else if (sp->picnum == BURNING || sp->picnum == BURNING2)
+		else if (act->spr.picnum == BURNING || act->spr.picnum == BURNING2)
 		{
-			sp->xrepeat = 4;
-			sp->yrepeat = 4;
+			act->spr.xrepeat = 4;
+			act->spr.yrepeat = 4;
 		}
 
-		if (spj)
+		if (actj)
 		{
-			int x = getflorzofslope(sp->sectnum, sp->x, sp->y);
-			if (sp->z > x - (12 << 8))
-				sp->z = x - (12 << 8);
+			int x = getflorzofslopeptr(act->sector(), act->spr.pos.X, act->spr.pos.Y);
+			if (act->spr.pos.Z > x - (12 << 8))
+				act->spr.pos.Z = x - (12 << 8);
 		}
 
-		if (sp->picnum == ONFIRE)
+		if (act->spr.picnum == ONFIRE)
 		{
-			sp->x += krand() % 256 - 128;
-			sp->y += krand() % 256 - 128;
-			sp->z -= krand() % 10240;
-			sp->cstat |= 0x80;
+			act->spr.pos.X += krand() % 256 - 128;
+			act->spr.pos.Y += krand() % 256 - 128;
+			act->spr.pos.Z -= krand() % 10240;
+			act->spr.cstat |= CSTAT_SPRITE_YCENTER;
 		}
 
-		changeactorstat(act, STAT_MISC);
+		ChangeActorStat(act, STAT_MISC);
 
 		break;
 
 	case PLAYERONWATER:
-		if (spj)
+		if (actj)
 		{
-			sp->xrepeat = spj->xrepeat;
-			sp->yrepeat = spj->yrepeat;
-			sp->zvel = 128;
-			if (sp->sector()->lotag != 2)
-				sp->cstat |= 32768;
+			act->spr.xrepeat = actj->spr.xrepeat;
+			act->spr.yrepeat = actj->spr.yrepeat;
+			act->spr.zvel = 128;
+			if (act->sector()->lotag != 2)
+				act->spr.cstat |= CSTAT_SPRITE_INVISIBLE;
 		}
-		changeactorstat(act, STAT_DUMMYPLAYER);
+		ChangeActorStat(act, STAT_DUMMYPLAYER);
 		break;
 
 	case APLAYER:
 	{
-		sp->xrepeat = sp->yrepeat = 0;
+		act->spr.xrepeat = act->spr.yrepeat = 0;
 		int j = ud.coop;
 		if (j == 2) j = 0;
 
-		if (ud.multimode < 2 || (ud.multimode > 1 && j != sp->lotag))
-			changeactorstat(act, STAT_MISC);
+		if (ud.multimode < 2 || (ud.multimode > 1 && j != act->spr.lotag))
+			ChangeActorStat(act, STAT_MISC);
 		else
-			changeactorstat(act, STAT_PLAYER);
+			ChangeActorStat(act, STAT_PLAYER);
 		break;
 	}
 	case WATERBUBBLE:
-		if (spj && spj->picnum == APLAYER)
-			sp->z -= (16 << 8);
-		if (sp->picnum == WATERBUBBLE)
+		if (actj && actj->spr.picnum == APLAYER)
+			act->spr.pos.Z -= (16 << 8);
+		if (act->spr.picnum == WATERBUBBLE)
 		{
-			if (spj)
-				sp->ang = spj->ang;
-			sp->xrepeat = sp->yrepeat = 4;
+			if (actj)
+				act->spr.ang = actj->spr.ang;
+			act->spr.xrepeat = act->spr.yrepeat = 4;
 		}
-		else sp->xrepeat = sp->yrepeat = 32;
+		else act->spr.xrepeat = act->spr.yrepeat = 32;
 
-		changeactorstat(act, STAT_MISC);
+		ChangeActorStat(act, STAT_MISC);
 		break;
 
 	case CRANE:
@@ -708,55 +704,55 @@ DDukeActor* spawninit_d(DDukeActor* actj, DDukeActor* act)
 		break;
 	case TRASH:
 
-		if (sp->picnum != WATERDRIP)
-			sp->ang = krand() & 2047;
+		if (act->spr.picnum != WATERDRIP)
+			act->spr.ang = krand() & 2047;
 		[[fallthrough]];
 
 	case WATERDRIPSPLASH:
 
-		sp->xrepeat = 24;
-		sp->yrepeat = 24;
+		act->spr.xrepeat = 24;
+		act->spr.yrepeat = 24;
 
 
-		changeactorstat(act, 6);
+		ChangeActorStat(act, 6);
 		break;
 
 	case PLUG:
-		sp->lotag = 9999;
-		changeactorstat(act, 6);
+		act->spr.lotag = 9999;
+		ChangeActorStat(act, 6);
 		break;
 	case TOUCHPLATE:
-		t[2] = sectp->floorz;
+		act->temp_data[2] = sectp->floorz;
 		if (sectp->lotag != 1 && sectp->lotag != 2)
-			sectp->floorz = sp->z;
+			sectp->setfloorz(act->spr.pos.Z);
 		if (!isWorldTour())
 		{
-			if (sp->pal && ud.multimode > 1)
+			if (act->spr.pal && ud.multimode > 1)
 			{
-				sp->xrepeat = sp->yrepeat = 0;
-				changeactorstat(act, STAT_MISC);
+				act->spr.xrepeat = act->spr.yrepeat = 0;
+				ChangeActorStat(act, STAT_MISC);
 				break;
 			}
 		}
 		else { // Twentieth Anniversary World Tour addition
-			if ((sp->pal == 1 && ud.multimode > 1) // Single-game Only
-				|| (sp->pal == 2 && (ud.multimode == 1 || (ud.multimode > 1 && ud.coop != 1))) // Co-op Only
-				|| (sp->pal == 3 && (ud.multimode == 1 || (ud.multimode > 1 && ud.coop == 1)))) // Dukematch Only
+			if ((act->spr.pal == 1 && ud.multimode > 1) // Single-game Only
+				|| (act->spr.pal == 2 && (ud.multimode == 1 || (ud.multimode > 1 && ud.coop != 1))) // Co-op Only
+				|| (act->spr.pal == 3 && (ud.multimode == 1 || (ud.multimode > 1 && ud.coop == 1)))) // Dukematch Only
 			{
-				sp->xrepeat = sp->yrepeat = 0;
-				changeactorstat(act, STAT_MISC);
+				act->spr.xrepeat = act->spr.yrepeat = 0;
+				ChangeActorStat(act, STAT_MISC);
 				break;
 			}
 		}
 		[[fallthrough]];
 	case WATERBUBBLEMAKER:
-		if (sp->hitag && sp->picnum == WATERBUBBLEMAKER)
+		if (act->spr.hitag && act->spr.picnum == WATERBUBBLEMAKER)
 		{	// JBF 20030913: Pisses off move(), eg. in bobsp2
-			Printf(TEXTCOLOR_YELLOW "WARNING: WATERBUBBLEMAKER %d @ %d,%d with hitag!=0. Applying fixup.\n", act->GetSpriteIndex(), sp->x, sp->y);
-			sp->hitag = 0;
+			Printf(TEXTCOLOR_YELLOW "WARNING: WATERBUBBLEMAKER %d @ %d,%d with hitag!=0. Applying fixup.\n", act->GetIndex(), act->spr.pos.X, act->spr.pos.Y);
+			act->spr.hitag = 0;
 		}
-		sp->cstat |= 32768;
-		changeactorstat(act, 6);
+		act->spr.cstat |= CSTAT_SPRITE_INVISIBLE;
+		ChangeActorStat(act, 6);
 		break;
 	case BOLT1:
 	case BOLT1 + 1:
@@ -766,21 +762,21 @@ DDukeActor* spawninit_d(DDukeActor* actj, DDukeActor* act)
 	case SIDEBOLT1 + 1:
 	case SIDEBOLT1 + 2:
 	case SIDEBOLT1 + 3:
-		t[0] = sp->xrepeat;
-		t[1] = sp->yrepeat;
+		act->temp_data[0] = act->spr.xrepeat;
+		act->temp_data[1] = act->spr.yrepeat;
 		[[fallthrough]];
 	case MASTERSWITCH:
-		if (sp->picnum == MASTERSWITCH)
-			sp->cstat |= 32768;
-		sp->yvel = 0;
-		changeactorstat(act, 6);
+		if (act->spr.picnum == MASTERSWITCH)
+			act->spr.cstat |= CSTAT_SPRITE_INVISIBLE;
+		act->spr.yvel = 0;
+		ChangeActorStat(act, 6);
 		break;
 	case TARGET:
 	case DUCK:
 	case LETTER:
-		sp->extra = 1;
-		sp->cstat |= 257;
-		changeactorstat(act, 1);
+		act->spr.extra = 1;
+		act->spr.cstat |= CSTAT_SPRITE_BLOCK_ALL;
+		ChangeActorStat(act, 1);
 		break;
 	case OCTABRAINSTAYPUT:
 	case LIZTROOPSTAYPUT:
@@ -790,7 +786,7 @@ DDukeActor* spawninit_d(DDukeActor* actj, DDukeActor* act)
 	case PIGCOPDIVE:
 	case COMMANDERSTAYPUT:
 	case BOSS4STAYPUT:
-		act->actorstayput = sp->sector();
+		act->actorstayput = act->sector();
 		[[fallthrough]];
 	case BOSS1:
 	case BOSS2:
@@ -798,8 +794,8 @@ DDukeActor* spawninit_d(DDukeActor* actj, DDukeActor* act)
 	case BOSS4:
 	case ROTATEGUN:
 	case GREENSLIME:
-		if (sp->picnum == GREENSLIME)
-			sp->extra = 1;
+		if (act->spr.picnum == GREENSLIME)
+			act->spr.extra = 1;
 		[[fallthrough]];
 	case DRONE:
 	case LIZTROOPONTOILET:
@@ -820,9 +816,9 @@ DDukeActor* spawninit_d(DDukeActor* actj, DDukeActor* act)
 	case RAT:
 	case SHARK:
 
-		if (sp->pal == 0)
+		if (act->spr.pal == 0)
 		{
-			switch (sp->picnum)
+			switch (act->spr.picnum)
 			{
 			case LIZTROOPONTOILET:
 			case LIZTROOPSHOOT:
@@ -832,140 +828,140 @@ DDukeActor* spawninit_d(DDukeActor* actj, DDukeActor* act)
 			case LIZTROOPSTAYPUT:
 			case LIZTROOPJUSTSIT:
 			case LIZTROOP:
-				sp->pal = 22;
+				act->spr.pal = 22;
 				break;
 			}
 		}
 
-		if (bossguy(sp))
+		if (bossguy(act))
 		{
-			if (spj && spj->picnum == RESPAWN)
-				sp->pal = spj->pal;
-			if (sp->pal && (!isWorldTour() || !(currentLevel->flags & LEVEL_WT_BOSSSPAWN) || sp->pal != 22))
+			if (actj && actj->spr.picnum == RESPAWN)
+				act->spr.pal = actj->spr.pal;
+			if (act->spr.pal && (!isWorldTour() || !(currentLevel->flags & LEVEL_WT_BOSSSPAWN) || act->spr.pal != 22))
 			{
-				sp->clipdist = 80;
-				sp->xrepeat = 40;
-				sp->yrepeat = 40;
+				act->spr.clipdist = 80;
+				act->spr.xrepeat = 40;
+				act->spr.yrepeat = 40;
 			}
 			else
 			{
-				sp->xrepeat = 80;
-				sp->yrepeat = 80;
-				sp->clipdist = 164;
+				act->spr.xrepeat = 80;
+				act->spr.yrepeat = 80;
+				act->spr.clipdist = 164;
 			}
 		}
 		else
 		{
-			if (sp->picnum != SHARK)
+			if (act->spr.picnum != SHARK)
 			{
-				sp->xrepeat = 40;
-				sp->yrepeat = 40;
-				sp->clipdist = 80;
+				act->spr.xrepeat = 40;
+				act->spr.yrepeat = 40;
+				act->spr.clipdist = 80;
 			}
 			else
 			{
-				sp->xrepeat = 60;
-				sp->yrepeat = 60;
-				sp->clipdist = 40;
+				act->spr.xrepeat = 60;
+				act->spr.yrepeat = 60;
+				act->spr.clipdist = 40;
 			}
 		}
 
-		if (spj) sp->lotag = 0;
+		if (actj) act->spr.lotag = 0;
 
-		if ((sp->lotag > ud.player_skill) || ud.monsters_off == 1)
+		if ((act->spr.lotag > ud.player_skill) || ud.monsters_off == 1)
 		{
-			sp->xrepeat = sp->yrepeat = 0;
-			changeactorstat(act, STAT_MISC);
+			act->spr.xrepeat = act->spr.yrepeat = 0;
+			ChangeActorStat(act, STAT_MISC);
 			break;
 		}
 		else
 		{
 			makeitfall(act);
 
-			if (sp->picnum == RAT)
+			if (act->spr.picnum == RAT)
 			{
-				sp->ang = krand() & 2047;
-				sp->xrepeat = sp->yrepeat = 48;
-				sp->cstat = 0;
+				act->spr.ang = krand() & 2047;
+				act->spr.xrepeat = act->spr.yrepeat = 48;
+				act->spr.cstat = 0;
 			}
 			else
 			{
-				sp->cstat |= 257;
+				act->spr.cstat |= CSTAT_SPRITE_BLOCK_ALL;
 
-				if (sp->picnum != SHARK)
+				if (act->spr.picnum != SHARK)
 					ps[myconnectindex].max_actors_killed++;
 			}
 
-			if (sp->picnum == ORGANTIC) sp->cstat |= 128;
+			if (act->spr.picnum == ORGANTIC) act->spr.cstat |= CSTAT_SPRITE_YCENTER;
 
-			if (spj)
+			if (actj)
 			{
 				act->timetosleep = 0;
 				check_fta_sounds_d(act);
-				changeactorstat(act, 1);
+				ChangeActorStat(act, 1);
 			}
-			else changeactorstat(act, 2);
+			else ChangeActorStat(act, 2);
 		}
 
-		if (sp->picnum == ROTATEGUN)
-			sp->zvel = 0;
+		if (act->spr.picnum == ROTATEGUN)
+			act->spr.zvel = 0;
 
 		break;
 
 	case LOCATORS:
-		sp->cstat |= 32768;
-		changeactorstat(act, 7);
+		act->spr.cstat |= CSTAT_SPRITE_INVISIBLE;
+		ChangeActorStat(act, 7);
 		break;
 
 	case ACTIVATORLOCKED:
 	case ACTIVATOR:
-		sp->cstat = 32768;
-		if (sp->picnum == ACTIVATORLOCKED)
-			sp->sector()->lotag |= 16384;
-		changeactorstat(act, 8);
+		act->spr.cstat = CSTAT_SPRITE_INVISIBLE;
+		if (act->spr.picnum == ACTIVATORLOCKED)
+			act->sector()->lotag |= 16384;
+		ChangeActorStat(act, 8);
 		break;
 
 	case DOORSHOCK:
-		sp->cstat |= 1 + 256;
-		sp->shade = -12;
-		changeactorstat(act, 6);
+		act->spr.cstat |= CSTAT_SPRITE_BLOCK_ALL;
+		act->spr.shade = -12;
+		ChangeActorStat(act, 6);
 		break;
 
 	case OOZ:
 	case OOZ2:
 	{
-		sp->shade = -12;
+		act->spr.shade = -12;
 
-		if (spj)
+		if (actj)
 		{
-			if (spj->picnum == NUKEBARREL)
-				sp->pal = 8;
+			if (actj->spr.picnum == NUKEBARREL)
+				act->spr.pal = 8;
 			insertspriteq(act);
 		}
 
-		changeactorstat(act, 1);
+		ChangeActorStat(act, 1);
 
 		getglobalz(act);
 
 		int j = (act->floorz - act->ceilingz) >> 9;
 
-		sp->yrepeat = j;
-		sp->xrepeat = 25 - (j >> 1);
-		sp->cstat |= (krand() & 4);
+		act->spr.yrepeat = j;
+		act->spr.xrepeat = 25 - (j >> 1);
+		if (krand() & 4) act->spr.cstat |= CSTAT_SPRITE_XFLIP;
 
 		break;
 	}
 	case HEAVYHBOMB:
-		if (spj) act->SetOwner(actj);
+		if (actj) act->SetOwner(actj);
 		else act->SetOwner(act);
 
-		sp->xrepeat = sp->yrepeat = 9;
-		sp->yvel = 4;
+		act->spr.xrepeat = act->spr.yrepeat = 9;
+		act->spr.yvel = 4;
 		[[fallthrough]];
 	case REACTOR2:
 	case REACTOR:
 	case RECON:
-		if (initreactor(actj, act, sp->picnum == RECON)) return act;
+		if (initreactor(actj, act, act->spr.picnum == RECON)) return act;
 		break;
 
 	case FLAMETHROWERSPRITE:
@@ -1005,60 +1001,60 @@ DDukeActor* spawninit_d(DDukeActor* actj, DDukeActor* act)
 	case COLA:
 	case FIRSTAID:
 	case SIXPAK:
-		if (spj)
+		if (actj)
 		{
-			sp->lotag = 0;
-			sp->z -= (32 << 8);
-			sp->zvel = -1024;
+			act->spr.lotag = 0;
+			act->spr.pos.Z -= (32 << 8);
+			act->spr.zvel = -1024;
 			ssp(act, CLIPMASK0);
-			sp->cstat = krand() & 4;
+			if (krand() & 4) act->spr.cstat |= CSTAT_SPRITE_XFLIP;
 		}
 		else
 		{
 			act->SetOwner(act);
-			sp->cstat = 0;
+			act->spr.cstat = 0;
 		}
 
-		if ((ud.multimode < 2 && sp->pal != 0) || (sp->lotag > ud.player_skill))
+		if ((ud.multimode < 2 && act->spr.pal != 0) || (act->spr.lotag > ud.player_skill))
 		{
-			sp->xrepeat = sp->yrepeat = 0;
-			changeactorstat(act, STAT_MISC);
+			act->spr.xrepeat = act->spr.yrepeat = 0;
+			ChangeActorStat(act, STAT_MISC);
 			break;
 		}
 
-		sp->pal = 0;
+		act->spr.pal = 0;
 		[[fallthrough]];
 
 	case ACCESSCARD:
 
-		if (sp->picnum == ATOMICHEALTH)
-			sp->cstat |= 128;
+		if (act->spr.picnum == ATOMICHEALTH)
+			act->spr.cstat |= CSTAT_SPRITE_YCENTER;
 
-		if (ud.multimode > 1 && ud.coop != 1 && sp->picnum == ACCESSCARD)
+		if (ud.multimode > 1 && ud.coop != 1 && act->spr.picnum == ACCESSCARD)
 		{
-			sp->xrepeat = sp->yrepeat = 0;
-			changeactorstat(act, STAT_MISC);
+			act->spr.xrepeat = act->spr.yrepeat = 0;
+			ChangeActorStat(act, STAT_MISC);
 			break;
 		}
 		else
 		{
-			if (sp->picnum == AMMO)
-				sp->xrepeat = sp->yrepeat = 16;
-			else sp->xrepeat = sp->yrepeat = 32;
+			if (act->spr.picnum == AMMO)
+				act->spr.xrepeat = act->spr.yrepeat = 16;
+			else act->spr.xrepeat = act->spr.yrepeat = 32;
 		}
 
-		sp->shade = -17;
+		act->spr.shade = -17;
 
-		if (spj) changeactorstat(act, STAT_ACTOR);
+		if (actj) ChangeActorStat(act, STAT_ACTOR);
 		else
 		{
-			changeactorstat(act, STAT_ZOMBIEACTOR);
+			ChangeActorStat(act, STAT_ZOMBIEACTOR);
 			makeitfall(act);
 		}
 		break;
 
 	case WATERFOUNTAIN:
-		sp->lotag = 1;
+		act->spr.lotag = 1;
 		[[fallthrough]];
 
 	case TREE1:
@@ -1066,23 +1062,23 @@ DDukeActor* spawninit_d(DDukeActor* actj, DDukeActor* act)
 	case TIRE:
 	case CONE:
 	case BOX:
-		sp->cstat = 257; // Make it hitable
-		sp->extra = 1;
-		changeactorstat(act, STAT_STANDABLE);
+		act->spr.cstat = CSTAT_SPRITE_BLOCK_ALL; // Make it hitable
+		act->spr.extra = 1;
+		ChangeActorStat(act, STAT_STANDABLE);
 		break;
 
 	case FLOORFLAME:
-		sp->shade = -127;
-		changeactorstat(act, STAT_STANDABLE);
+		act->spr.shade = -127;
+		ChangeActorStat(act, STAT_STANDABLE);
 		break;
 
 	case BOUNCEMINE:
 		act->SetOwner(act);
-		sp->cstat |= 1 + 256; //Make it hitable
-		sp->xrepeat = sp->yrepeat = 24;
-		sp->shade = -127;
-		sp->extra = gs.impact_damage << 2;
-		changeactorstat(act, STAT_ZOMBIEACTOR);
+		act->spr.cstat |= CSTAT_SPRITE_BLOCK_ALL; //Make it hitable
+		act->spr.xrepeat = act->spr.yrepeat = 24;
+		act->spr.shade = -127;
+		act->spr.extra = gs.impact_damage << 2;
+		ChangeActorStat(act, STAT_ZOMBIEACTOR);
 		break;
 
 	case CAMERA1:
@@ -1091,41 +1087,41 @@ DDukeActor* spawninit_d(DDukeActor* actj, DDukeActor* act)
 	case CAMERA1 + 3:
 	case CAMERA1 + 4:
 	case CAMERAPOLE:
-		sp->extra = 1;
+		act->spr.extra = 1;
 
-		if (gs.camerashitable) sp->cstat = 257;
-		else sp->cstat = 0;
+		if (gs.camerashitable) act->spr.cstat = CSTAT_SPRITE_BLOCK_ALL;
+		else act->spr.cstat = 0;
 		[[fallthrough]];
 
 	case GENERICPOLE:
 
-		if (ud.multimode < 2 && sp->pal != 0)
+		if (ud.multimode < 2 && act->spr.pal != 0)
 		{
-			sp->xrepeat = sp->yrepeat = 0;
-			changeactorstat(act, STAT_MISC);
+			act->spr.xrepeat = act->spr.yrepeat = 0;
+			ChangeActorStat(act, STAT_MISC);
 			break;
 		}
-		else sp->pal = 0;
-		if (sp->picnum == CAMERAPOLE || sp->picnum == GENERICPOLE) break;
-		sp->picnum = CAMERA1;
-		changeactorstat(act, 1);
+		else act->spr.pal = 0;
+		if (act->spr.picnum == CAMERAPOLE || act->spr.picnum == GENERICPOLE) break;
+		act->spr.picnum = CAMERA1;
+		ChangeActorStat(act, 1);
 		break;
 	case STEAM:
-		if (spj)
+		if (actj)
 		{
-			sp->ang = spj->ang;
-			sp->cstat = 16 + 128 + 2;
-			sp->xrepeat = sp->yrepeat = 1;
-			sp->xvel = -8;
+			act->spr.ang = actj->spr.ang;
+			act->spr.cstat = CSTAT_SPRITE_ALIGNMENT_WALL | CSTAT_SPRITE_YCENTER | CSTAT_SPRITE_TRANSLUCENT;
+			act->spr.xrepeat = act->spr.yrepeat = 1;
+			act->spr.xvel = -8;
 			ssp(act, CLIPMASK0);
 		}
 		[[fallthrough]];
 	case CEILINGSTEAM:
-		changeactorstat(act, STAT_STANDABLE);
+		ChangeActorStat(act, STAT_STANDABLE);
 		break;
 
 	case SECTOREFFECTOR:
-		spawneffector(act);
+		spawneffector(act, actors);
 
 		break;
 
@@ -1133,16 +1129,16 @@ DDukeActor* spawninit_d(DDukeActor* actj, DDukeActor* act)
 	case SEENINE:
 	case OOZFILTER:
 
-		sp->shade = -16;
-		if (sp->xrepeat <= 8)
+		act->spr.shade = -16;
+		if (act->spr.xrepeat <= 8)
 		{
-			sp->cstat = 32768;
-			sp->xrepeat = sp->yrepeat = 0;
+			act->spr.cstat = CSTAT_SPRITE_INVISIBLE;
+			act->spr.xrepeat = act->spr.yrepeat = 0;
 		}
-		else sp->cstat = 1 + 256;
-		sp->extra = gs.impact_damage << 2;
+		else act->spr.cstat = CSTAT_SPRITE_BLOCK_ALL;
+		act->spr.extra = gs.impact_damage << 2;
 		act->SetOwner(act);
-		changeactorstat(act, STAT_STANDABLE);
+		ChangeActorStat(act, STAT_STANDABLE);
 		break;
 
 	case CRACK1:
@@ -1150,36 +1146,36 @@ DDukeActor* spawninit_d(DDukeActor* actj, DDukeActor* act)
 	case CRACK3:
 	case CRACK4:
 	case FIREEXT:
-		if (sp->picnum == FIREEXT)
+		if (act->spr.picnum == FIREEXT)
 		{
-			sp->cstat = 257;
-			sp->extra = gs.impact_damage << 2;
+			act->spr.cstat = CSTAT_SPRITE_BLOCK_ALL;
+			act->spr.extra = gs.impact_damage << 2;
 		}
 		else
 		{
-			sp->cstat |= (sp->cstat & 48) ? 1 : 17;
-			sp->extra = 1;
+			act->spr.cstat |= (act->spr.cstat & CSTAT_SPRITE_ALIGNMENT_MASK) ? CSTAT_SPRITE_BLOCK : (CSTAT_SPRITE_BLOCK | CSTAT_SPRITE_ALIGNMENT_WALL);
+			act->spr.extra = 1;
 		}
 
-		if (ud.multimode < 2 && sp->pal != 0)
+		if (ud.multimode < 2 && act->spr.pal != 0)
 		{
-			sp->xrepeat = sp->yrepeat = 0;
-			changeactorstat(act, STAT_MISC);
+			act->spr.xrepeat = act->spr.yrepeat = 0;
+			ChangeActorStat(act, STAT_MISC);
 			break;
 		}
 
-		sp->pal = 0;
+		act->spr.pal = 0;
 		act->SetOwner(act);
-		changeactorstat(act, STAT_STANDABLE);
-		sp->xvel = 8;
+		ChangeActorStat(act, STAT_STANDABLE);
+		act->spr.xvel = 8;
 		ssp(act, CLIPMASK0);
 		break;
 
 	case TOILET:
 	case STALL:
-		sp->lotag = 1;
-		sp->cstat |= 257;
-		sp->clipdist = 8;
+		act->spr.lotag = 1;
+		act->spr.cstat |= CSTAT_SPRITE_BLOCK_ALL;
+		act->spr.clipdist = 8;
 		act->SetOwner(act);
 		break;
 	case CANWITHSOMETHING:
@@ -1187,7 +1183,7 @@ DDukeActor* spawninit_d(DDukeActor* actj, DDukeActor* act)
 	case CANWITHSOMETHING3:
 	case CANWITHSOMETHING4:
 	case RUBBERCAN:
-		sp->extra = 0;
+		act->spr.extra = 0;
 		[[fallthrough]];
 	case EXPLODINGBARREL:
 	case HORSEONSIDE:
@@ -1198,34 +1194,34 @@ DDukeActor* spawninit_d(DDukeActor* actj, DDukeActor* act)
 	case NUKEBARRELLEAKED:
 	case WOODENHORSE:
 
-		if (spj)
-			sp->xrepeat = sp->yrepeat = 32;
-		sp->clipdist = 72;
+		if (actj)
+			act->spr.xrepeat = act->spr.yrepeat = 32;
+		act->spr.clipdist = 72;
 		makeitfall(act);
-		if (spj) act->SetOwner(actj);
+		if (actj) act->SetOwner(actj);
 		else act->SetOwner(act);
 		[[fallthrough]];
 
 	case EGG:
-		if (ud.monsters_off == 1 && sp->picnum == EGG)
+		if (ud.monsters_off == 1 && act->spr.picnum == EGG)
 		{
-			sp->xrepeat = sp->yrepeat = 0;
-			changeactorstat(act, STAT_MISC);
+			act->spr.xrepeat = act->spr.yrepeat = 0;
+			ChangeActorStat(act, STAT_MISC);
 		}
 		else
 		{
-			if (sp->picnum == EGG)
+			if (act->spr.picnum == EGG)
 			{
-				sp->clipdist = 24;
+				act->spr.clipdist = 24;
 				ps[connecthead].max_actors_killed++;
 			}
-			sp->cstat = 257 | (krand() & 4);
-			changeactorstat(act, STAT_ZOMBIEACTOR);
+			act->spr.cstat = CSTAT_SPRITE_BLOCK_ALL | randomXFlip();
+			ChangeActorStat(act, STAT_ZOMBIEACTOR);
 		}
 		break;
 	case TOILETWATER:
-		sp->shade = -16;
-		changeactorstat(act, STAT_STANDABLE);
+		act->spr.shade = -16;
+		ChangeActorStat(act, STAT_STANDABLE);
 		break;
 	}
 	return act;

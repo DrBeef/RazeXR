@@ -1,156 +1,66 @@
 #pragma once
 
+#include "coreactor.h"
+
 BEGIN_BLD_NS
 
 class DBloodActor;
 
-// Wrapper around the insane collision info mess from Build.
-struct Collision
-{
-	int type;
-	int index;
-	int legacyVal;	// should be removed later, but needed for converting back for unadjusted code.
-	DBloodActor* actor;
-
-	Collision() = default;
-	Collision(int legacyval) { setFromEngine(legacyval); }
-
-	// need forward declarations of these.
-	int actorIndex(DBloodActor*);
-	DBloodActor* Actor(int);
-
-	int setNone()
-	{
-		type = kHitNone;
-		index = -1;
-		legacyVal = 0;
-		actor = nullptr;
-		return kHitNone;
-	}
-
-	int setSector(int num)
-	{
-		type = kHitSector;
-		index = num;
-		legacyVal = type | index;
-		actor = nullptr;
-		return kHitSector;
-	}
-	int setWall(int num)
-	{
-		type = kHitWall;
-		index = num;
-		legacyVal = type | index;
-		actor = nullptr;
-		return kHitWall;
-	}
-	int setSprite(DBloodActor* num)
-	{
-		type = kHitSprite;
-		index = -1;
-		legacyVal = type | actorIndex(num);
-		actor = num;
-		return kHitSprite;
-	}
-
-	int setFromEngine(int value)
-	{
-		legacyVal = value;
-		type = value & kHitTypeMask;
-		if (type == 0) { index = -1; actor = nullptr; }
-		else if (type != kHitSprite) { index = value & kHitIndexMask; actor = nullptr; }
-		else { index = -1; actor = Actor(value & kHitIndexMask); }
-		return type;
-	}
-
-	walltype* wall()
-	{
-		assert(type == kHitWall);
-		return &::wall[index];
-	}
-
-	sectortype* sector()
-	{
-		assert(type == kHitSector);
-		return &::sector[index];
-	}
-
-};
-
 struct SPRITEHIT
 {
+	// These must use read barriers as they can live longer and need proper GC maintenance.
 	Collision hit, ceilhit, florhit;
 };
 
-
-// Due to the messed up array storage of all the game data we cannot do any direct references here yet. We have to access everything via wrapper functions for now.
-// Note that the indexing is very inconsistent - partially by sprite index, partially by xsprite index.
-class DBloodActor
+class DBloodActor : public DCoreActor
 {
-	int index;
-	DBloodActor* base();
+	DECLARE_CLASS(DBloodActor, DCoreActor)
+	HAS_OBJECT_POINTERS
 
 public:
 	int dudeSlope;
+	vec3_t vel;
+	bool hasx;
+	XSPRITE xspr;
 	SPRITEHIT hit;
 	DUDEEXTRA dudeExtra;
 	SPRITEMASS spriteMass;
 	GENDUDEEXTRA genDudeExtra;
-	DBloodActor* prevmarker;	// needed by the nnext marker code. This originally hijacked targetX in XSPRITE
+	TObjPtr<DBloodActor*> prevmarker;	// needed by the nnext marker code. This originally hijacked targetX in XSPRITE
+	TObjPtr<DBloodActor*> ownerActor;	// was previously stored in the sprite's owner field.
 	POINT3D basePoint;
-	int xvel, yvel, zvel;
-
-	int cumulDamage; // this one's transient and does not need to be saved.
+	EventObject condition[2];
 	bool explosionhackflag; // this originally hijacked the target field which is not safe when working with pointers.
+
+	// transient data (not written to savegame)
+	int cumulDamage;
 	bool interpolated;
 
-	DBloodActor() :index(int(this - base())) {}
-	DBloodActor& operator=(const DBloodActor& other) = default;
+	DBloodActor() = default;
+	void Serialize(FSerializer& arc) override;
+	size_t PropagateMark() override;
 
-	void Clear()
-	{
-		dudeSlope = 0;
-		hit = {};
-		dudeExtra = {};
-		spriteMass = {};
-		genDudeExtra = {};
-		prevmarker = nullptr;
-		basePoint = {};
-		interpolated = false;
-		xvel = yvel = zvel = 0;
-		explosionhackflag = false;
-		interpolated = false;
-	}
-	bool hasX() { return sprite[index].extra > 0; }
-	void addX()
-	{
-		if (s().extra == -1) dbInsertXSprite(s().index);
-	}
-	spritetype& s() { return sprite[index]; }
-	XSPRITE& x() { return xsprite[sprite[index].extra]; }	// calling this does not validate the xsprite!
-	int GetIndex() { return s().time; }	// For error printing only! This is only identical with the sprite index for items spawned at map start.
-	int GetSpriteIndex() { return index; }	// this is only here to mark places that need changing later!
+	bool hasX() { return hasx; }
+	void addX() { hasx = true; }
 
 	void SetOwner(DBloodActor* own)
 	{
-		s().owner = own ? own->GetSpriteIndex() : -1;
+		ownerActor = own;
 	}
 
 	DBloodActor* GetOwner()
 	{
-		if (s().owner == -1 || s().owner == kMaxSprites - 1) return nullptr;
-		return base() + s().owner;
+		return ownerActor;
 	}
 
 	void SetTarget(DBloodActor* own)
 	{
-		x().target_i = own ? own->GetSpriteIndex() : -1;
+		xspr.target = own;
 	}
 
 	DBloodActor* GetTarget()
 	{
-		if (x().target_i <= -1 || x().target_i == kMaxSprites - 1) return nullptr;
-		return base() + x().target_i;
+		return xspr.target;
 	}
 
 	bool ValidateTarget(const char* func)
@@ -165,56 +75,56 @@ public:
 
 	void SetBurnSource(DBloodActor* own)
 	{
-		x().burnSource = own ? own->GetSpriteIndex() : -1;
+		xspr.burnSource = own;
 	}
 
 	DBloodActor* GetBurnSource()
 	{
-		if (x().burnSource == -1 || x().burnSource == kMaxSprites - 1) return nullptr;
-		return base() + x().burnSource;
+		return xspr.burnSource;
 	}
 
 	void SetSpecialOwner() // nnext hackery
 	{
-		s().owner = kMaxSprites - 1;
+		ownerActor = nullptr;
+		spr.intowner = kMagicOwner;
 	}
 
 	bool GetSpecialOwner()
 	{
-		return (s().owner == kMaxSprites - 1);
+		return  ownerActor == nullptr && (spr.intowner == kMagicOwner);
 	}
 
 	bool IsPlayerActor()
 	{
-		return s().type >= kDudePlayer1 && s().type <= kDudePlayer8;
+		return spr.type >= kDudePlayer1 && spr.type <= kDudePlayer8;
 	}
 
 	bool IsDudeActor()
 	{
-		return s().type >= kDudeBase && s().type < kDudeMax;
+		return spr.type >= kDudeBase && spr.type < kDudeMax;
 	}
 
 	bool IsItemActor()
 	{
-		return s().type >= kItemBase && s().type < kItemMax;
+		return spr.type >= kItemBase && spr.type < kItemMax;
 	}
 
 	bool IsWeaponActor()
 	{
-		return s().type >= kItemWeaponBase && s().type < kItemWeaponMax;
+		return spr.type >= kItemWeaponBase && spr.type < kItemWeaponMax;
 	}
 
 	bool IsAmmoActor()
 	{
-		return s().type >= kItemAmmoBase && s().type < kItemAmmoMax;
+		return spr.type >= kItemAmmoBase && spr.type < kItemAmmoMax;
 	}
 
-	bool isActive() 
+	bool isActive()
 	{
 		if (!hasX())
 			return false;
 
-		switch (x().aiState->stateType) 
+		switch (xspr.aiState->stateType)
 		{
 		case kAiStateIdle:
 		case kAiStateGenIdle:
@@ -228,162 +138,34 @@ public:
 	}
 };
 
-extern DBloodActor bloodActors[kMaxSprites];
+// subclassed to add a game specific actor() method
 
-inline DBloodActor* DBloodActor::base() { return bloodActors; }
+extern HitInfo gHitInfo;
+
 
 // Iterator wrappers that return an actor pointer, not an index.
-class BloodStatIterator : public StatIterator
-{
-public:
-	BloodStatIterator(int stat) : StatIterator(stat)
-	{
-	}
 
-	DBloodActor* Next()
-	{
-		int n = NextIndex();
-		return n >= 0 ? &bloodActors[n] : nullptr;
-	}
-
-	DBloodActor* Peek()
-	{
-		int n = PeekIndex();
-		return n >= 0 ? &bloodActors[n] : nullptr;
-	}
-};
-
-class BloodSectIterator : public SectIterator
-{
-public:
-	BloodSectIterator(int stat) : SectIterator(stat)
-	{
-	}
-
-	DBloodActor* Next()
-	{
-		int n = NextIndex();
-		return n >= 0 ? &bloodActors[n] : nullptr;
-	}
-
-	DBloodActor* Peek()
-	{
-		int n = PeekIndex();
-		return n >= 0 ? &bloodActors[n] : nullptr;
-	}
-};
-
-// An iterator to iterate over all sprites.
-class BloodSpriteIterator
-{
-	BloodStatIterator it;
-	int stat = kStatDecoration;
-
-public:
-	BloodSpriteIterator() : it(kStatDecoration) {}
-
-	DBloodActor* Next()
-	{
-		while (stat < kStatFree)
-		{
-			auto ac = it.Next();
-			if (ac) return ac;
-			stat++;
-			if (stat < kStatFree) it.Reset(stat);
-		}
-		return nullptr;
-	}
-};
-
-// For iterating linearly over map spawned sprites.
-class BloodLinearSpriteIterator
-{
-	int index = 0;
-public:
-
-	void Reset()
-	{
-		index = 0;
-	}
-
-	DBloodActor* Next()
-	{
-		while (index < MAXSPRITES)
-		{
-			auto p = &bloodActors[index++];
-			if (p->s().statnum != kStatFree) return p;
-		}
-		return nullptr;
-	}
-};
-
-
-
-inline int DeleteSprite(DBloodActor* nSprite)
-{
-	if (nSprite) return DeleteSprite(nSprite->GetSpriteIndex());
-	return 0;
-}
+using BloodStatIterator = TStatIterator<DBloodActor>;
+using BloodSectIterator = TSectIterator<DBloodActor>;
+using BloodSpriteIterator = TSpriteIterator<DBloodActor>;
 
 inline void GetActorExtents(DBloodActor* actor, int* top, int* bottom)
 {
-	GetSpriteExtents(&actor->s(), top, bottom);
+	GetSpriteExtents(&actor->spr, top, bottom);
 }
 
-inline DBloodActor* getUpperLink(int sect)
+inline bool CheckSector(const BitArray& bits, DBloodActor* act)
 {
-	return gUpperLink[sect];
+	return bits[act->sectno()];
 }
 
-inline DBloodActor* getLowerLink(int sect)
+inline bool IsTargetTeammate(DBloodActor* pSource, DBloodActor* pTarget)
 {
-	return gLowerLink[sect];
+	if (!pSource->IsPlayerActor())
+		return false;
+	PLAYER* pSourcePlayer = &gPlayer[pSource->spr.type - kDudePlayer1];
+	return IsTargetTeammate(pSourcePlayer, pTarget);
 }
 
-inline FSerializer& Serialize(FSerializer& arc, const char* keyname, DBloodActor*& w, DBloodActor** def)
-{
-	int index = w? int(w - bloodActors) : -1;
-	Serialize(arc, keyname, index, nullptr);
-	if (arc.isReading()) w = index == -1? nullptr : &bloodActors[index];
-	return arc;
-}
-
-inline void sfxPlay3DSound(DBloodActor* pSprite, int soundId, int a3 = -1, int a4 = 0)
-{
-	sfxPlay3DSound(&pSprite->s(), soundId, a3, a4);
-}
-inline void sfxPlay3DSoundCP(DBloodActor* pSprite, int soundId, int a3 = -1, int a4 = 0, int pitch = 0, int volume = 0)
-{
-	sfxPlay3DSoundCP(&pSprite->s(), soundId, a3, a4, pitch, volume);
-}
-inline void sfxKill3DSound(DBloodActor* pSprite, int a2 = -1, int a3 = -1)
-{
-	sfxKill3DSound(&pSprite->s(), a2, a3);
-}
-
-inline void ChangeActorStat(DBloodActor* actor, int stat)
-{
-	ChangeSpriteStat(actor->GetSpriteIndex(), stat);
-}
-
-inline void ChangeActorSect(DBloodActor* actor, int stat)
-{
-	ChangeSpriteSect(actor->GetSpriteIndex(), stat);
-}
-
-inline int Collision::actorIndex(DBloodActor* actor)
-{
-	return int(actor - bloodActors);
-}
-
-inline DBloodActor* Collision::Actor(int a)
-{
-	return &bloodActors[a];
-}
-
-inline void setActorPos(DBloodActor* actor, vec3_t* pos)
-{
-	setsprite(actor->GetSpriteIndex(), pos);
-}
 
 END_BLD_NS

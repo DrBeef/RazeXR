@@ -155,7 +155,7 @@ STATE s_GoroRun[5][4] =
 };
 
 
-STATEp sg_GoroRun[] =
+STATE* sg_GoroRun[] =
 {
     &s_GoroRun[0][0],
     &s_GoroRun[1][0],
@@ -224,7 +224,7 @@ STATE s_GoroChop[5][7] =
 };
 
 
-STATEp sg_GoroChop[] =
+STATE* sg_GoroChop[] =
 {
     &s_GoroChop[0][0],
     &s_GoroChop[1][0],
@@ -308,7 +308,7 @@ STATE s_GoroSpell[5][10] =
 };
 
 
-STATEp sg_GoroSpell[] =
+STATE* sg_GoroSpell[] =
 {
     &s_GoroSpell[0][0],
     &s_GoroSpell[1][0],
@@ -345,7 +345,7 @@ STATE s_GoroStand[5][1] =
 };
 
 
-STATEp sg_GoroStand[] =
+STATE* sg_GoroStand[] =
 {
     s_GoroStand[0],
     s_GoroStand[1],
@@ -383,7 +383,7 @@ STATE s_GoroPain[5][1] =
 };
 
 
-STATEp sg_GoroPain[] =
+STATE* sg_GoroPain[] =
 {
     s_GoroPain[0],
     s_GoroPain[1],
@@ -420,37 +420,37 @@ STATE s_GoroDead[] =
     {GORO_DEAD, GORO_DIE_RATE, DoActorDebris, &s_GoroDead[0]},
 };
 
-STATEp sg_GoroDie[] =
+STATE* sg_GoroDie[] =
 {
     s_GoroDie
 };
 
-STATEp sg_GoroDead[] =
+STATE* sg_GoroDead[] =
 {
     s_GoroDead
 };
 
 /*
-STATEp *Stand[MAX_WEAPONS];
-STATEp *Run;
-STATEp *Jump;
-STATEp *Fall;
-STATEp *Crawl;
-STATEp *Swim;
-STATEp *Fly;
-STATEp *Rise;
-STATEp *Sit;
-STATEp *Look;
-STATEp *Climb;
-STATEp *Pain;
-STATEp *Death1;
-STATEp *Death2;
-STATEp *Dead;
-STATEp *DeathJump;
-STATEp *DeathFall;
-STATEp *CloseAttack[2];
-STATEp *Attack[6];
-STATEp *Special[2];
+STATE* *Stand[MAX_WEAPONS];
+STATE* *Run;
+STATE* *Jump;
+STATE* *Fall;
+STATE* *Crawl;
+STATE* *Swim;
+STATE* *Fly;
+STATE* *Rise;
+STATE* *Sit;
+STATE* *Look;
+STATE* *Climb;
+STATE* *Pain;
+STATE* *Death1;
+STATE* *Death2;
+STATE* *Dead;
+STATE* *DeathJump;
+STATE* *DeathFall;
+STATE* *CloseAttack[2];
+STATE* *Attack[6];
+STATE* *Special[2];
 */
 
 ACTOR_ACTION_SET GoroActionSet =
@@ -483,40 +483,31 @@ ACTOR_ACTION_SET GoroActionSet =
 
 int SetupGoro(DSWActor* actor)
 {
-    SPRITEp sp = &actor->s();
-    USERp u;
     ANIMATOR DoActorDecide;
 
-    if (TEST(sp->cstat, CSTAT_SPRITE_RESTORE))
+    if (!(actor->spr.cstat & CSTAT_SPRITE_RESTORE))
     {
-        u = actor->u();
-        ASSERT(u);
-    }
-    else
-    {
-        u = SpawnUser(actor, GORO_RUN_R0,s_GoroRun[0]);
-        u->Health = HEALTH_GORO;
+        SpawnUser(actor, GORO_RUN_R0,s_GoroRun[0]);
+        actor->user.Health = HEALTH_GORO;
     }
 
     ChangeState(actor, s_GoroRun[0]);
-    u->Attrib = &GoroAttrib;
+    actor->user.Attrib = &GoroAttrib;
     DoActorSetSpeed(actor, NORM_SPEED);
-    u->StateEnd = s_GoroDie;
-    u->Rot = sg_GoroRun;
+    actor->user.StateEnd = s_GoroDie;
+    actor->user.Rot = sg_GoroRun;
 
 
     EnemyDefaults(actor, &GoroActionSet, &GoroPersonality);
-    sp->clipdist = 512 >> 2;
-    SET(u->Flags, SPR_XFLIP_TOGGLE);
+    actor->spr.clipdist = 512 >> 2;
+    actor->user.Flags |= (SPR_XFLIP_TOGGLE);
 
     return 0;
 }
 
 int NullGoro(DSWActor* actor)
 {
-    USER* u = actor->u();
-
-    if (TEST(u->Flags,SPR_SLIDING))
+    if (actor->user.Flags & (SPR_SLIDING))
         DoActorSlide(actor);
 
     KeepActorOnFloor(actor);
@@ -527,26 +518,22 @@ int NullGoro(DSWActor* actor)
 
 int DoGoroPain(DSWActor* actor)
 {
-    USER* u = actor->u();
-    
     NullGoro(actor);
 
-    if ((u->WaitTics -= ACTORMOVETICS) <= 0)
+    if ((actor->user.WaitTics -= ACTORMOVETICS) <= 0)
         InitActorDecide(actor);
     return 0;
 }
 
 int DoGoroMove(DSWActor* actor)
 {
-    USER* u = actor->u();
-
-    if (TEST(u->Flags,SPR_SLIDING))
+    if (actor->user.Flags & (SPR_SLIDING))
         DoActorSlide(actor);
 
-    if (u->track >= 0)
+    if (actor->user.track >= 0)
         ActorFollowTrack(actor, ACTORMOVETICS);
     else
-        (*u->ActorActionFunc)(actor);
+        (*actor->user.ActorActionFunc)(actor);
 
     KeepActorOnFloor(actor);
 

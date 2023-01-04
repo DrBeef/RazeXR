@@ -31,35 +31,44 @@ Prepared for public release: 03/21/2003 - Charlie Wiederhold, 3D Realms
 #include "serializer.h"
 #include "savegamehelp.h"
 #include "dukeactor.h"
+#include "interpolate.h"
 
 BEGIN_DUKE_NS
 
 static int torchcnt;
-static int jaildoorcnt;
-static int minecartcnt;
 static int lightnincnt;
 
 static sectortype* torchsector[64];
 static short torchsectorshade[64];
 static short torchtype[64];
 
-static short jaildoorsound[32];
-static int jaildoordrag[32];
-static int jaildoorspeed[32];
-static short jaildoorsecthtag[32];
-static int jaildoordist[32];
-static short jaildoordir[32];
-static short jaildooropen[32];
-static sectortype* jaildoorsect[32];
+struct jaildoor
+{
+	sectortype* sect;
+	int speed;
+	float dist;
+	float drag;
+	int16_t direction;
+	int16_t sound;
+	int16_t open;
+	int16_t hitag;
+};
 
-static short minecartdir[16];
-static int minecartspeed[16];
-static sectortype* minecartchildsect[16];
-static short minecartsound[16];
-static int minecartdist[16];
-static int minecartdrag[16];
-static short minecartopen[16];
-static sectortype* minecartsect[16];
+struct minecart
+{
+	sectortype* sect;
+	sectortype* childsect;
+	int speed;
+	float dist;
+	float drag;
+	int16_t direction;
+	int16_t sound;
+	int16_t open;
+};
+
+static TArray<jaildoor> jaildoors;
+static TArray<minecart> minecarts;
+
 
 static sectortype* lightninsector[64];
 static short lightninsectorshade[64];
@@ -74,43 +83,57 @@ static int windertime;
 
 void lava_cleararrays()
 {
-	jaildoorcnt = 0;
-	minecartcnt = 0;
+	jaildoors.Clear();
+	minecarts.Clear();
 	torchcnt = 0;
 	lightnincnt = 0;
+}
+
+FSerializer& Serialize(FSerializer& arc, const char* key, jaildoor& c, jaildoor* def)
+{
+	if (arc.BeginObject(key))
+	{
+		arc("sect", c.sect)
+			("hitag", c.hitag)
+			("speed", c.speed)
+			("dist", c.dist)
+			("drag", c.drag)
+			("dir", c.direction)
+			("sound", c.sound)
+			("open", c.open)
+			.EndObject();
+	}
+	return arc;
+}
+
+FSerializer& Serialize(FSerializer& arc, const char* key, minecart& c, minecart* def)
+{
+	if (arc.BeginObject(key))
+	{
+		arc("sect", c.sect)
+			("childsect", c.childsect)
+			("speed", c.speed)
+			("dist", c.dist)
+			("drag", c.drag)
+			("dir", c.direction)
+			("sound", c.sound)
+			("open", c.open)
+			.EndObject();
+	}
+	return arc;
 }
 
 void lava_serialize(FSerializer& arc)
 {
 	arc("torchcnt", torchcnt)
-		("jaildoorcnt", jaildoorcnt)
-		("minecartcnt", minecartcnt)
+		("jaildoors", jaildoors)
+		("minecarts", minecarts)
 		("lightnincnt", lightnincnt);
 
 	if (torchcnt)
 		arc.Array("torchsector", torchsector, torchcnt)
 		.Array("torchsectorshade", torchsectorshade, torchcnt)
 		.Array("torchtype", torchtype, torchcnt);
-
-	if (jaildoorcnt)
-		arc.Array("jaildoorsound", jaildoorsound, jaildoorcnt)
-		.Array("jaildoordrag", jaildoordrag, jaildoorcnt)
-		.Array("jaildoorspeed", jaildoorspeed, jaildoorcnt)
-		.Array("jaildoorsecthtag", jaildoorsecthtag, jaildoorcnt)
-		.Array("jaildoordist", jaildoordist, jaildoorcnt)
-		.Array("jaildoordir", jaildoordir, jaildoorcnt)
-		.Array("jaildooropen", jaildooropen, jaildoorcnt)
-		.Array("jaildoorsect", jaildoorsect, jaildoorcnt);
-
-	if (minecartcnt)
-		arc.Array("minecartdir", minecartdir, minecartcnt)
-		.Array("minecartspeed", minecartspeed, minecartcnt)
-		.Array("minecartchildsect", minecartchildsect, minecartcnt)
-		.Array("minecartsound", minecartsound, minecartcnt)
-		.Array("minecartdist", minecartdist, minecartcnt)
-		.Array("minecartdrag", minecartdrag, minecartcnt)
-		.Array("minecartopen", minecartopen, minecartcnt)
-		.Array("minecartsect", minecartsect, minecartcnt);
 
 	if (lightnincnt)
 		arc.Array("lightninsector", lightninsector, lightnincnt)
@@ -123,62 +146,62 @@ void lava_serialize(FSerializer& arc)
 		("windertime", windertime);
 }
 
-void addtorch(spritetype* s)
+void addtorch(DDukeActor* actor)
 {
 	if (torchcnt >= 64)
 		I_Error("Too many torch effects");
 
-	torchsector[torchcnt] = s->sector();
-	torchsectorshade[torchcnt] = s->sector()->floorshade;
-	torchtype[torchcnt] = s->lotag;
+	torchsector[torchcnt] = actor->sector();
+	torchsectorshade[torchcnt] = actor->sector()->floorshade;
+	torchtype[torchcnt] = actor->spr.lotag;
 	torchcnt++;
 }
 
-void addlightning(spritetype* s)
+void addlightning(DDukeActor* actor)
 {
 	if (lightnincnt >= 64)
 		I_Error("Too many lightnin effects");
 
-	lightninsector[lightnincnt] = s->sector();
-	lightninsectorshade[lightnincnt] = s->sector()->floorshade;
+	lightninsector[lightnincnt] = actor->sector();
+	lightninsectorshade[lightnincnt] = actor->sector()->floorshade;
 	lightnincnt++;
 }
 
 void addjaildoor(int p1, int p2, int iht, int jlt, int p3, sectortype* j)
 {
-	if (jaildoorcnt >= 32)
-		I_Error("Too many jaildoor sectors");
-
 	if (jlt != 10 && jlt != 20 && jlt != 30 && jlt != 40)
 	{
 		Printf(PRINT_HIGH, "Bad direction %d for jail door with tag %d\n", jlt, iht);
 		return;	// wouldn't work so let's skip it.
 	}
 
-	jaildoordist[jaildoorcnt] = p1;
-	jaildoorspeed[jaildoorcnt] = p2;
-	jaildoorsecthtag[jaildoorcnt] = iht;
-	jaildoorsect[jaildoorcnt] = j;
-	jaildoordrag[jaildoorcnt] = 0;
-	jaildooropen[jaildoorcnt] = 0;
-	jaildoordir[jaildoorcnt] = jlt;
-	jaildoorsound[jaildoorcnt] = p3;
-	jaildoorcnt++;
+	jaildoors.Reserve(1);
+	auto& jd = jaildoors.Last();
+
+	jd.dist = p1;
+	jd.speed = p2;
+	jd.hitag = iht;
+	jd.sect = j;
+	jd.drag = 0;
+	jd.open = 0;
+	jd.direction = jlt;
+	jd.sound = p3;
+	setsectinterpolate(j);
 }
 
 void addminecart(int p1, int p2, sectortype* i, int iht, int p3, sectortype* childsectnum)
 {
-	if (minecartcnt >= 16)
-		I_Error("Too many minecart sectors");
-	minecartdist[minecartcnt] = p1;
-	minecartspeed[minecartcnt] = p2;
-	minecartsect[minecartcnt] = i;
-	minecartdir[minecartcnt] = i->hitag;
-	minecartdrag[minecartcnt] = p1;
-	minecartopen[minecartcnt] = 1;
-	minecartsound[minecartcnt] = p3;
-	minecartchildsect[minecartcnt] = childsectnum;
-	minecartcnt++;
+	minecarts.Reserve(1);
+	auto& mc = minecarts.Last();
+	mc.dist = p1;
+	mc.speed = p2;
+	mc.sect = i;
+	mc.direction = i->hitag;
+	mc.drag = p1;
+	mc.open = 1;
+	mc.sound = p3;
+	mc.childsect = childsectnum;
+	setsectinterpolate(i);
 }
 
 //---------------------------------------------------------------------------
@@ -247,36 +270,32 @@ void dotorch(void)
 
 void dojaildoor(void)
 {
-	for (int i = 0; i < jaildoorcnt; i++)
+	for(auto& jd : jaildoors)
 	{
-		int speed;
-		auto sectp = jaildoorsect[i];
-		if (numplayers > 2)
-			speed = jaildoorspeed[i];
-		else
-			speed = jaildoorspeed[i];
-		if (speed < 2)
-			speed = 2;
-		if (jaildooropen[i] == 1)
+		auto sectp = jd.sect;
+		if (!sectp) continue; // this is only for allowing old, broken savegames to work, this would crash otherwise.
+		double speed = max(2, jd.speed) * maptoworld;
+
+		if (jd.open == 1 || jd.open == 3)
 		{
-			jaildoordrag[i] -= speed;
-			if (jaildoordrag[i] <= 0)
+			jd.drag -= speed;
+			if (jd.drag <= 0)
 			{
-				jaildoordrag[i] = 0;
-				jaildooropen[i] = 2;
-				switch (jaildoordir[i])
+				jd.drag = 0;
+				jd.open ^= 3;
+				switch (jd.direction)
 				{
 					case 10:
-						jaildoordir[i] = 30;
+						jd.direction = 30;
 						break;
 					case 20:
-						jaildoordir[i] = 40;
+						jd.direction = 40;
 						break;
 					case 30:
-						jaildoordir[i] = 10;
+						jd.direction = 10;
 						break;
 					case 40:
-						jaildoordir[i] = 20;
+						jd.direction = 20;
 						break;
 				}
 			}
@@ -284,80 +303,48 @@ void dojaildoor(void)
 			{
 				for (auto& wal : wallsofsector(sectp))
 				{
-					int x = wal.x;
-					int y = wal.y;
-					switch (jaildoordir[i])
+					DVector2 vec = wal.pos;
+					switch (jd.direction)
 					{
 						case 10:
-							y += speed;
+							vec.Y += speed;
 							break;
 						case 20:
-							x -= speed;
+							vec.X -= speed;
 							break;
 						case 30:
-							y -= speed;
+							vec.Y -= speed;
 							break;
 						case 40:
-							x += speed;
+							vec.X += speed;
 							break;
 					}
-					dragpoint(&wal, x, y);
+					dragpoint(&wal, vec);
 				}
 			}
 		}
-		if (jaildooropen[i] == 3)
+	}
+}
+
+void operatejaildoors(int hitag)
+{
+	for (auto& jd : jaildoors)
+	{
+		if (jd.hitag == hitag)
 		{
-			jaildoordrag[i] -= speed;
-			if (jaildoordrag[i] <= 0)
+			if (jd.open == 0)
 			{
-				jaildoordrag[i] = 0;
-				jaildooropen[i] = 0;
-				switch (jaildoordir[i])
-				{
-					case 10:
-						jaildoordir[i] = 30;
-						break;
-					case 20:
-						jaildoordir[i] = 40;
-						break;
-					case 30:
-						jaildoordir[i] = 10;
-						break;
-					case 40:
-						jaildoordir[i] = 20;
-						break;
-				}
+				jd.open = 1;
+				jd.drag = jd.dist;
+				if (!isRRRA() || jd.sound != 0)
+					S_PlayActorSound(jd.sound, ps[screenpeek].GetActor());
 			}
-			else
+			if (jd.open == 2)
 			{
-				for (auto& wal : wallsofsector(sectp))
-				{
-					int x, y;
-					switch (jaildoordir[i])
-					{
-						default: // make case of bad parameters well defined.
-							x = wal.x;
-							y = wal.y;
-							break;
-						case 10:
-							x = wal.x;
-							y = wal.y + speed;
-							break;
-						case 20:
-							x = wal.x - speed;
-							y = wal.y;
-							break;
-						case 30:
-							x = wal.x;
-							y = wal.y - speed;
-							break;
-						case 40:
-							x = wal.x + speed;
-							y = wal.y;
-							break;
-					}
-					dragpoint(&wal, x, y);
-				}
+				jd.open = 3;
+				jd.drag = jd.dist;
+				if (!isRRRA() || jd.sound != 0)
+					S_PlayActorSound(jd.sound, ps[screenpeek].GetActor());
 			}
 		}
 	}
@@ -371,43 +358,31 @@ void dojaildoor(void)
 
 void moveminecart(void)
 {
-	int i;
-	int speed;
-	int y;
-	int x;
-	int cx;
-	int cy;
-	int max_x;
-	int min_y;
-	int max_y;
-	int min_x;
-	for (i = 0; i < minecartcnt; i++)
+	for(auto& mc : minecarts)
 	{
-		auto sectp = minecartsect[i];
-		speed = minecartspeed[i];
-		if (speed < 2)
-			speed = 2;
+		auto sectp = mc.sect;
+		double speed = max(2, mc.speed) * maptoworld;
 
-		if (minecartopen[i] == 1)
+		if (mc.open == 1 || mc.open == 2)
 		{
-			minecartdrag[i] -= speed;
-			if (minecartdrag[i] <= 0)
+			mc.drag -= speed;
+			if (mc.drag <= 0)
 			{
-				minecartdrag[i] = minecartdist[i];
-				minecartopen[i] = 2;
-				switch (minecartdir[i])
+				mc.drag = mc.dist;
+				mc.open ^= 3;
+				switch (mc.direction)
 				{
 					case 10:
-						minecartdir[i] = 30;
+						mc.direction = 30;
 						break;
 					case 20:
-						minecartdir[i] = 40;
+						mc.direction = 40;
 						break;
 					case 30:
-						minecartdir[i] = 10;
+						mc.direction = 10;
 						break;
 					case 40:
-						minecartdir[i] = 20;
+						mc.direction = 20;
 						break;
 				}
 			}
@@ -415,94 +390,35 @@ void moveminecart(void)
 			{
 				for (auto& wal : wallsofsector(sectp))
 				{
-					switch (minecartdir[i])
+					auto pos = wal.pos;
+					switch (mc.direction)
 					{
 						default: // make case of bad parameters well defined.
-							x = wal.x;
-							y = wal.y;
 							break;
 						case 10:
-							x = wal.x;
-							y = wal.y + speed;
+							pos.Y += speed;
 							break;
 						case 20:
-							x = wal.x - speed;
-							y = wal.y;
+							pos.X -= speed;
 							break;
 						case 30:
-							x = wal.x;
-							y = wal.y - speed;
+							pos.Y -= speed;
 							break;
 						case 40:
-							x = wal.x + speed;
-							y = wal.y;
+							pos.X += speed;
 							break;
 					}
-					dragpoint(&wal, x, y);
+					dragpoint(&wal, pos);
 				}
 			}
 		}
-		if (minecartopen[i] == 2)
-		{
-			minecartdrag[i] -= speed;
-			if (minecartdrag[i] <= 0)
-			{
-				minecartdrag[i] = minecartdist[i];
-				minecartopen[i] = 1;
-				switch (minecartdir[i])
-				{
-					case 10:
-						minecartdir[i] = 30;
-						break;
-					case 20:
-						minecartdir[i] = 40;
-						break;
-					case 30:
-						minecartdir[i] = 10;
-						break;
-					case 40:
-						minecartdir[i] = 20;
-						break;
-				}
-			}
-			else
-			{
-				for (auto& wal : wallsofsector(sectp))
-				{
-					switch (minecartdir[i])
-					{
-						default: // make case of bad parameters well defined.
-							x = wal.x;
-							y = wal.y;
-							break;
-						case 10:
-							x = wal.x;
-							y = wal.y + speed;
-							break;
-						case 20:
-							x = wal.x - speed;
-							y = wal.y;
-							break;
-						case 30:
-							x = wal.x;
-							y = wal.y - speed;
-							break;
-						case 40:
-							x = wal.x + speed;
-							y = wal.y;
-							break;
-					}
-					dragpoint(&wal, x, y);
-				}
-			}
-		}
-		auto csect = minecartchildsect[i];
-		max_x = max_y = -0x20000;
-		min_x = min_y = 0x20000;
+
+		auto csect = mc.childsect;
+		double max_x = INT32_MIN, max_y = INT32_MIN, min_x = INT32_MAX, min_y = INT32_MAX;
 		for (auto& wal : wallsofsector(csect))
 		{
-			x = wal.x;
-			y = wal.y;
+			double x = wal.pos.X;
+			double y = wal.pos.Y;
 			if (x > max_x)
 				max_x = x;
 			if (y > max_y)
@@ -512,38 +428,13 @@ void moveminecart(void)
 			if (y < min_y)
 				min_y = y;
 		}
-		cx = (max_x + min_x) >> 1;
-		cy = (max_y + min_y) >> 1;
+		double cx = (max_x + min_x) * 0.5;
+		double cy = (max_y + min_y) * 0.5;
 		DukeSectIterator it(csect);
 		while (auto a2 = it.Next())
 		{
-			auto sj = a2->s;
-			if (badguy(sj))
-				setsprite(a2, cx, cy, sj->z);
-		}
-	}
-}
-
-void operatejaildoors(int hitag)
-{
-	for (int i = 0; i < jaildoorcnt; i++)
-	{
-		if (jaildoorsecthtag[i] == hitag)
-		{
-			if (jaildooropen[i] == 0)
-			{
-				jaildooropen[i] = 1;
-				jaildoordrag[i] = jaildoordist[i];
-				if (!isRRRA() || jaildoorsound[i] != 0)
-					S_PlayActorSound(jaildoorsound[i], ps[screenpeek].GetActor());
-			}
-			if (jaildooropen[i] == 2)
-			{
-				jaildooropen[i] = 3;
-				jaildoordrag[i] = jaildoordist[i];
-				if (!isRRRA() || jaildoorsound[i] != 0)
-					S_PlayActorSound(jaildoorsound[i], ps[screenpeek].GetActor());
-			}
+			if (badguy(a2))
+				SetActor(a2, { int(cx * worldtoint), int(cy * worldtoint), a2->spr.pos.Z });
 		}
 	}
 }
@@ -559,9 +450,9 @@ void thunder(void)
 
 	if (!thunderflash)
 	{
-		if (testgotpic(RRTILE2577, true))
+		if (testgotpic(RRTHUNDERSKY, true))
 		{
-			g_visibility = 256; // this is an engine variable
+			g_relvisibility = 0;
 			if (krand() > 65000)
 			{
 				thunderflash = 1;
@@ -571,7 +462,6 @@ void thunder(void)
 		}
 		else
 		{
-			g_visibility = p->visibility;
 			brightness = ud.brightness >> 2;
 		}
 	}
@@ -583,7 +473,6 @@ void thunder(void)
 			thunderflash = 0;
 			brightness = ud.brightness >> 2;
 			thunder_brightness = brightness;
-			g_visibility = p->visibility;
 		}
 	}
 	if (!winderflash)
@@ -618,24 +507,6 @@ void thunder(void)
 	{
 		r1 = krand() & 4;
 		brightness += r1;
-		switch (r1)
-		{
-		case 0:
-			g_visibility = 2048;
-			break;
-		case 1:
-			g_visibility = 1024;
-			break;
-		case 2:
-			g_visibility = 512;
-			break;
-		case 3:
-			g_visibility = 256;
-			break;
-		default:
-			g_visibility = 4096;
-			break;
-		}
 		if (brightness > 8)
 			brightness = 0;
 		thunder_brightness = brightness;

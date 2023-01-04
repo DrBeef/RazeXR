@@ -16,7 +16,6 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 */
 //-------------------------------------------------------------------------
 #include "ns.h"
-#include "compat.h"
 #include "engine.h"
 #include "exhumed.h"
 #include "sequence.h"
@@ -50,10 +49,46 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 #include "razemenu.h"
 #include "v_draw.h"
 #include "interpolate.h"
+#include "psky.h"
 
 BEGIN_PS_NS
 
-DExhumedActor exhumedActors[MAXSPRITES];
+TObjPtr<DExhumedActor*> bestTarget;
+
+IMPLEMENT_CLASS(DExhumedActor, false, true)
+IMPLEMENT_POINTERS_START(DExhumedActor)
+IMPLEMENT_POINTER(pTarget)
+IMPLEMENT_POINTERS_END
+
+size_t MarkMove();
+size_t MarkBullets();
+size_t MarkInput();
+size_t MarkItems();
+size_t MarkLighting();
+size_t MarkObjects();
+size_t MarkPlayers();
+size_t MarkQueen();
+size_t MarkRa();
+size_t MarkSnake();
+size_t MarkRunlist();
+
+
+static void markgcroots()
+{
+    MarkBullets();
+    MarkInput();
+    MarkItems();
+    MarkLighting();
+    MarkObjects();
+    MarkPlayers();
+    MarkQueen();
+    MarkRa();
+    MarkSnake();
+    MarkRunlist();
+
+    GC::Mark(bestTarget);
+    GC::Mark(pSpiritSprite);
+}
 
 static MapRecord* NextMap;
 
@@ -81,65 +116,61 @@ void GameInterface::loadPalette()
     LoadPaletteLookups();
 }
 
-void CopyTileToBitmap(short nSrcTile, short nDestTile, int xPos, int yPos);
+void CopyTileToBitmap(int nSrcTile, int nDestTile, int xPos, int yPos);
 
 // void TestSaveLoad();
-void EraseScreen(int nVal);
 void LoadStatus();
 void MySetView(int x1, int y1, int x2, int y2);
 
 char sHollyStr[40];
 
-short nFontFirstChar;
-short nBackgroundPic;
-short nShadowPic;
+int nFontFirstChar;
+int nBackgroundPic;
+int nShadowPic;
 
-short nCreaturesKilled = 0, nCreaturesTotal = 0;
+int nCreaturesKilled = 0, nCreaturesTotal = 0;
 
-short nFreeze;
+int nFreeze;
 
-short nSnakeCam = -1;
+int nSnakeCam = -1;
 
 int nNetPlayerCount = 0;
 
-short nClockVal;
-short nRedTicks;
-short nAlarmTicks;
-short nButtonColor;
-short nEnergyChan;
+int nClockVal;
+int nRedTicks;
+int nAlarmTicks;
+int nButtonColor;
+int nEnergyChan;
 
 int lCountDown = 0;
-short nEnergyTowers = 0;
+int nEnergyTowers = 0;
 
-short nCfgNetPlayers = 0;
+int nCfgNetPlayers = 0;
 
 int lLocalCodes = 0;
 
-short bCoordinates = false;
+bool bCoordinates = false;
 
 int nNetTime = -1;
 
 int flash;
 int totalmoves;
 
-short nCurBodyNum = 0;
+int nCurBodyNum = 0;
 
-short nBodyTotal = 0;
+int nBodyTotal = 0;
 
-short nTotalPlayers = 1;
+int nTotalPlayers = 1;
 // TODO: Rename this (or make it static) so it doesn't conflict with library function
 
 
-short bSnakeCam = false;
-short bRecord = false;
-short bPlayback = false;
-short bInDemo = false;
-short bSlipMode = false;
-short bDoFlashes = true;
+bool bSnakeCam = false;
+bool bRecord = false;
+bool bPlayback = false;
+bool bInDemo = false;
+bool bSlipMode = false;
+bool bDoFlashes = true;
 
-DExhumedActor* bestTarget;
-
-short scan_char = 0;
 
 int nStartLevel;
 int nTimeLimit;
@@ -177,9 +208,8 @@ void DoRedAlert(int nVal)
     {
         if (nVal)
         {
-			auto spri = &ac->s();
-            PlayFXAtXYZ(StaticSound[kSoundAlarm], spri->x, spri->y, spri->z, spri->sectnum);
-            AddFlash(spri->sectnum, spri->x, spri->y, spri->z, 192);
+            PlayFXAtXYZ(StaticSound[kSoundAlarm], ac->spr.pos.X, ac->spr.pos.Y, ac->spr.pos.Z);
+            AddFlash(ac->sector(), ac->spr.pos.X, ac->spr.pos.Y, ac->spr.pos.Z, 192);
         }
     }
 }
@@ -217,7 +247,7 @@ void DrawClock()
 
 double calc_smoothratio()
 {
-    if (bRecord || bPlayback || nFreeze != 0 || paused || cl_capfps || !cl_interpolate)
+    if (bRecord || bPlayback || nFreeze != 0 || paused || cl_capfps || !cl_interpolate || EndLevel)
         return MaxSmoothRatio;
 
     return I_GetTimeFrac() * MaxSmoothRatio;
@@ -239,7 +269,7 @@ void GameMove(void)
 	ExhumedSpriteIterator it;
     while (auto ac = it.Next())
     {
-		ac->s().backuploc();
+		ac->backuploc();
     }
 
     if (currentLevel->gameflags & LEVEL_EX_COUNTDOWN)
@@ -433,7 +463,6 @@ void GameInterface::Ticker()
             PlayLocalSound(StaticSound[59], 0, true, CHANF_UI);
 
         if (EndLevel > 1) EndLevel--;
-		r_NoInterpolate = true;
         int flash = 7 - abs(EndLevel - 7);
         videoTintBlood(flash * 30, flash * 30, flash * 30);
         if (EndLevel == 1)
@@ -461,6 +490,7 @@ static void SetTileNames()
     auto registerName = [](const char* name, int index)
     {
         TexMan.AddAlias(name, tileGetTexture(index));
+        TileFiles.addName(name, index);
     };
 #include "namelist.h"
 }
@@ -468,6 +498,9 @@ static void SetTileNames()
 
 void GameInterface::app_init()
 {
+    GC::AddMarkerFunc(markgcroots);
+
+
 #if 0
     help_disabled = true;
 #endif
@@ -481,11 +514,12 @@ void GameInterface::app_init()
     }
 
     SetTileNames();
+    defineSky(DEFAULTPSKY, 2, nullptr, 256, 1.f);
 
     InitFX();
     seq_LoadSequences();
     InitStatus();
-    
+
     resettiming();
     GrabPalette();
 
@@ -499,20 +533,16 @@ void DeleteActor(DExhumedActor* actor)
         return;
     }
 
-    FVector3 pos = GetSoundPos(&actor->s().pos);
-    soundEngine->RelinkSound(SOURCE_Actor, &actor->s(), nullptr, &pos);
-
-    deletesprite(actor->GetSpriteIndex());
-    actor->s().ox = 0x80000000;
-
     if (actor == bestTarget) {
         bestTarget = nullptr;
     }
+
+    actor->Destroy();
 }
 
 
 
-void CopyTileToBitmap(short nSrcTile,  short nDestTile, int xPos, int yPos)
+void CopyTileToBitmap(int nSrcTile,  int nDestTile, int xPos, int yPos)
 {
     int nOffs = tileHeight(nDestTile) * xPos;
 
@@ -570,33 +600,24 @@ bool GameInterface::CanSave()
     return new GameInterface;
 }
 
-extern short cPupData[300];
-extern uint8_t* Worktile;
-extern int lHeadStartClock;
-extern short* pPupData;
-
-FSerializer& Serialize(FSerializer& arc, const char* keyname, DExhumedActor& w, DExhumedActor* def)
+void DExhumedActor::Serialize(FSerializer& arc)
 {
-    if (arc.BeginObject(keyname))
-    {
-        arc("phase", w.nPhase)
-            ("health", w.nHealth)
-            ("frame", w.nFrame)
-            ("action", w.nAction)
-            ("target", w.pTarget)
-            ("count", w.nCount)
-            ("run", w.nRun)
-            ("index", w.nIndex)
-			("index2", w.nIndex2)
-			("channel", w.nChannel)
-            ("damage", w.nDamage)
+    Super::Serialize(arc);
+    arc("phase", nPhase)
+        ("health", nHealth)
+        ("frame", nFrame)
+        ("action", nAction)
+        ("target", pTarget)
+        ("count", nCount)
+        ("run", nRun)
+        ("index", nIndex)
+        ("index2", nIndex2)
+        ("channel", nChannel)
+        ("damage", nDamage)
 
-            ("turn", w.nTurn)
-            ("x", w.x)
-            ("y", w.y)
-            .EndObject();
-    }
-    return arc;
+        ("turn", nTurn)
+        ("x", x)
+        ("y", y);
 }
 
 void SerializeState(FSerializer& arc)
@@ -627,7 +648,6 @@ void SerializeState(FSerializer& arc)
             ("slipmode", bSlipMode)
             ("PlayClock", PlayClock)
             ("spiritsprite", pSpiritSprite)
-            .SparseArray("actors", exhumedActors, kMaxSprites, activeSprites)
             .EndObject();
     }
 }

@@ -157,7 +157,7 @@ STATE s_CoolieRun[5][4] =
     }
 };
 
-STATEp sg_CoolieRun[] =
+STATE* sg_CoolieRun[] =
 {
     &s_CoolieRun[0][0],
     &s_CoolieRun[1][0],
@@ -212,7 +212,7 @@ STATE s_CoolieCharge[5][4] =
     }
 };
 
-STATEp sg_CoolieCharge[] =
+STATE* sg_CoolieCharge[] =
 {
     &s_CoolieCharge[0][0],
     &s_CoolieCharge[1][0],
@@ -246,7 +246,7 @@ STATE s_CoolieStand[5][6] =
     }
 };
 
-STATEp sg_CoolieStand[] =
+STATE* sg_CoolieStand[] =
 {
     &s_CoolieStand[0][0],
     &s_CoolieStand[1][0],
@@ -288,7 +288,7 @@ STATE s_CooliePain[5][1] =
     }
 };
 
-STATEp sg_CooliePain[] =
+STATE* sg_CooliePain[] =
 {
     &s_CooliePain[0][0],
     &s_CooliePain[1][0],
@@ -326,7 +326,7 @@ STATE s_CoolieDie[] =
     {COOLIE_DEAD_NOHEAD, COOLIE_DIE_RATE, DoActorDebris, &s_CoolieDie[12]}
 };
 
-STATEp sg_CoolieDie[] =
+STATE* sg_CoolieDie[] =
 {
     s_CoolieDie
 };
@@ -336,45 +336,10 @@ STATE s_CoolieDead[] =
     {COOLIE_DEAD, COOLIE_DIE_RATE, DoActorDebris, &s_CoolieDead[0]},
 };
 
-STATEp sg_CoolieDead[] =
+STATE* sg_CoolieDead[] =
 {
     s_CoolieDead
 };
-
-/*
-typedef struct
-{
-#define MAX_ACTOR_CLOSE_ATTACK 2
-#define MAX_ACTOR_ATTACK 6
-STATEp *Stand;
-STATEp *Run;
-STATEp *Jump;
-STATEp *Fall;
-STATEp *Crawl;
-STATEp *Swim;
-STATEp *Fly;
-STATEp *Rise;
-STATEp *Sit;
-STATEp *Look;
-STATEp *Climb;
-STATEp *Pain;
-STATEp *Death1;
-STATEp *Death2;
-STATEp *Dead;
-STATEp *DeathJump;
-STATEp *DeathFall;
-
-STATEp *CloseAttack[MAX_ACTOR_CLOSE_ATTACK];
-short  CloseAttackPercent[MAX_ACTOR_CLOSE_ATTACK];
-
-STATEp *Attack[MAX_ACTOR_ATTACK];
-short  AttackPercent[MAX_ACTOR_ATTACK];
-
-STATEp *Special[2];
-STATEp *Duck;
-STATEp *Dive;
-}ACTOR_ACTION_SET,*ACTOR_ACTION_SETp;
-*/
 
 ACTOR_ACTION_SET CoolieActionSet =
 {
@@ -405,16 +370,13 @@ ACTOR_ACTION_SET CoolieActionSet =
 };
 
 // later. This is used by multiple enemies.
-void EnemyDefaults(DSWActor* actor, ACTOR_ACTION_SETp action, PERSONALITYp person)
+void EnemyDefaults(DSWActor* actor, ACTOR_ACTION_SET* action, PERSONALITY* person)
 {
-    USERp u = actor->u();
-    SPRITEp sp = &actor->s();
     unsigned int wpn;
-    short wpn_cnt;
-    short depth = 0;
-    extern short TotalKillable;
+    int wpn_cnt;
+    int depth = 0;
 
-    switch (u->ID)
+    switch (actor->user.ID)
     {
     case PACHINKO1:
     case PACHINKO2:
@@ -438,80 +400,77 @@ void EnemyDefaults(DSWActor* actor, ACTOR_ACTION_SETp action, PERSONALITYp perso
     break;
     }
 
-    RESET(sp->cstat, CSTAT_SPRITE_RESTORE);
+    actor->spr.cstat &= ~(CSTAT_SPRITE_RESTORE);
 
-    u->spal = sp->pal;
+    actor->user.spal = actor->spr.pal;
 
-    u->RotNum = 5;
-    sp->clipdist = (256) >> 2;
+    actor->user.RotNum = 5;
+    actor->spr.clipdist = (256) >> 2;
 
-    u->zclip = Z(48);
-    u->lo_step = Z(32);
+    actor->user.zclip = Z(48);
+    actor->user.lo_step = Z(32);
 
-    u->floor_dist = u->zclip - u->lo_step;
-    u->ceiling_dist = SPRITEp_SIZE_Z(sp) - u->zclip;
+    actor->user.floor_dist = actor->user.zclip - actor->user.lo_step;
+    actor->user.ceiling_dist = ActorSizeZ(actor) - actor->user.zclip;
 
-    u->Radius = 400;
+    actor->user.Radius = 400;
 
-    u->MaxHealth = u->Health;
+    actor->user.MaxHealth = actor->user.Health;
 
-    u->PainThreshold = (u->Health >> 4) - 1;
+    actor->user.PainThreshold = (actor->user.Health >> 4) - 1;
 
-    SET(sp->cstat,CSTAT_SPRITE_BLOCK|CSTAT_SPRITE_BLOCK_HITSCAN);
-    SET(sp->extra,SPRX_PLAYER_OR_ENEMY);
+    actor->spr.cstat |= (CSTAT_SPRITE_BLOCK|CSTAT_SPRITE_BLOCK_HITSCAN);
+    actor->spr.extra |= (SPRX_PLAYER_OR_ENEMY);
 
-    sp->picnum = u->State->Pic;
+    actor->spr.picnum = actor->user.State->Pic;
     change_actor_stat(actor, STAT_ENEMY);
 
-    u->Personality = person;
-    u->ActorActionSet = action;
+    actor->user.Personality = person;
+    actor->user.ActorActionSet = action;
 
     DoActorZrange(actor);
 
     //KeepActorOnFloor(actor); // for swimming actors
 
     // make sure we start in the water if thats where we are
-    if (u->lo_sectp) // && SectUser[u->lo_sectp - sector])
+    if (actor->user.lo_sectp)
     {
-        int i;
-        int sectno = sectnum(u->lo_sectp);
 
-        if (SectUser[sectno].Data() && TEST(u->lo_sectp->extra, SECTFX_SINK))
+        if (actor->user.lo_sectp->hasU() && (actor->user.lo_sectp->extra & SECTFX_SINK))
         {
-            depth = FixedToInt(SectUser[sectno]->depth_fixed);
+            depth = FixedToInt(actor->user.lo_sectp->depth_fixed);
         }
         else
         {
-            SWSectIterator it(sectno);
+            SWSectIterator it(actor->user.lo_sectp);
             while (auto itActor = it.Next())
             {
-                SPRITEp np = &itActor->s();
-                if (np->picnum == ST1 && np->hitag == SECT_SINK)
+                if (itActor->spr.picnum == ST1 && itActor->spr.hitag == SECT_SINK)
                 {
-                    depth = np->lotag;
+                    depth = itActor->spr.lotag;
                 }
             }
         }
     }
 
-    if (depth && labs(sp->z - u->loz) < Z(8))
+    if (depth && labs(actor->spr.pos.Z - actor->user.loz) < Z(8))
     {
-        sp->z += Z(depth);
-        u->loz = sp->z;
-        sp->backupz();
+        actor->spr.pos.Z += Z(depth);
+        actor->user.loz = actor->spr.pos.Z;
+        actor->backupz();
     }
 
     if (!action)
         return;
 
-    NewStateGroup(actor, u->ActorActionSet->Run);
+    NewStateGroup(actor, actor->user.ActorActionSet->Run);
 
-    u->ActorActionFunc = DoActorDecide;
+    actor->user.ActorActionFunc = DoActorDecide;
 
     // find the number of long range attacks
-    for (wpn = wpn_cnt = 0; wpn < SIZ(u->ActorActionSet->Attack); wpn++)
+    for (wpn = wpn_cnt = 0; wpn < SIZ(actor->user.ActorActionSet->Attack); wpn++)
     {
-        if (u->ActorActionSet->Attack[wpn])
+        if (actor->user.ActorActionSet->Attack[wpn])
             wpn_cnt++;
         else
             break;
@@ -519,38 +478,31 @@ void EnemyDefaults(DSWActor* actor, ACTOR_ACTION_SETp action, PERSONALITYp perso
 
     // for actors this tells the number of weapons available
     // for player it tells the current weapon
-    u->WeaponNum = int8_t(wpn_cnt);
+    actor->user.WeaponNum = int8_t(wpn_cnt);
 }
 
 int SetupCoolie(DSWActor* actor)
 {
-    SPRITEp sp = &actor->s();
-    USERp u;
     ANIMATOR DoActorDecide;
 
-    if (TEST(sp->cstat, CSTAT_SPRITE_RESTORE))
+    if (!(actor->spr.cstat & CSTAT_SPRITE_RESTORE))
     {
-        u = actor->u();
-        ASSERT(u);
-    }
-    else
-    {
-        u = SpawnUser(actor,COOLIE_RUN_R0,s_CoolieRun[0]);
-        u->Health = HEALTH_COOLIE;
+        SpawnUser(actor,COOLIE_RUN_R0,s_CoolieRun[0]);
+        actor->user.Health = HEALTH_COOLIE;
     }
 
     ChangeState(actor,s_CoolieRun[0]);
-    u->Attrib = &CoolieAttrib;
+    actor->user.Attrib = &CoolieAttrib;
     DoActorSetSpeed(actor, NORM_SPEED);
-    u->StateEnd = s_CoolieDie;
-    u->Rot = sg_CoolieRun;
+    actor->user.StateEnd = s_CoolieDie;
+    actor->user.Rot = sg_CoolieRun;
 
     EnemyDefaults(actor, &CoolieActionSet, &CooliePersonality);
 
-    sp->xrepeat = 42;
-    sp->yrepeat = 42;
+    actor->spr.xrepeat = 42;
+    actor->spr.yrepeat = 42;
 
-    SET(u->Flags, SPR_XFLIP_TOGGLE);
+    actor->user.Flags |= (SPR_XFLIP_TOGGLE);
 
     return 0;
 }
@@ -573,17 +525,15 @@ int SpawnCoolg(DSWActor* actor)
 
 int CooliePain(DSWActor* actor)
 {
-    USER* u = actor->u();
-
-    if (TEST(u->Flags,SPR_SLIDING))
+    if (actor->user.Flags & (SPR_SLIDING))
         DoActorSlide(actor);
 
-    if (!TEST(u->Flags,SPR_CLIMBING))
+    if (!(actor->user.Flags & SPR_CLIMBING))
         KeepActorOnFloor(actor);
 
     DoActorSectorDamage(actor);
 
-    if ((u->WaitTics -= ACTORMOVETICS) <= 0)
+    if ((actor->user.WaitTics -= ACTORMOVETICS) <= 0)
         InitActorDecide(actor);
 
     return 0;
@@ -591,12 +541,10 @@ int CooliePain(DSWActor* actor)
 
 int NullCoolie(DSWActor* actor)
 {
-    USER* u = actor->u();
-
-    if (TEST(u->Flags,SPR_SLIDING))
+    if (actor->user.Flags & (SPR_SLIDING))
         DoActorSlide(actor);
 
-    if (!TEST(u->Flags,SPR_CLIMBING))
+    if (!(actor->user.Flags & SPR_CLIMBING))
         KeepActorOnFloor(actor);
 
     DoActorSectorDamage(actor);
@@ -606,16 +554,13 @@ int NullCoolie(DSWActor* actor)
 
 int DoCoolieMove(DSWActor* actor)
 {
-    USER* u = actor->u();
-    SPRITEp sp = &actor->s();
-
-    if (TEST(u->Flags,SPR_SLIDING))
+    if (actor->user.Flags & (SPR_SLIDING))
         DoActorSlide(actor);
 
-    if (u->track >= 0)
+    if (actor->user.track >= 0)
         ActorFollowTrack(actor, ACTORMOVETICS);
     else
-        (*u->ActorActionFunc)(actor);
+        (*actor->user.ActorActionFunc)(actor);
 
     KeepActorOnFloor(actor);
 
@@ -624,7 +569,7 @@ int DoCoolieMove(DSWActor* actor)
         return 0;
     }
 
-    if (Distance(sp->x, sp->y, u->targetActor->s().x, u->targetActor->s().y) < 1200)
+    if (Distance(actor->spr.pos.X, actor->spr.pos.Y, actor->user.targetActor->spr.pos.X, actor->user.targetActor->spr.pos.Y) < 1200)
     {
         UpdateSinglePlayKills(actor);
         DoActorDie(actor, actor, 0);
@@ -636,8 +581,6 @@ int DoCoolieMove(DSWActor* actor)
 
 int InitCoolieCharge(DSWActor* actor)
 {
-    SPRITEp sp = &actor->s();
-
     if (RANDOM_P2(1024) > 950)
         PlaySound(DIGI_COOLIESCREAM, actor, v3df_follow);
 
@@ -651,12 +594,9 @@ int InitCoolieCharge(DSWActor* actor)
 }
 
 
-int
-DoCoolieWaitBirth(DSWActor* actor)
+int DoCoolieWaitBirth(DSWActor* actor)
 {
-    USER* u = actor->u();
-
-    if ((u->Counter -= ACTORMOVETICS) <= 0)
+    if ((actor->user.Counter -= ACTORMOVETICS) <= 0)
     {
         ChangeState(actor,&s_CoolieDie[9]);
     }

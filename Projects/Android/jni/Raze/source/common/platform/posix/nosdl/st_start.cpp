@@ -43,66 +43,32 @@
 #include "c_cvars.h"
 #include "engineerrors.h"
 
-#ifdef __MOBILE__
-
-#define fprintf my_fprintf
-
-void my_fprintf(FILE * x, const char *format, ...)
-{
-	FString str;
-	va_list argptr;
-
-	va_start (argptr, format);
-	str.VFormat (format, argptr);
-	va_end (argptr);
-	//fprintf (stderr, "\r%-40s\n", str.GetChars());
-}
-
-#endif
-
 // MACROS ------------------------------------------------------------------
 
 // TYPES -------------------------------------------------------------------
 
 class FTTYStartupScreen : public FStartupScreen
 {
-	public:
-		FTTYStartupScreen(int max_progress);
-		~FTTYStartupScreen();
+public:
+	FTTYStartupScreen(int max_progress);
+	~FTTYStartupScreen();
 
-		void Progress();
-		void NetInit(const char *message, int num_players);
-		void NetProgress(int count);
-		void NetMessage(const char *format, ...);	// cover for printf
-		void NetDone();
-		bool NetLoop(bool (*timer_callback)(void *), void *userdata);
-	protected:
-		bool DidNetInit;
-		int NetMaxPos, NetCurPos;
-		const char *TheNetMessage;
-		termios OldTermIOS;
+	void Progress();
+	void NetInit(const char *message, int num_players);
+	void NetProgress(int count);
+	void NetDone();
+	bool NetLoop(bool (*timer_callback)(void *), void *userdata);
+protected:
+	bool DidNetInit;
+	int NetMaxPos, NetCurPos;
+	const char *TheNetMessage;
+	termios OldTermIOS;
 };
 
 // EXTERNAL FUNCTION PROTOTYPES --------------------------------------------
 
 extern void RedrawProgressBar(int CurPos, int MaxPos);
 extern void CleanProgressBar();
-
-// PUBLIC FUNCTION PROTOTYPES ----------------------------------------------
-
-// PRIVATE FUNCTION PROTOTYPES ---------------------------------------------
-
-// EXTERNAL DATA DECLARATIONS ----------------------------------------------
-
-// PUBLIC DATA DEFINITIONS -------------------------------------------------
-
-FStartupScreen *StartScreen;
-
-CUSTOM_CVAR(Int, showendoom, 0, CVAR_ARCHIVE|CVAR_GLOBALCONFIG)
-{
-	if (self < 0) self = 0;
-	else if (self > 2) self=2;
-}
 
 // PRIVATE DATA DEFINITIONS ------------------------------------------------
 
@@ -119,7 +85,7 @@ static const char SpinnyProgressChars[4] = { '|', '/', '-', '\\' };
 //
 //==========================================================================
 
-FStartupScreen *FStartupScreen::CreateInstance(int max_progress)
+FStartupScreen *FStartupScreen::CreateInstance(int max_progress, bool)
 {
 	return new FTTYStartupScreen(max_progress);
 }
@@ -133,7 +99,7 @@ FStartupScreen *FStartupScreen::CreateInstance(int max_progress)
 //===========================================================================
 
 FTTYStartupScreen::FTTYStartupScreen(int max_progress)
-	: FStartupScreen(max_progress)
+		: FStartupScreen(max_progress)
 {
 	DidNetInit = false;
 	NetMaxPos = 0;
@@ -194,7 +160,6 @@ void FTTYStartupScreen::NetInit(const char *message, int numplayers)
 		rawtermios.c_lflag &= ~(ICANON | ECHO);
 		tcsetattr (STDIN_FILENO, TCSANOW, &rawtermios);
 		DidNetInit = true;
-
 	}
 	if (numplayers == 1)
 	{
@@ -221,7 +186,7 @@ void FTTYStartupScreen::NetInit(const char *message, int numplayers)
 //===========================================================================
 
 void FTTYStartupScreen::NetDone()
-{	
+{
 	CleanProgressBar();
 	// Restore stdin settings
 	if (DidNetInit)
@@ -229,29 +194,7 @@ void FTTYStartupScreen::NetDone()
 		tcsetattr (STDIN_FILENO, TCSANOW, &OldTermIOS);
 		printf ("\n");
 		DidNetInit = false;
-
 	}
-}
-
-//===========================================================================
-//
-// FTTYStartupScreen :: NetMessage
-//
-// Call this between NetInit() and NetDone() instead of Printf() to
-// display messages, because the progress meter is mixed in the same output
-// stream as normal messages.
-//
-//===========================================================================
-
-void FTTYStartupScreen::NetMessage(const char *format, ...)
-{
-	FString str;
-	va_list argptr;
-	
-	va_start (argptr, format);
-	str.VFormat (format, argptr);
-	va_end (argptr);
-	fprintf (stderr, "\r%-40s\n", str.GetChars());
 }
 
 //===========================================================================
@@ -325,16 +268,7 @@ bool FTTYStartupScreen::NetLoop(bool (*timer_callback)(void *), void *userdata)
 		FD_SET (STDIN_FILENO, &rfds);
 
 		retval = select (1, &rfds, NULL, NULL, &tv);
-#ifdef __ANDROID__
-		usleep(1000*200);
-		//The select command is to wait for the console input to be ready, obv don't need this on droid
-		retval = 0;
 
-//		if( getConsoleBoxCanceled() )
-		{
-			return false;
-		}
-#endif
 		if (retval == -1)
 		{
 			// Error
@@ -359,7 +293,3 @@ bool FTTYStartupScreen::NetLoop(bool (*timer_callback)(void *), void *userdata)
 	}
 }
 
-void ST_Endoom()
-{
-	throw CExitEvent(0);
-}

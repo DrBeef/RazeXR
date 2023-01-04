@@ -38,45 +38,41 @@ static actionSeq ScorpSeq[] = {
     {53, 1}
 };
 
-void BuildScorp(DExhumedActor* pActor, int x, int y, int z, int nSector, int nAngle, int nChannel)
+void BuildScorp(DExhumedActor* pActor, int x, int y, int z, sectortype* pSector, int nAngle, int nChannel)
 {
-    spritetype* pSprite;
-
     if (pActor == nullptr)
     {
-        pActor = insertActor(nSector, 122);
-        pSprite = &pActor->s();
+        pActor = insertActor(pSector, 122);
     }
     else
     {
         ChangeActorStat(pActor, 122);
 
-		pSprite = &pActor->s();
-        x = pSprite->x;
-        y = pSprite->y;
-        z = pSprite->sector()->floorz;
-        nAngle = pSprite->ang;
+        x = pActor->spr.pos.X;
+        y = pActor->spr.pos.Y;
+        z = pActor->sector()->floorz;
+        nAngle = pActor->spr.ang;
     }
 
-	pSprite->x = x;
-    pSprite->y = y;
-    pSprite->z = z;
-    pSprite->cstat = 0x101;
-    pSprite->clipdist = 70;
-    pSprite->shade = -12;
-    pSprite->xrepeat = 80;
-    pSprite->yrepeat = 80;
-    pSprite->picnum = 1;
-    pSprite->pal = pSprite->sector()->ceilingpal;
-    pSprite->xoffset = 0;
-    pSprite->yoffset = 0;
-    pSprite->ang = nAngle;
-    pSprite->xvel = 0;
-    pSprite->yvel = 0;
-    pSprite->zvel = 0;
-    pSprite->lotag = runlist_HeadRun() + 1;
-    pSprite->extra = -1;
-    pSprite->hitag = 0;
+	pActor->spr.pos.X = x;
+    pActor->spr.pos.Y = y;
+    pActor->spr.pos.Z = z;
+    pActor->spr.cstat = CSTAT_SPRITE_BLOCK_ALL;
+    pActor->spr.clipdist = 70;
+    pActor->spr.shade = -12;
+    pActor->spr.xrepeat = 80;
+    pActor->spr.yrepeat = 80;
+    pActor->spr.picnum = 1;
+    pActor->spr.pal = pActor->sector()->ceilingpal;
+    pActor->spr.xoffset = 0;
+    pActor->spr.yoffset = 0;
+    pActor->spr.ang = nAngle;
+    pActor->spr.xvel = 0;
+    pActor->spr.yvel = 0;
+    pActor->spr.zvel = 0;
+    pActor->spr.lotag = runlist_HeadRun() + 1;
+    pActor->spr.extra = -1;
+    pActor->spr.hitag = 0;
 
     //	GrabTimeSlot(3);
 
@@ -90,7 +86,7 @@ void BuildScorp(DExhumedActor* pActor, int x, int y, int z, int nSector, int nAn
 
     pActor->nChannel = nChannel;
 
-    pSprite->owner = runlist_AddRunRec(pSprite->lotag - 1, pActor, 0x220000);
+    pActor->spr.intowner = runlist_AddRunRec(pActor->spr.lotag - 1, pActor, 0x220000);
     pActor->nRun = runlist_AddRunRec(NewRun, pActor, 0x220000);
 
     nCreaturesTotal++;
@@ -101,7 +97,7 @@ void AIScorp::Draw(RunListEvent* ev)
 	auto pActor = ev->pObjActor;
 	if (!pActor) return;
 
-    short nAction = pActor->nAction;
+    int nAction = pActor->nAction;
 
     seq_PlotSequence(ev->nParam, SeqOffsets[kSeqScorp] + ScorpSeq[nAction].a, pActor->nFrame, ScorpSeq[nAction].b);
 }
@@ -121,9 +117,6 @@ void AIScorp::Damage(RunListEvent* ev)
 	auto pActor = ev->pObjActor;
 	if (!pActor) return;
 
-    auto pSprite = &pActor->s();
-
-
     DExhumedActor* pTarget = nullptr;
 
     if (pActor->nHealth <= 0) {
@@ -139,10 +132,10 @@ void AIScorp::Damage(RunListEvent* ev)
         pActor->nFrame = 0;
         pActor->nCount = 10;
 
-        pSprite->xvel = 0;
-        pSprite->yvel = 0;
-        pSprite->zvel = 0;
-        pSprite->cstat &= 0xFEFE;
+        pActor->spr.xvel = 0;
+        pActor->spr.yvel = 0;
+        pActor->spr.zvel = 0;
+        pActor->spr.cstat &= ~CSTAT_SPRITE_BLOCK_ALL;
 
         nCreaturesKilled++;
         return;
@@ -153,7 +146,7 @@ void AIScorp::Damage(RunListEvent* ev)
 
         if (pTarget)
         {
-            if (pSprite->statnum == 100 || (pSprite->statnum < 199 && !RandomSize(5)))
+            if (pActor->spr.statnum == 100 || (pActor->spr.statnum < 199 && !RandomSize(5)))
             {
                 pActor->pTarget = pTarget;
             }
@@ -180,10 +173,7 @@ void AIScorp::Tick(RunListEvent* ev)
 	auto pActor = ev->pObjActor;
 	if (!pActor) return;
 
-
-    short nAction = pActor->nAction;
-    auto pSprite = &pActor->s();
-
+    int nAction = pActor->nAction;
     bool bVal = false;
 
     DExhumedActor* pTarget = nullptr;
@@ -194,7 +184,7 @@ void AIScorp::Tick(RunListEvent* ev)
 
     int nSeq = SeqOffsets[kSeqScorp] + ScorpSeq[nAction].a;
 
-    pSprite->picnum = seq_GetSeqPicnum2(nSeq, pActor->nFrame);
+    pActor->spr.picnum = seq_GetSeqPicnum2(nSeq, pActor->nFrame);
     seq_MoveSequence(pActor, nSeq, pActor->nFrame);
 
     pActor->nFrame++;
@@ -232,8 +222,8 @@ void AIScorp::Tick(RunListEvent* ev)
                     D3PlayFX(StaticSound[kSound41], pActor);
 
                     pActor->nFrame = 0;
-                    pSprite->xvel = bcos(pSprite->ang);
-                    pSprite->yvel = bsin(pSprite->ang);
+                    pActor->spr.xvel = bcos(pActor->spr.ang);
+                    pActor->spr.yvel = bsin(pActor->spr.ang);
 
                     pActor->nAction = 1;
                     pActor->pTarget = pTarget;
@@ -258,10 +248,10 @@ void AIScorp::Tick(RunListEvent* ev)
             auto nMov = MoveCreatureWithCaution(pActor);
             if (nMov.type == kHitSprite)
             {
-                if (pTarget == nMov.actor)
+                if (pTarget == nMov.actor())
                 {
-                    int nAngle = getangle(pTarget->s().x - pSprite->x, pTarget->s().y - pSprite->y);
-                    if (AngleDiff(pSprite->ang, nAngle) < 64)
+                    int nAngle = getangle(pTarget->spr.pos.X - pActor->spr.pos.X, pTarget->spr.pos.Y - pActor->spr.pos.Y);
+                    if (AngleDiff(pActor->spr.ang, nAngle) < 64)
                     {
                         pActor->nAction = 2;
                         pActor->nFrame = 0;
@@ -317,8 +307,8 @@ void AIScorp::Tick(RunListEvent* ev)
             {
                 pActor->nAction = 1;
 
-                pSprite->xvel = bcos(pSprite->ang);
-                pSprite->yvel = bsin(pSprite->ang);
+                pActor->spr.xvel = bcos(pActor->spr.ang);
+                pActor->spr.yvel = bsin(pActor->spr.ang);
 
                 pActor->nFrame = 0;
                 return;
@@ -329,7 +319,7 @@ void AIScorp::Tick(RunListEvent* ev)
             return;
         }
 
-        auto nBulletSprite = BuildBullet(pActor, 16, -1, pSprite->ang, pTarget, 1);
+        auto nBulletSprite = BuildBullet(pActor, 16, -1, pActor->spr.ang, pTarget, 1);
         if (nBulletSprite)
         {
             PlotCourseToSprite(nBulletSprite, pTarget);
@@ -379,17 +369,16 @@ void AIScorp::Tick(RunListEvent* ev)
             return;
         }
 
-        auto pSpiderActor = BuildSpider(nullptr, pSprite->x, pSprite->y, pSprite->z, pSprite->sectnum, pSprite->ang);
+        auto pSpiderActor = BuildSpider(nullptr, pActor->spr.pos.X, pActor->spr.pos.Y, pActor->spr.pos.Z, pActor->sector(), pActor->spr.ang);
         if (pSpiderActor)
         {
-			auto pSpiderSprite = &pSpiderActor->s();
-            pSpiderSprite->ang = RandomSize(11);
+            pSpiderActor->spr.ang = RandomSize(11);
 
             int nVel = RandomSize(5) + 1;
 
-            pSpiderSprite->xvel = bcos(pSpiderSprite->ang, -8) * nVel;
-            pSpiderSprite->yvel = bsin(pSpiderSprite->ang, -8) * nVel;
-            pSpiderSprite->zvel = (-(RandomSize(5) + 3)) << 8;
+            pSpiderActor->spr.xvel = bcos(pSpiderActor->spr.ang, -8) * nVel;
+            pSpiderActor->spr.yvel = bsin(pSpiderActor->spr.ang, -8) * nVel;
+            pSpiderActor->spr.zvel = (-(RandomSize(5) + 3)) << 8;
         }
 
         return;
@@ -397,13 +386,13 @@ void AIScorp::Tick(RunListEvent* ev)
 
     case 9:
     {
-        pSprite->cstat &= 0xFEFE;
+        pActor->spr.cstat &= ~CSTAT_SPRITE_BLOCK_ALL;
 
         if (bVal)
         {
             runlist_SubRunRec(pActor->nRun);
-            runlist_DoSubRunRec(pSprite->owner);
-            runlist_FreeRun(pSprite->lotag - 1);
+            runlist_DoSubRunRec(pActor->spr.intowner);
+            runlist_FreeRun(pActor->spr.lotag - 1);
 
             DeleteActor(pActor);
         }
@@ -418,17 +407,16 @@ void AIScorp::Effect(RunListEvent* ev, DExhumedActor* pTarget, int mode)
 	auto pActor = ev->pObjActor;
 	if (!pActor) return;
 
-    short nAction = pActor->nAction;
-    auto pSprite = &pActor->s();
+    int nAction = pActor->nAction;
 
     if (mode == 0)
     {
         PlotCourseToSprite(pActor, pTarget);
-        pSprite->ang += RandomSize(7) - 63;
-        pSprite->ang &= kAngleMask;
+        pActor->spr.ang += RandomSize(7) - 63;
+        pActor->spr.ang &= kAngleMask;
 
-        pSprite->xvel = bcos(pSprite->ang);
-        pSprite->yvel = bsin(pSprite->ang);
+        pActor->spr.xvel = bcos(pActor->spr.ang);
+        pActor->spr.yvel = bsin(pActor->spr.ang);
     }
     if (mode <= 1)
     {
@@ -440,12 +428,12 @@ void AIScorp::Effect(RunListEvent* ev, DExhumedActor* pTarget, int mode)
         {
             pActor->nCount = 45;
 
-            if (cansee(pSprite->x, pSprite->y, pSprite->z - GetActorHeight(pActor), pSprite->sectnum,
-                pTarget->s().x, pTarget->s().y, pTarget->s().z - GetActorHeight(pTarget), pTarget->s().sectnum))
+            if (cansee(pActor->spr.pos.X, pActor->spr.pos.Y, pActor->spr.pos.Z - GetActorHeight(pActor), pActor->sector(),
+                pTarget->spr.pos.X, pTarget->spr.pos.Y, pTarget->spr.pos.Z - GetActorHeight(pTarget), pTarget->sector()))
             {
-                pSprite->xvel = 0;
-                pSprite->yvel = 0;
-                pSprite->ang = GetMyAngle(pTarget->s().x - pSprite->x, pTarget->s().y - pSprite->y);
+                pActor->spr.xvel = 0;
+                pActor->spr.yvel = 0;
+                pActor->spr.ang = GetMyAngle(pTarget->spr.pos.X - pActor->spr.pos.X, pTarget->spr.pos.Y - pActor->spr.pos.Y);
 
                 pActor->nIndex = RandomSize(2) + RandomSize(3);
 
@@ -465,15 +453,15 @@ void AIScorp::Effect(RunListEvent* ev, DExhumedActor* pTarget, int mode)
         return;
     }
 
-    if (!(pTarget->s().cstat & 0x101))
+    if (!(pTarget->spr.cstat & CSTAT_SPRITE_BLOCK_ALL))
     {
         pActor->nAction = 0;
         pActor->nFrame = 0;
         pActor->nCount = 30;
         pActor->pTarget = nullptr;
 
-        pSprite->xvel = 0;
-        pSprite->yvel = 0;
+        pActor->spr.xvel = 0;
+        pActor->spr.yvel = 0;
     }
 }
 

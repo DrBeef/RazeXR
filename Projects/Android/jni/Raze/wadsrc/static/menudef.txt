@@ -69,9 +69,9 @@ LISTMENU "MainMenu"
 		linespacing 22
 		Animated
 		ExhumedPlasma
-		ExhumedTextItem "$MNU_NEWGAME", "n", "StartGameNoSkill", 0
+		ExhumedTextItem "$MNU_NEWGAME", "n", "EpisodeMenu"
 		ExhumedTextItem "$MNU_LOADGAME", "l", "LoadGameMenu"
-		ExhumedTextItem "$TXT_EX_MAP00", "m", "StartGameNoSkill", 1
+		//ExhumedTextItem "$TXT_EX_MAP00", "m", "StartGameNoSkill", 1
 		ExhumedTextItem "$MNU_OPTIONS", "v", "OptionsMenu"
 		ExhumedTextItem "$MNU_QUITGAME", "q", "QuitMenu"
 	}
@@ -141,10 +141,12 @@ LISTMENU "IngameMenu"
 		class ExhumedMainMenu
 		Position 160, 65
 		linespacing 22
+		Animated
 		ExhumedLogo
-		ExhumedTextItem "$MNU_NEWGAME", "n", "StartGameNoSkill", 0
+		ExhumedTextItem "$MNU_NEWGAME", "n", "EpisodeMenu", 0
 		ExhumedTextItem "$MNU_LOADGAME", "l", "LoadGameMenu"
-		ExhumedTextItem "$TXT_EX_MAP00", "m", "StartGameNoSkill", 1
+		ExhumedTextItem "$MNU_SAVEGAME", "s", "SaveGameMenu"
+		//ExhumedTextItem "$TXT_EX_MAP00", "m", "StartGameNoSkill", 1
 		ExhumedTextItem "$MNU_OPTIONS", "v", "OptionsMenu"
 		ExhumedTextItem "$MNU_QUITGAME", "q", "QuitMenu"
 	}
@@ -180,6 +182,12 @@ LISTMENU "EpisodeMenu"
 		Position 35, 32
 		Linespacing 17
 	}
+	ifgame(Exhumed)
+	{
+		class ExhumedMainMenu
+		Position 160, 65
+		linespacing 22
+	}
 }
 
 LISTMENU "SkillMenu"
@@ -207,6 +215,13 @@ LISTMENU "SkillMenu"
 		Position 35, 32
 		Linespacing 17
 	}
+	ifgame(Exhumed)
+	{
+		class ExhumedMainMenu
+		Position 160, 65
+		linespacing 22
+		CaptionItem "$MNU_DIFFICULTY"
+	}
 }
 
 //-------------------------------------------------------------------------------------------
@@ -219,7 +234,7 @@ ImageScroller "HelpMenu"
 {
 	ifgame(Duke, Nam, WW2GI, Redneck, RedneckRides)
 	{
-		
+
 		ImageItem "TEXTSTORY"
 		ImageItem "F1HELP"
 		ifgame(RedneckRides)
@@ -283,11 +298,10 @@ ImageScroller "CreditsMenu"
 			DukeCredits2
 			DukeCredits3
 		}
-		animatedtransition
 	}
 	ifgame(Redneck)
 	{
-		TextBackground "MENUSCREEN"
+		// TextBackground "MENUSCREEN"
 		TextBackgroundBrightness 0.5
 		TextFont "SmallFont"
 		TextScale 0.45
@@ -319,7 +333,7 @@ ImageScroller "CreditsMenu"
 	}
 	ifgame(RedneckRides)
 	{
-		TextBackground "MENUSCREEN"
+		// TextBackground "MENUSCREEN"
 		TextBackgroundBrightness 0.5
 		TextFont "SmallFont"
 		TextScale 0.45
@@ -379,7 +393,7 @@ ImageScroller "CreditsMenu"
 		ImageItem "TilePIELogo"
 	}
 }
-	
+
 //-------------------------------------------------------------------------------------------
 //
 // Base definition for load game menu. Only the configurable part is done here
@@ -405,7 +419,20 @@ ListMenu "SaveGameMenu"
 	Class "SaveMenu"	// uses its own implementation
 	CaptionItem "$MNU_SAVEGAME"
 }
-	
+
+//-------------------------------------------------------------------------------------------
+//
+// Base definition for user map menu. Only the configurable part is done here
+//
+//-------------------------------------------------------------------------------------------
+
+ListMenu "UsermapMenu"
+{
+	Position 0, 40
+	Class "UsermapMenu"	// uses its own implementation
+	CaptionItem "$MNU_USERMAP"
+}
+
 //-------------------------------------------------------------------------------------------
 //
 // The generic options menus start here
@@ -475,7 +502,7 @@ OptionMenu "OptionsMenu" protected
 	SafeCommand	"$OPTMNU_RESETTOSAVED",	"reset2saved"
 	//Command "$OPTMNU_CONSOLE",			"menuconsole"
 }	
-	
+
 //-------------------------------------------------------------------------------------------
 //
 // Controls Menu
@@ -534,7 +561,7 @@ OptionMenu "ActionControlsMenu" protected
 	StaticText ""
 	Control    "$CNTRLMNU_MOUSELOOK"        , "+mouse_aiming"
 	Control    "$CNTRLMNU_MLOOKTOGGLE"		, "togglemouseaim"
-	
+
 	Control    "$CNTRLMNU_AIMUP"           , "+aim_up"
 	Control    "$CNTRLMNU_AIMDOWN"         , "+aim_down"
 	Control    "$CNTRLMNU_LOOKUP"           , "+look_up"
@@ -625,7 +652,7 @@ OptionMenu "InventoryControlsMenu" protected
 	StaticText ""
 	Control    "$CNTRLMNU_NEXTITEM"     , "invnext"
 	Control    "$CNTRLMNU_PREVIOUSITEM" , "invprev"
-	
+
 	// Item numbers here are are defined by the games' internal order.
 	ifgame(Duke)
 	{
@@ -787,7 +814,6 @@ OptionMenu "MouseOptions" protected
 	StaticText 	""
 	Slider "$MOUSEMNU_SENSITIVITY_X",	"m_sensitivity_x", 0.5, 8, 0.25
 	Slider "$MOUSEMNU_SENSITIVITY_Y",	"m_sensitivity_y", 0.5, 8, 0.25
-	Option "$MOUSEMNU_SMOOTHMOUSE",		"m_filter", "YesNo"
 	StaticText 	""
 	Slider "$MOUSEMNU_TURNSPEED",		"m_yaw", 0, 2.5, 0.1
 	Slider "$MOUSEMNU_MOUSELOOKSPEED",	"m_pitch", 0, 2.5, 0.1
@@ -1040,16 +1066,29 @@ OptionValue "Multisample"
 	32, "$OPTVAL_32X"
 }
 
+OptionValue "Precision"
+{
+	0, "$OPTVAL_SPEED"
+	1, "$OPTVAL_QUALITY"
+}
+
+OptionValue "VideoRenderers"
+{
+        0, "Polymost"
+        1, "Raze3D"
+}
 
 OptionMenu "VideoOptions" protected
 {
 	Title "$DSPLYMNU_TITLE"
-	
+
 	Submenu "$OPTMNU_HUD", "HUDOptions"
 	Submenu "$RENDER_OPTIONS", "RenderOptions"
 	Submenu "$AUTOMAPMNU_TITLE", "AutomapOptions"
 	Submenu "$GLMNU_POSTPROCESS", "PostProcessMenu"
 	Submenu "$GLTEXMNU_TITLE", "GLTextureGLOptions"
+	StaticText ""
+	Option "Renderer",							vid_renderer,					"VideoRenderers"
 	StaticText ""
 
 	Slider "$DSPLYMNU_GAMMA",					"vid_gamma",					0.75, 3.0, 0.05, 2
@@ -1059,9 +1098,9 @@ OptionMenu "VideoOptions" protected
 	Slider "$DSPLYMNU_AMBIENT_LIGHT",			"r_ambientlight",  				0.5, 4.0, 0.1
 
 	StaticText ""
-	Option "$DSPLYMNU_VOXELS",					"r_voxels",					"OnOff"
+	Option "$DSPLYMNU_VOXELS",					"r_voxels",						"OnOff"
 	Option "$DSPLYMNU_SHADOWS",					"r_shadows",					"OnOff"
-	Option "$DSPLYMNU_SLOPETILT",				"cl_slopetilting",					"OnOff"
+	Option "$DSPLYMNU_SLOPETILT",				"cl_slopetilting",				"OnOff"
 	Option "$GLPREFMNU_ENVIRONMENTMAPMIRROR",	gl_mirror_envmap,				"OnOff"
 	ifnotgame(Blood, Exhumed)
 	{
@@ -1072,12 +1111,14 @@ OptionMenu "VideoOptions" protected
 		Option "$DSPLYMNU_VIEWBOB",					"cl_viewvbob",					"OnOff"
 		Option "$DSPLYMNU_VIEWSWAY",				"cl_viewhbob",					"OnOff"
 	}
-	StaticText ""
-	Slider "$DSPLYMNU_FOV",						"r_fov",					60, 130, 10, 1
+	Slider "$DSPLYMNU_FOV",						"r_fov",						60, 130, 10, 1
 
 	StaticText ""
-	Option "$GLTEXMNU_TEXFILTER",		gl_texture_filter,				"FilterModes"
-	Option "$GLTEXMNU_ANISOTROPIC",		gl_texture_filter_anisotropic,				"Anisotropy"
+	Option "$GLPREFMNU_RENDERQUALITY",			gl_seamless,					"Precision"
+
+	StaticText ""
+	Option "$GLTEXMNU_TEXFILTER",				gl_texture_filter,				"FilterModes"
+	Option "$GLTEXMNU_ANISOTROPIC",				gl_texture_filter_anisotropic,	"Anisotropy"
 	StaticText " "
 	Option "$GLPREFMNU_MULTISAMPLE", 			gl_multisample,					"Multisample"
 
@@ -1148,13 +1189,35 @@ OptionValue "HqResizeModesNoMMX"
    6, "$OPTVAL_NORMALNX"
 }
 
+OptionValue "FogMode"
+{
+	0, "$OPTVAL_OFF"
+	1, "$OPTVAL_STANDARD"
+	2, "$OPTVAL_RADIAL"
+}
+
+OptionValue "LightModes"
+{
+	0, "$GLPREFMNU_ORIGINAL"
+	1, "$GLPREFMNU_NATURAL"
+	2, "$GLPREFMNU_HIGHCONTRAST"
+}
+
+OptionValue "SSAOModes"
+{
+	0, "$OPTVAL_OFF"
+	1, "$OPTVAL_LOW"
+	2, "$OPTVAL_MEDIUM"
+	3, "$OPTVAL_HIGH"
+}
+
 OptionMenu "PostProcessMenu"
 {
 	Title "$GLMNU_POSTPROCESS"
-	//Option "$GLPREFMNU_BLOOM",		 			gl_bloom,						"OnOff"
+	Option "$GLPREFMNU_BLOOM",		 			gl_bloom,						"OnOff"
 	Option "$GLPREFMNU_LENS",		 			gl_lens,						"OnOff"
-	//Option "$GLPREFMNU_SSAO",		 			gl_ssao,						"SSAOModes"
-	//Slider "$GLPREFMNU_SSAO_PORTALS",			gl_ssao_portals,				0.0, 4.0, 1.0, 0
+	Option "$GLPREFMNU_SSAO",		 			gl_ssao,						"SSAOModes"
+	Slider "$GLPREFMNU_SSAO_PORTALS",			gl_ssao_portals,				0.0, 4.0, 1.0, 0
 	Option "$GLPREFMNU_FXAA",		 			gl_fxaa,						"FXAAQuality"
 	Option "$GLPREFMNU_DITHER",		 			gl_dither_bpc,					"DitherModes"
 	Option "$GLPREFMNU_TONEMAP", 				gl_tonemap,						"TonemapModes"
@@ -1249,6 +1312,9 @@ OptionMenu "HUDOptions" protected
 	Slider "$DSPLYMNU_STATSCALE",				"hud_statscale",			0.36, 1.0, 0.04, 2
 
 	StaticText ""
+	Option "$DSPLYMNU_SHOWMAPNAME",				"hud_showmapname",	OnOff
+
+	StaticText ""
 	Option "$DSPLYMNU_MESSAGES",				"hud_messages",				"HudMessages"
 	Option "$DSPLYMNU_MESSAGEDISP",				"con_notify_advanced",		"HudMessageStyle"
 	Option "$MSGMNU_CENTERMESSAGES",			"con_centernotify", 		"OnOff", "con_notify_advanced"
@@ -1279,8 +1345,14 @@ OptionMenu "RenderOptions"
 	Option "$RENDER_TC", "hw_hightile", "OnOff"
 	Option "$RENDER_CACHE", "r_precache", "OnOff"
 	StaticText ""
-	Option "$RENDER_PALETTEEMU", "hw_useindexedcolortextures", "OnOff"
-	Option "$RENDER_PALINTER", "hw_shadeinterpolate", "OnOff", "hw_useindexedcolortextures"
+	// Exhumed's lighting system does not work with the enhanced modes.
+	ifnotgame(Exhumed)
+	{
+		Option "$GLPREFMNU_SECLIGHTMODE",			"hw_lightmode",					"LightModes"
+	}
+	Option "$GLPREFMNU_FOGMODE",				gl_fogmode,						"FogMode"
+	Option "$RENDER_PALETTEEMU",				"hw_useindexedcolortextures",	"OnOff"
+	Option "$RENDER_PALINTER",					"hw_shadeinterpolate",			"OnOff", "hw_useindexedcolortextures"
 	StaticText ""
 	Option "$RENDER_MODELS", "hw_models", "OnOff"
 }
@@ -1416,7 +1488,7 @@ OptionMenu AdvSoundOptions protected
 	Option "$ADVSNDMNU_LOOKUPMUS",			"mus_extendedlookup", "OnOff"
 	Option "$ADVSNDMNU_LOOKUPSND",			"snd_extendedlookup", "OnOff"
 	StaticText " "
-	
+
 	//Option "$ADVSNDMNU_HRTF",				"snd_hrtf", "AutoOffOn"
 	StaticText " "
 	//Option "$SNDMNU_BACKGROUND",			"i_soundinbackground", "OnOff"
@@ -1684,7 +1756,7 @@ OptionString "LanguageOptions"
 	"auto", "Auto"
 	"default", "English (US)"
 	"eng", "English (UK)"
-	//"cs", "Česky (Czech)"
+	"cs", "Česky (Czech)"
 	"de", "Deutsch (German)"
 	//"es", "Español (España) (Castilian Spanish)"
 	//"esm", "Español (Latino) (Latin American Spanish)"
@@ -1966,7 +2038,7 @@ OptionMenu "EngineCredits1a"
 	title "$MNU_CREDITS"
 	Submenu " ---->", "EngineCredits1b"
 	StaticText "Raze QA", 1
-	
+
 	StaticText "sinisterseed                        ", 0
 	StaticText "Major Cooke       Dynamo            ", 0
 	StaticText "Nash Muhandes     Martin Howe       ", 0
@@ -2021,7 +2093,7 @@ OptionMenu "EngineCredits2a"
 	StaticText "Alexey \"Nuke.YKT\" Skrybykin", 0
 	StaticText "sirlemonhead", 0
 }
-	
+
 OptionMenu "EngineCredits2b"
 {
 	title "$MNU_CREDITS"
@@ -2032,14 +2104,14 @@ OptionMenu "EngineCredits2b"
 	StaticText "MaxED             Kinsie            ", 0
 	StaticText "Maxi Clouds                         ", 0
 }
-	
+
 OptionMenu "EngineCredits3"
 {
 	title "$MNU_CREDITS"
 	//Submenu " ---->", "EngineCredits"	// This creates a circular dependency which makes the search tool crash.
 	StaticText "The EDuke32 team thanks the following people", 1
 	StaticText "for their contributions:", 1
-	
+
 	StaticText "Alexey Skrybykin  Bioman            Brandon Bergren  ", 0
 	StaticText "Charlie Honig     Dan Gaskill       David Koenig     ", 0
 	StaticText "Ed Coolidge       Emile Belanger    Fox              ", 0
@@ -2052,4 +2124,4 @@ OptionMenu "EngineCredits3"
 	StaticText "Ryan Gordon       Stephen Anthony   tueidj           ", 0
 	StaticText "Pär \"Parkar\" Karlsson", 0
 }
-	
+

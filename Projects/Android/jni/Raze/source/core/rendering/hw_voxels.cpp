@@ -49,7 +49,11 @@ void voxClear()
 {
 	for (auto& vox : voxmodels)
 	{
-		if (vox) delete vox;
+		if (vox)
+		{
+			delete vox->model;
+			delete vox;
+		}
 		vox = nullptr;
 	}
 }
@@ -74,12 +78,12 @@ static voxmodel_t* voxload(int lumpnum)
 		auto pivot = voxel->Mips[0].Pivot;
 		vm->mdnum = 1; //VOXel model id
 		vm->scale = vm->bscale = 1.f;
-		vm->piv.x = float(pivot.X);
-		vm->piv.y = float(pivot.Y);
-		vm->piv.z = float(pivot.Z);
-		vm->siz.x = voxel->Mips[0].SizeX;
-		vm->siz.y = voxel->Mips[0].SizeY;
-		vm->siz.z = voxel->Mips[0].SizeZ;
+		vm->piv.X = float(pivot.X);
+		vm->piv.Y = float(pivot.Y);
+		vm->piv.Z = float(pivot.Z);
+		vm->siz.X = voxel->Mips[0].SizeX;
+		vm->siz.Y = voxel->Mips[0].SizeY;
+		vm->siz.Z = voxel->Mips[0].SizeZ;
 		vm->is8bit = true;
 		voxel->Mips[0].Pivot.Zero();  // Needs to be taken out of the voxel data because it gets baked into the vertex buffer which we cannot use here.
 		vm->model = new FVoxelModel(voxel, true);

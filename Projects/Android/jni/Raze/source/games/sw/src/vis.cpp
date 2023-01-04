@@ -39,44 +39,40 @@ BEGIN_SW_NS
 
 extern short NormalVisibility;  // player.c
 
-#define VIS_VisCur(sp) (SP_TAG2(sp))
-#define VIS_VisDir(sp) (SP_TAG3(sp))
-#define VIS_VisGoal(sp) (SP_TAG4(sp))
+inline int16_t& VIS_VisCur(DSWActor* actor) { return SP_TAG2(actor); }
+#define VIS_VisDir(actor) (SP_TAG3(actor))
+#define VIS_VisGoal(actor) (SP_TAG4(actor))
 
 void ProcessVisOn(void)
 {
-    SPRITEp sp;
-
     SWStatIterator it(STAT_VIS_ON);
     while (auto actor = it.Next())
     {
-        sp = &actor->s();
-
-        if (VIS_VisDir(sp))
+        if (VIS_VisDir(actor))
         {
             // get brighter
-            VIS_VisCur(sp) >>= 1;
-            //VIS_VisCur(sp) -= 16;
-            if (VIS_VisCur(sp) <= VIS_VisGoal(sp))
+            VIS_VisCur(actor) >>= 1;
+            //VIS_VisCur(actor) -= 16;
+            if (VIS_VisCur(actor) <= VIS_VisGoal(actor))
             {
-                VIS_VisCur(sp) = VIS_VisGoal(sp);
-                VIS_VisDir(sp) ^= 1;
+                VIS_VisCur(actor) = VIS_VisGoal(actor);
+                VIS_VisDir(actor) ^= 1;
             }
         }
         else
         {
             // get darker
-            VIS_VisCur(sp) <<= 1;
-            VIS_VisCur(sp) += 1;
-            //VIS_VisCur(sp) += 16;
-            if (VIS_VisCur(sp) >= NormalVisibility)
+            VIS_VisCur(actor) <<= 1;
+            VIS_VisCur(actor) += 1;
+            //VIS_VisCur(actor) += 16;
+            if (VIS_VisCur(actor) >= NormalVisibility)
             {
-                VIS_VisCur(sp) = NormalVisibility;
+                VIS_VisCur(actor) = NormalVisibility;
                 auto own = GetOwner(actor);
                 if (own != nullptr)
                 {
                     ASSERT(own->hasU());
-                    RESET(own->u()->Flags2, SPR2_VIS_SHADING);
+                    own->user.Flags2 &= ~(SPR2_VIS_SHADING);
                 }
                 KillActor(actor);
             }
@@ -84,12 +80,11 @@ void ProcessVisOn(void)
     }
 }
 
-void VisViewChange(PLAYERp pp, int *vis)
+void VisViewChange(PLAYER* pp, int *vis)
 {
-    SPRITEp sp;
     short BrightestVis = NormalVisibility;
     int x,y,z;
-    short sectnum;
+    sectortype* sectp;
 
     if (paused)
         return;
@@ -98,47 +93,42 @@ void VisViewChange(PLAYERp pp, int *vis)
     SWStatIterator it(STAT_VIS_ON);
     while (auto actor = it.Next())
     {
-        sp = &actor->s();
-
         auto own = GetOwner(actor);
         if (own != nullptr)
         {
-            x = own->s().x;
-            y = own->s().y;
-            z = own->s().z;
-            sectnum = own->s().sectnum;
+            x = own->spr.pos.X;
+            y = own->spr.pos.Y;
+            z = own->spr.pos.Z;
+            sectp = own->sector();
         }
         else
         {
-            x = sp->x;
-            y = sp->y;
-            z = sp->z;
-            sectnum = sp->sectnum;
+            x = actor->spr.pos.X;
+            y = actor->spr.pos.Y;
+            z = actor->spr.pos.Z;
+            sectp = actor->sector();
         }
 
         // save off the brightest vis that you can see
-        if (FAFcansee(pp->posx, pp->posy, pp->posz, pp->cursectnum, x, y, z, sectnum))
+        if (FAFcansee(pp->pos.X, pp->pos.Y, pp->pos.Z, pp->cursector, x, y, z, sectp))
         {
-            if (VIS_VisCur(sp) < BrightestVis)
-                BrightestVis = VIS_VisCur(sp);
+            if (VIS_VisCur(actor) < BrightestVis)
+                BrightestVis = VIS_VisCur(actor);
         }
     }
 
     *vis = BrightestVis;
 }
 
-void SpawnVis(DSWActor* parentActor, short sectnum, int x, int y, int z, int amt)
+void SpawnVis(DSWActor* parentActor, sectortype* sect, int x, int y, int z, int amt)
 {
-    SPRITEp sp;
+    DSWActor* actorNew = nullptr;
     if (parentActor != nullptr)
     {
-        auto psp = &parentActor->s();
-        auto pu = parentActor->u();
-
-        if (sector[psp->sectnum].floorpal == PALETTE_FOG)
+        if (parentActor->sector()->floorpal == PALETTE_FOG)
             return;
 
-        if (sector[psp->sectnum].floorpal == PALETTE_DIVE_LAVA)
+        if (parentActor->sector()->floorpal == PALETTE_DIVE_LAVA)
             return;
 
         // kill any others with the same parent
@@ -151,39 +141,35 @@ void SpawnVis(DSWActor* parentActor, short sectnum, int x, int y, int z, int amt
             }
         }
 
-        auto actorNew = InsertActor(psp->sectnum, STAT_VIS_ON);
-        sp = &actorNew->s();
+        actorNew = insertActor(parentActor->sector(), STAT_VIS_ON);
         SetOwner(parentActor, actorNew);
 
 
         ASSERT(parentActor->hasU());
-        SET(pu->Flags2, SPR2_CHILDREN);
+        parentActor->user.Flags2 |= (SPR2_CHILDREN);
 
-        sp->x = psp->x;
-        sp->y = psp->y;
-        sp->z = psp->z;
+        actorNew->spr.pos = parentActor->spr.pos;
 
-        SET(pu->Flags2, SPR2_VIS_SHADING);
+        parentActor->user.Flags2 |= (SPR2_VIS_SHADING);
     }
     else
     {
-        if (sector[sectnum].floorpal == PALETTE_FOG)
+        if (sect->floorpal == PALETTE_FOG)
             return;
 
-        auto actorNew = InsertActor(sectnum, STAT_VIS_ON);
-        sp = &actorNew->s();
+        actorNew = insertActor(sect, STAT_VIS_ON);
 
-        sp->x = x;
-        sp->y = y;
-        sp->z = z - Z(20);
+        actorNew->spr.pos.X = x;
+        actorNew->spr.pos.Y = y;
+        actorNew->spr.pos.Z = z - Z(20);
     }
 
-    sp->cstat = 0;
-    sp->extra = 0;
+    actorNew->spr.cstat = 0;
+    actorNew->spr.extra = 0;
 
-    VIS_VisDir(sp) = 1;
-    VIS_VisCur(sp) = NormalVisibility;
-    VIS_VisGoal(sp) = amt;
+    VIS_VisDir(actorNew) = 1;
+    VIS_VisCur(actorNew) = NormalVisibility;
+    VIS_VisGoal(actorNew) = amt;
 }
 
 END_SW_NS

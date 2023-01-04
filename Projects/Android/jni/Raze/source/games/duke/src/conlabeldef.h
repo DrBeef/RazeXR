@@ -62,7 +62,7 @@ LABELS walllabels[]=
 	{ "lotag", WALL_LOTAG, 0, 0 },
 	{ "hitag", WALL_HITAG, 0, 0 },
 	{ "extra", WALL_EXTRA, 0, 0 },
-	
+
   { "", -1, 0, 0  }	// END OF LIST
 
 };
@@ -93,7 +93,7 @@ LABELS actorlabels[]=
 	{ "hitag", ACTOR_HITAG, 0, 0 },
 	{ "extra", ACTOR_EXTRA, 0, 0 },
 
-	// hittype labels...
+	// hit type labels...
 	{ "htcgg", ACTOR_HTCGG, 0, 0 },
 	{ "htpicnum", ACTOR_HTPICNUM, 0, 0 },
 	{ "htang", ACTOR_HTANG, 0, 0 },
@@ -120,7 +120,7 @@ LABELS actorlabels[]=
 	{ "htg_t[5]", ACTOR_HTG_T5, 0, 0 },
 
   { "", -1, 0, 0  }	// END OF LIST
-	
+
 };
 
 
@@ -261,9 +261,9 @@ LABELS playerlabels[]=
 	{ "pals", PLAYER_PALS, LABEL_HASPARM2, 3 },
 	{ "max_actors_killed", PLAYER_MAX_ACTORS_KILLED, 0, 0 },
 	{ "actors_killed", PLAYER_ACTORS_KILLED, 0, 0 },
-	
+
   { "", -1, 0, 0  }	// END OF LIST
-	
+
 };
 
 ///////////////////////////////////////
@@ -345,6 +345,6 @@ LABELS userdefslabels[]=
  { "mouseflip", USERDEFS_MOUSEFLIP, 0, 0 },
 
   { "", -1, 0, 0  }	// END OF LIST
-	
+
 };
 END_DUKE_NS

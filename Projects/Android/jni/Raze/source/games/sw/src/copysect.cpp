@@ -40,56 +40,54 @@ BEGIN_SW_NS
 
 extern int GlobSpeedSO;
 
-void CopySectorWalls(short dest_sectnum, short src_sectnum)
+void CopySectorWalls(sectortype* dest_sect, sectortype* src_sect)
 {
-    short dest_wall_num, src_wall_num, start_wall;
-    SECTOR_OBJECTp sop;
-    SECTORp *sectp;
+    SECTOR_OBJECT* sop;
+    sectortype* *sectp;
 
-    dest_wall_num = sector[dest_sectnum].wallptr;
-    src_wall_num = sector[src_sectnum].wallptr;
+    auto dwall = dest_sect->firstWall();
+    auto swall = src_sect->firstWall();
+    auto firstwall = dwall;
 
-    start_wall = dest_wall_num;
-
+    // this looks broken.
     do
     {
-        wall[dest_wall_num].picnum = wall[src_wall_num].picnum;
+        dwall->picnum = swall->picnum;
 
-        wall[dest_wall_num].xrepeat =       wall[src_wall_num].xrepeat;
-        wall[dest_wall_num].yrepeat =       wall[src_wall_num].yrepeat;
-        wall[dest_wall_num].overpicnum =    wall[src_wall_num].overpicnum;
-        wall[dest_wall_num].pal =           wall[src_wall_num].pal;
-        wall[dest_wall_num].cstat =         wall[src_wall_num].cstat;
-        wall[dest_wall_num].shade =         wall[src_wall_num].shade;
-        wall[dest_wall_num].xpan_ =      wall[src_wall_num].xpan_;
-        wall[dest_wall_num].ypan_ =      wall[src_wall_num].ypan_;
-        wall[dest_wall_num].hitag =         wall[src_wall_num].hitag;
-        wall[dest_wall_num].lotag =         wall[src_wall_num].lotag;
-        wall[dest_wall_num].extra =         wall[src_wall_num].extra;
+        dwall->xrepeat =       swall->xrepeat;
+        dwall->yrepeat =       swall->yrepeat;
+        dwall->overpicnum =    swall->overpicnum;
+        dwall->pal =           swall->pal;
+        dwall->cstat =         swall->cstat;
+        dwall->shade =         swall->shade;
+        dwall->xpan_ =         swall->xpan_;
+        dwall->ypan_ =         swall->ypan_;
+        dwall->hitag =         swall->hitag;
+        dwall->lotag =         swall->lotag;
+        dwall->extra =         swall->extra;
 
-        uint32_t const dest_nextwall = wall[dest_wall_num].nextwall;
-        uint32_t const src_nextwall = wall[src_wall_num].nextwall;
-
-        if (validWallIndex(dest_nextwall) && validWallIndex(src_nextwall))
+        if (dwall->twoSided() && swall->twoSided())
         {
-            wall[dest_nextwall].picnum = wall[src_nextwall].picnum;
-            wall[dest_nextwall].xrepeat = wall[src_nextwall].xrepeat;
-            wall[dest_nextwall].yrepeat = wall[src_nextwall].yrepeat;
-            wall[dest_nextwall].overpicnum = wall[src_nextwall].overpicnum;
-            wall[dest_nextwall].pal = wall[src_nextwall].pal;
-            wall[dest_nextwall].cstat = wall[src_nextwall].cstat;
-            wall[dest_nextwall].shade = wall[src_nextwall].shade;
-            wall[dest_nextwall].xpan_ = wall[src_nextwall].xpan_;
-            wall[dest_nextwall].ypan_ = wall[src_nextwall].ypan_;
-            wall[dest_nextwall].hitag = wall[src_nextwall].hitag;
-            wall[dest_nextwall].lotag = wall[src_nextwall].lotag;
-            wall[dest_nextwall].extra = wall[src_nextwall].extra;
+            auto const dest_nextwall = dwall->nextWall();
+            auto const src_nextwall = swall->nextWall();
+            dest_nextwall->picnum = src_nextwall->picnum;
+            dest_nextwall->xrepeat = src_nextwall->xrepeat;
+            dest_nextwall->yrepeat = src_nextwall->yrepeat;
+            dest_nextwall->overpicnum = src_nextwall->overpicnum;
+            dest_nextwall->pal = src_nextwall->pal;
+            dest_nextwall->cstat = src_nextwall->cstat;
+            dest_nextwall->shade = src_nextwall->shade;
+            dest_nextwall->xpan_ = src_nextwall->xpan_;
+            dest_nextwall->ypan_ = src_nextwall->ypan_;
+            dest_nextwall->hitag = src_nextwall->hitag;
+            dest_nextwall->lotag = src_nextwall->lotag;
+            dest_nextwall->extra = src_nextwall->extra;
         }
 
-        dest_wall_num = wall[dest_wall_num].point2;
-        src_wall_num = wall[src_wall_num].point2;
+        dwall = dwall->point2Wall();
+        swall = swall->point2Wall();
     }
-    while (dest_wall_num != start_wall);
+    while (dwall != firstwall);
 
     // TODO: Mapping a sector to the sector object to which it belongs is better
     for (sop = SectorObject; sop < &SectorObject[MAX_SECTOR_OBJECTS]; sop++)
@@ -98,7 +96,7 @@ void CopySectorWalls(short dest_sectnum, short src_sectnum)
             continue;
 
         for (sectp = sop->sectp; *sectp; sectp++)
-            if (sectnum(*sectp) == dest_sectnum)
+            if (*sectp == dest_sect)
             {
                 so_setinterpolationtics(sop, 0);
                 break;
@@ -106,31 +104,26 @@ void CopySectorWalls(short dest_sectnum, short src_sectnum)
     }
 }
 
-void CopySectorMatch(short match)
+void CopySectorMatch(int match)
 {
-    SPRITEp dest_sp, src_sp;
-    SECTORp dsectp,ssectp;
+    sectortype* dsectp, *ssectp;
     int kill;
-    SPRITEp k;
 
     SWStatIterator it(STAT_COPY_DEST);
     while (auto dActor = it.Next())
     {
-        dest_sp = &dActor->s();
-        dsectp = &sector[dest_sp->sectnum];
+        dsectp = dActor->sector();
 
-        if (match != dest_sp->lotag)
+        if (match != dActor->spr.lotag)
             continue;
 
         SWStatIterator it2(STAT_COPY_SOURCE);
         while (auto sActor = it2.Next())
         {
-            src_sp = &sActor->s();
-
-            if (SP_TAG2(src_sp) == SP_TAG2(dest_sp) &&
-                SP_TAG3(src_sp) == SP_TAG3(dest_sp))
+            if (SP_TAG2(sActor) == SP_TAG2(dActor) &&
+                SP_TAG3(sActor) == SP_TAG3(dActor))
             {
-                ssectp = &sector[src_sp->sectnum];
+                ssectp = sActor->sector();
 
                 // !!!!!AAAAAAAAAAAAAAAAAAAAAAHHHHHHHHHHHHHHHHHHHHHH
                 // Don't kill anything you don't have to
@@ -139,13 +132,11 @@ void CopySectorMatch(short match)
 
 #if 1
                 // kill all sprites in the dest sector that need to be
-                SWSectIterator itsec(dest_sp->sectnum);
+                SWSectIterator itsec(dsectp);
                 while (auto itActor = itsec.Next())
                 {
-                    k = &itActor->s();
-
                     // kill anything not invisible
-                    if (!TEST(k->cstat, CSTAT_SPRITE_INVISIBLE))
+                    if (!(itActor->spr.cstat & CSTAT_SPRITE_INVISIBLE))
                     {
                         if (itActor->hasU())
                         {
@@ -161,41 +152,40 @@ void CopySectorMatch(short match)
                 }
 #endif
 
-                CopySectorWalls(dest_sp->sectnum, src_sp->sectnum);
+                CopySectorWalls(dsectp, ssectp);
 
-                itsec.Reset(src_sp->sectnum);
+                itsec.Reset(ssectp);
                 while (auto itActor = itsec.Next())
                 {
-                    auto sp = &itActor->s();
                     // don't move ST1 Copy Tags
-                    if (SP_TAG1(sp) != SECT_COPY_SOURCE)
+                    if (SP_TAG1(itActor) != SECT_COPY_SOURCE)
                     {
                         int sx,sy,dx,dy,src_xoff,src_yoff,trash;
 
                         // move sprites from source to dest - use center offset
 
                         // get center of src and dest sect
-                        SectorMidPoint(src_sp->sectnum, &sx, &sy, &trash);
-                        SectorMidPoint(dest_sp->sectnum, &dx, &dy, &trash);
+                        SectorMidPoint(sActor->sector(), &sx, &sy, &trash);
+                        SectorMidPoint(dActor->sector(), &dx, &dy, &trash);
 
                         // get offset
-                        src_xoff = sx - sp->x;
-                        src_yoff = sy - sp->y;
+                        src_xoff = sx - itActor->spr.pos.X;
+                        src_yoff = sy - itActor->spr.pos.Y;
 
                         // move sprite to dest sector
-                        sp->x = dx - src_xoff;
-                        sp->y = dy - src_yoff;
+                        itActor->spr.pos.X = dx - src_xoff;
+                        itActor->spr.pos.Y = dy - src_yoff;
 
                         // change sector
-                        ChangeActorSect(itActor, dest_sp->sectnum);
+                        ChangeActorSect(itActor, dsectp);
 
                         // check to see if it moved on to a sector object
-                        if (TEST(sector[dest_sp->sectnum].extra, SECTFX_SECTOR_OBJECT))
+                        if ((dsectp->extra & SECTFX_SECTOR_OBJECT))
                         {
-                            SECTOR_OBJECTp sop;
+                            SECTOR_OBJECT* sop;
 
                             // find and add sprite to SO
-                            sop = DetectSectorObject(&sector[sp->sectnum]);
+                            sop = DetectSectorObject(itActor->sector());
                             AddSpriteToSectorObject(itActor, sop);
 
                             // update sprites postions so they aren't in the
@@ -207,19 +197,23 @@ void CopySectorMatch(short match)
                 }
 
                 // copy sector user if there is one
-                if (SectUser[src_sp->sectnum].Data() || SectUser[dest_sp->sectnum].Data())
-                {
-                    SECT_USERp ssectu = GetSectUser(src_sp->sectnum);
-                    SECT_USERp dsectu = GetSectUser(dest_sp->sectnum);
 
-                    memcpy(dsectu, ssectu, sizeof(SECT_USER));
-                }
+                dsectp->flags        = ssectp->flags;
+                dsectp->depth_fixed  = ssectp->depth_fixed;
+                dsectp->stag         = ssectp->stag;
+                dsectp->ang          = ssectp->ang;
+                dsectp->height       = ssectp->height;
+                dsectp->speed        = ssectp->speed;
+                dsectp->damage       = ssectp->damage;
+                dsectp->number       = ssectp->number;
+                if (ssectp->u_defined) dsectp->u_defined    = true;
+                dsectp->flags2       = ssectp->flags2;
 
                 dsectp->hitag = ssectp->hitag;
                 dsectp->lotag = ssectp->lotag;
 
-                dsectp->floorz = ssectp->floorz;
-                dsectp->ceilingz = ssectp->ceilingz;
+                dsectp->setfloorz(ssectp->floorz);
+                dsectp->setceilingz(ssectp->ceilingz);
 
                 dsectp->floorshade = ssectp->floorshade;
                 dsectp->ceilingshade = ssectp->ceilingshade;
@@ -259,7 +253,7 @@ void CopySectorMatch(short match)
     it.Reset(STAT_COPY_DEST);
     while (auto dActor = it.Next())
     {
-        if (match == dActor->s().lotag)
+        if (match == dActor->spr.lotag)
             KillActor(dActor);
     }
 
@@ -267,7 +261,7 @@ void CopySectorMatch(short match)
     it.Reset(STAT_COPY_SOURCE);
     while (auto sActor = it.Next())
     {
-        if (match == sActor->s().lotag)
+        if (match == sActor->spr.lotag)
             KillActor(sActor);
     }
 

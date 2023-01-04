@@ -150,9 +150,7 @@ struct SWPlayer native
         vec3_t pos;
     };
 	*/
-    
-    // interpolation
-    //int oposx, oposy, oposz;
+
 
     // holds last valid move position
     //int16 lv_sectnum;
@@ -196,13 +194,9 @@ struct SWPlayer native
     native int hiz,loz;
     native int ceiling_dist,floor_dist;
     native int circle_camera_dist;
-    native int six,siy,siz; // save player interp position for PlayerSprite
     native int16 siang;
 
-    native int xvect, yvect;
-    native int oxvect, oyvect;
     native int friction;
-    native int slide_xvect, slide_yvect;
     native int16 slide_ang;
     native int slide_dec;
     native float drive_avel;
@@ -211,8 +205,7 @@ struct SWPlayer native
     native int16 circle_camera_ang;
     native int16 camera_check_time_delay;
 
-    native int cursectnum,lastcursectnum;
-    native int turn180_target; // 180 degree turn
+    //native int /*cursectnum,*/lastcursectnum;
 
     // variables that do not fit into sprite structure
     native int hvel,tilt,tilt_dest;
@@ -221,14 +214,11 @@ struct SWPlayer native
     native int16 recoil_ndx;
     native int recoil_horizoff;
 
-    native int oldposx,oldposy,oldposz;
-    native int RevolveX, RevolveY;
     native int16 RevolveDeltaAng;
 
     native int16 pnum; // carry along the player number
 
-    native int16 LadderSector;
-    native int lx,ly; // ladder x and y
+    //native int16 LadderSector;
     native int16 JumpDuration;
     native int16 WadeDepth;
     native int16 bob_amt;

@@ -40,12 +40,13 @@
 template<class Type, int size> class FreeListArray
 {
     int freecount;
-    short FreeList[size];
+    int16_t FreeList[size];
     Type DataList[size];
 public:
     enum { count = size };
     void Clear()
     {
+        memset(DataList, 0, sizeof(DataList));
         freecount = size;
         for (int i = 0; i < size; i++)
         {
@@ -61,6 +62,8 @@ public:
 
     void Release(int i)
     {
+        // Important: This must not clear the released objects because several 
+        // linked list loops are written to access the 'next' field after the Release call!
         FreeList[freecount++] = i;
     }
 

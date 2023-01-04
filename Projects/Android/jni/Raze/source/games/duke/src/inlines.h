@@ -22,24 +22,29 @@ inline int badguypic(int const tileNum)
 	return ((gs.actorinfo[tileNum].flags & (SFLAG_INTERNAL_BADGUY | SFLAG_BADGUY)) != 0);
 }
 
-inline int badguy(spritetype const * const pSprite)
-{
-	return badguypic(pSprite->picnum);
-}
-
 inline int bossguypic(int const tileNum)
 {
 	return ((gs.actorinfo[tileNum].flags & (SFLAG_BOSS)) != 0);
 }
 
-inline int bossguy(spritetype const* const pSprite)
+inline int actorflag(DDukeActor * actor, EDukeFlags1 mask)
 {
-	return bossguypic(pSprite->picnum);
+	return (((gs.actorinfo[actor->spr.picnum].flags) & mask) != 0);
 }
 
-inline int actorflag(DDukeActor * actor, int mask)
+inline int actorflag(DDukeActor* actor, EDukeFlags2 mask)
 {
-	return (((gs.actorinfo[actor->s->picnum].flags) & mask) != 0);
+	return (((gs.actorinfo[actor->spr.picnum].flags2) & mask) != 0);
+}
+
+inline int attackerflag(DDukeActor* actor, EDukeFlags1 mask)
+{
+	return (((gs.actorinfo[actor->attackertype].flags) & mask) != 0);
+}
+
+inline int attackerflag(DDukeActor* actor, EDukeFlags2 mask)
+{
+	return (((gs.actorinfo[actor->attackertype].flags2) & mask) != 0);
 }
 
 inline int actorfella(DDukeActor* actor)
@@ -47,7 +52,7 @@ inline int actorfella(DDukeActor* actor)
 	return actorflag(actor, SFLAG_KILLCOUNT);
 }
 
-inline void setflag(int flag, const std::initializer_list<short>& types)
+inline void setflag(EDukeFlags1 flag, const std::initializer_list<short>& types)
 {
 	for (auto val : types)
 	{
@@ -55,9 +60,17 @@ inline void setflag(int flag, const std::initializer_list<short>& types)
 	}
 }
 
-inline bool inventory(spritetype* S)
+inline void setflag(EDukeFlags2 flag, const std::initializer_list<short>& types)
 {
-	return !!(gs.actorinfo[S->picnum].flags & SFLAG_INVENTORY);
+	for (auto val : types)
+	{
+		gs.actorinfo[val].flags2 |= flag;
+	}
+}
+
+inline bool inventory(DDukeActor* S)
+{
+	return actorflag(S, SFLAG_INVENTORY);
 }
 
 inline void settileflag(int flag, const std::initializer_list<short>& types)
@@ -70,32 +83,38 @@ inline void settileflag(int flag, const std::initializer_list<short>& types)
 
 inline bool wallswitchcheck(DDukeActor* s)
 {
-	return !!(gs.tileinfo[s->s->picnum].flags & TFLAG_WALLSWITCH);
+	return !!(gs.tileinfo[s->spr.picnum].flags & TFLAG_WALLSWITCH);
 }
 
-inline int checkcursectnums(int se)
+inline int checkcursectnums(sectortype* se)
 {
 	int i;
 	for(i=connecthead;i>=0;i=connectpoint2[i])
-		if(ps[i].GetActor() && ps[i].GetActor()->s->sectnum == se ) return i;
+		if(ps[i].GetActor() && ps[i].GetActor()->sector() == se ) return i;
 	return -1;
 }
 
-// These are from duke's sector.c
-inline int ldist(const spritetype* s1, const spritetype* s2)
+inline int ldist(DDukeActor* s1, DDukeActor* s2)
 {
 	int vx, vy;
-	vx = s1->x - s2->x;
-	vy = s1->y - s2->y;
+	vx = s1->spr.pos.X - s2->spr.pos.X;
+	vy = s1->spr.pos.Y - s2->spr.pos.Y;
 	return(FindDistance2D(vx, vy) + 1);
 }
 
-inline int dist(const spritetype* s1, const spritetype* s2)
+inline int ldist(const DDukeActor* s1, const tspritetype* s2)
+{
+	int vx, vy;
+	vx = s1->spr.pos.X - s2->pos.X;
+	vy = s1->spr.pos.Y - s2->pos.Y;
+	return(FindDistance2D(vx, vy) + 1);
+}
+inline int dist(DDukeActor* s1, DDukeActor* s2)
 {
 	int vx, vy, vz;
-	vx = s1->x - s2->x;
-	vy = s1->y - s2->y;
-	vz = s1->z - s2->z;
+	vx = s1->spr.pos.X - s2->spr.pos.X;
+	vy = s1->spr.pos.Y - s2->spr.pos.Y;
+	vz = s1->spr.pos.Z - s2->spr.pos.Z;
 	return(FindDistance3D(vx, vy, vz));
 }
 
@@ -115,7 +134,6 @@ inline bool isIn(int value, const std::initializer_list<int>& list)
 	for (auto v : list) if (v == value) return true;
 	return false;
 }
-
 
 // these are mainly here to avoid directly accessing the input data so that it can be more easily refactored later.
 inline bool PlayerInput(int pl, ESyncBits bit)
@@ -173,7 +191,7 @@ inline void clearfriction()
 {
 	for (int i = 0; i != -1; i = connectpoint2[i])
 	{
-		ps[i].fric.x = ps[i].fric.y = 0;
+		ps[i].fric.X = ps[i].fric.Y = 0;
 	}
 }
 
@@ -189,13 +207,8 @@ inline bool playrunning()
 
 inline void doslopetilting(player_struct* p, double const scaleAdjust = 1)
 {
-	bool const canslopetilt = p->on_ground && p->insector() && p->cursector()->lotag != ST_2_UNDERWATER && (p->cursector()->floorstat & 2);
-	p->horizon.calcviewpitch(p->pos.vec2, p->angle.ang, p->aim_mode == 0, canslopetilt, p->cursectnum, scaleAdjust);
-}
-
-inline int callsound(sectortype* sect, DDukeActor* snum)
-{
-	return callsound(sectnum(sect), snum);
+	bool const canslopetilt = p->on_ground && p->insector() && p->cursector->lotag != ST_2_UNDERWATER && (p->cursector->floorstat & CSTAT_SECTOR_SLOPE);
+	p->horizon.calcviewpitch(p->pos.vec2, p->angle.ang, p->aim_mode == 0, canslopetilt, p->cursector, scaleAdjust);
 }
 
 //---------------------------------------------------------------------------
@@ -206,9 +219,32 @@ inline int callsound(sectortype* sect, DDukeActor* snum)
 
 inline void hud_draw(double x, double y, int tilenum, int shade, int orientation)
 {
-	int p = ps[screenpeek].cursector()->floorpal;
+	int p = ps[screenpeek].cursector->floorpal;
 	hud_drawsprite(x, y, 65536, 0, tilenum, shade, p, 2 | orientation);
 }
 
+inline void animateshrunken(player_struct* p, double weapon_xoffset, double looking_arc, double look_anghalf, int tilenum, int8_t shade, int o, double smoothratio)
+{
+	const double fistsign = bsinf(interpolatedvalue(p->ofistsign, p->fistsign, smoothratio), -10);
+	if (p->jetpack_on == 0)	looking_arc += 32 - (p->GetActor()->spr.xvel >> 1);
+	hud_draw(weapon_xoffset + fistsign + 250 - look_anghalf, looking_arc + 258 - fabs(fistsign * 4), tilenum, shade, o);
+	hud_draw(weapon_xoffset - fistsign + 40 - look_anghalf, looking_arc + 200 + fabs(fistsign * 4), tilenum, shade, o | 4);
+}
+
+inline ESpriteFlags randomFlip()
+{
+	int r = krand() & 12;
+	if (r == 0) return 0;
+	if (r == 4) return CSTAT_SPRITE_XFLIP;
+	if (r == 8) return CSTAT_SPRITE_YFLIP;
+	return CSTAT_SPRITE_XFLIP | CSTAT_SPRITE_YFLIP;
+}
+
+inline ESpriteFlags randomXFlip()
+{
+	int r = krand() & 4;
+	if (r == 0) return 0;
+	return CSTAT_SPRITE_XFLIP;
+}
 
 END_DUKE_NS

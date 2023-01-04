@@ -41,20 +41,22 @@ const char *GetVersionString();
 
 /** Lots of different version numbers **/
 
-#define VERSIONSTR "1.3.1"
+
+#define VERSIONSTR "1.5.0"
 
 // The version as seen in the Windows resource
-#define RC_FILEVERSION 1,3,1,0
-#define RC_PRODUCTVERSION 1,3,1
+#define RC_FILEVERSION 1,5,0,0
+#define RC_PRODUCTVERSION 1,5,0,0
 #define RC_PRODUCTVERSION2 VERSIONSTR
 // These are for content versioning.
 #define VER_MAJOR 4
-#define VER_MINOR 7
+#define VER_MINOR 8
 #define VER_REVISION 0
 
 #define ENG_MAJOR 1
-#define ENG_MINOR 3
-#define ENG_REVISION 1
+#define ENG_MINOR 5
+#define ENG_REVISION 0
+
 
 // More stuff that needs to be different for derivatives.
 #define GAMENAME "Raze"
@@ -73,16 +75,15 @@ const char *GetVersionString();
 #define SAVESIG_SW GAMENAME ".ShadowWarrior"
 #define SAVESIG_PS GAMENAME ".Exhumed"
 
-#define MINSAVEVER_DN3D 10
-#define MINSAVEVER_BLD 11
-#define MINSAVEVER_SW 13
-#define MINSAVEVER_PS 15
+#define MINSAVEVER_DN3D 16
+#define MINSAVEVER_BLD 16
+#define MINSAVEVER_SW 17
+#define MINSAVEVER_PS 16
 
-#define SAVEVER_DN3D 12
-#define SAVEVER_BLD 11
-#define SAVEVER_SW 13
-#define SAVEVER_PS 15
-#define OLD_SAVEGAME 1	// this is to keep writing out the old format in Blood, even when data has been refactored. 
+#define SAVEVER_DN3D 16
+#define SAVEVER_BLD 16
+#define SAVEVER_SW 17
+#define SAVEVER_PS 16
 
 #define NETGAMEVERSION 1
 
@@ -91,6 +92,8 @@ const char *GetVersionString();
 #else
 #define GAME_DIR ".config/" GAMENAMELOWERCASE
 #endif
+
+#define DEFAULT_DISCORD_APP_ID "954282576464449556"
 
 const int SAVEPICWIDTH = 240;
 const int SAVEPICHEIGHT = 180;

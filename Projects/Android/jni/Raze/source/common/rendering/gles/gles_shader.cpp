@@ -266,7 +266,7 @@ bool FShader::Load(const char * name, const char * vert_prog_lump_, const char *
 
 		// light buffers
 		uniform vec4 lights[MAXIMUM_LIGHT_VECTORS];
-		
+
 		uniform	mat4 ProjectionMatrix;
 		uniform	mat4 ViewMatrix;
 		uniform	mat4 NormalViewMatrix;
@@ -370,7 +370,7 @@ bool FShader::Load(const char * name, const char * vert_prog_lump_, const char *
 		#define glowtexture texture4
 		#endif
 	)";
-	
+
 #ifdef NPOT_EMULATION
 	i_data += "#define NPOT_EMULATION\nuniform vec2 uNpotEmulation;\n";
 #endif
@@ -494,7 +494,7 @@ bool FShader::Load(const char * name, const char * vert_prog_lump_, const char *
 	}
 
 	shaderData->hShader = glCreateProgram();
-	
+
 	uint32_t binaryFormat = 0;
 	TArray<uint8_t> binary;
 	if (IsShaderCacheActive())
@@ -694,7 +694,7 @@ bool FShader::Bind(ShaderFlavourData& flavour)
 		variantConfig.AppendFormat("#define DEF_USE_U_LIGHT_LEVEL %d\n", flavour.useULightLevel);
 
 		variantConfig.AppendFormat("#define DEF_DO_DESATURATE %d\n", flavour.doDesaturate);
-		
+
 		variantConfig.AppendFormat("#define DEF_DYNAMIC_LIGHTS_MOD %d\n", flavour.dynLightsMod);
 		variantConfig.AppendFormat("#define DEF_DYNAMIC_LIGHTS_SUB %d\n", flavour.dynLightsSub);
 		variantConfig.AppendFormat("#define DEF_DYNAMIC_LIGHTS_ADD %d\n", flavour.dynLightsAdd);
@@ -702,7 +702,7 @@ bool FShader::Bind(ShaderFlavourData& flavour)
 		variantConfig.AppendFormat("#define DEF_USE_OBJECT_COLOR_2 %d\n", flavour.useObjectColor2);
 		variantConfig.AppendFormat("#define DEF_USE_GLOW_TOP_COLOR %d\n", flavour.useGlowTopColor);
 		variantConfig.AppendFormat("#define DEF_USE_GLOW_BOTTOM_COLOR %d\n", flavour.useGlowBottomColor);
-		
+
 		variantConfig.AppendFormat("#define DEF_USE_COLOR_MAP %d\n", flavour.useColorMap);
 		variantConfig.AppendFormat("#define DEF_BUILD_LIGHTING %d\n", flavour.buildLighting);
 		variantConfig.AppendFormat("#define DEF_BANDED_SW_LIGHTING %d\n", flavour.bandedSwLight);
@@ -733,7 +733,7 @@ bool FShader::Bind(ShaderFlavourData& flavour)
 
 //==========================================================================
 //
-// Since all shaders are REQUIRED, any error here needs to be fatal
+//
 //
 //==========================================================================
 
@@ -744,21 +744,8 @@ FShader *FShaderCollection::Compile (const char *ShaderName, const char *ShaderP
 	// this can't be in the shader code due to ATI strangeness.
 	if (!usediscard) defines += "#define NO_ALPHATEST\n";
 
-	FShader *shader = NULL;
-	try
-	{
-		shader = new FShader(ShaderName);
-		if (!shader->Configure(ShaderName, "shaders_gles/glsl/main.vp", "shaders_gles/glsl/main.fp", ShaderPath, LightModePath, defines.GetChars()))
-		{
-			I_FatalError("Unable to load shader %s\n", ShaderName);
-		}
-	}
-	catch(CRecoverableError &err)
-	{
-		if (shader != NULL) delete shader;
-		shader = NULL;
-		I_FatalError("Unable to load shader %s:\n%s\n", ShaderName, err.GetMessage());
-	}
+	FShader *shader = new FShader(ShaderName);
+	shader->Configure(ShaderName, "shaders_gles/glsl/main.vp", "shaders_gles/glsl/main.fp", ShaderPath, LightModePath, defines.GetChars());
 	return shader;
 }
 

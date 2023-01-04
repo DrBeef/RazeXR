@@ -44,14 +44,14 @@
 FGameTexture* GetSkyTexture(int basetile, int lognumtiles, const int16_t *tilemap, int remap)
 {
 	FString synthname;
-	
-	
-	if ((lognumtiles == 0 && remap == 0) || lognumtiles > 4) 
+
+
+	if ((lognumtiles == 0 && remap == 0) || lognumtiles > 4 || lognumtiles < 0) 
 	{
 		// no special handling - let the old code do its job as-is
 		return nullptr;
 	}
-	
+
 	int numtiles = 1 << lognumtiles;
 	synthname.Format("Sky%04x%02x", basetile, remap);
 	for(int i = 0; i < numtiles; i++)
@@ -60,14 +60,14 @@ FGameTexture* GetSkyTexture(int basetile, int lognumtiles, const int16_t *tilema
 	};
 	auto tex = TexMan.FindGameTexture(synthname);
 	if (tex) return tex;
-	
+
 	TArray<TexPartBuild> build(numtiles, true);
 	int tilewidth = tileWidth(basetile);
 	for(int i = 0; i < numtiles; i++)
 	{
-		auto tex = tileGetTexture(basetile + tilemap[i]);
-		if (!tex || !tex->isValid() || tex->GetTexture() == 0) return nullptr;
-		build[i].TexImage = static_cast<FImageTexture*>(tex->GetTexture());
+		auto texture = tileGetTexture(basetile + tilemap[i]);
+		if (!texture || !texture->isValid() || texture->GetTexture() == 0) return nullptr;
+		build[i].TexImage = static_cast<FImageTexture*>(texture->GetTexture());
 		build[i].OriginX = tilewidth * i;
 		build[i].Translation = GPalette.GetTranslation(GetTranslationType(remap), GetTranslationIndex(remap));
 	}

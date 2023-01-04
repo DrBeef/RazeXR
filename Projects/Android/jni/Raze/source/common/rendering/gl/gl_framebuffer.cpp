@@ -69,7 +69,6 @@ EXTERN_CVAR(Int, gl_pipeline_depth);
 
 void gl_LoadExtensions();
 void gl_PrintStartupLog();
-void Draw2D(F2DDrawer *drawer, FRenderState &state);
 
 extern bool vid_hdr_active;
 
@@ -177,12 +176,14 @@ void OpenGLFrameBuffer::InitializeState()
 
 	static_cast<GLDataBuffer*>(mLights->GetBuffer())->BindBase();
 
+
 #ifdef __ANDROID__ 	// This is needed to stop Ardeno 530 from crashing on the first drawer
 	static_cast<GLDataBuffer*>(mLights->GetBuffer())->Map();
 	static_cast<GLDataBuffer*>(mLights->GetBuffer())->Unmap();
 #endif
 
-	mDebug = std::make_shared<FGLDebug>();
+	mDebug = std::make_unique<FGLDebug>();
+
 	mDebug->Update();
 }
 
@@ -392,6 +393,29 @@ void OpenGLFrameBuffer::BlurScene(float amount)
 	GLRenderer->BlurScene(amount);
 }
 
+void OpenGLFrameBuffer::InitLightmap(int LMTextureSize, int LMTextureCount, TArray<uint16_t>& LMTextureData)
+{
+	if (LMTextureData.Size() > 0)
+	{
+		GLint activeTex = 0;
+		glGetIntegerv(GL_ACTIVE_TEXTURE, &activeTex);
+		glActiveTexture(GL_TEXTURE0 + 17);
+
+		if (GLRenderer->mLightMapID == 0)
+			glGenTextures(1, (GLuint*)&GLRenderer->mLightMapID);
+
+		glBindTexture(GL_TEXTURE_2D_ARRAY, GLRenderer->mLightMapID);
+		glTexImage3D(GL_TEXTURE_2D_ARRAY, 0, GL_RGB16F, LMTextureSize, LMTextureSize, LMTextureCount, 0, GL_RGB, GL_HALF_FLOAT, &LMTextureData[0]);
+		glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+		glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+		glGenerateMipmap(GL_TEXTURE_2D_ARRAY);
+
+		glActiveTexture(activeTex);
+
+		LMTextureData.Reset(); // We no longer need this, release the memory
+	}
+}
+
 void OpenGLFrameBuffer::SetViewportRects(IntRect *bounds)
 {
 	Super::SetViewportRects(bounds);
@@ -566,6 +590,11 @@ void OpenGLFrameBuffer::PostProcessScene(bool swscene, int fixedcm, float flash,
 {
 	if (!swscene) GLRenderer->mBuffers->BlitSceneToTexture(); // Copy the resulting scene to the current post process texture
 	GLRenderer->PostProcessScene(fixedcm, flash, afterBloomDrawEndScene2D);
+}
+
+bool OpenGLFrameBuffer::CompileNextShader()
+{
+	return GLRenderer->mShaderManager->CompileNextShader();
 }
 
 //==========================================================================

@@ -29,9 +29,9 @@ struct Blood native
 	native static void sndStartSampleNamed(String sname, int volume, int channel);
 	native static TextureID PowerupIcon(int pwup);
 	native static BloodPlayer GetViewPlayer();
-	
+
 	// These are just dummies to make the MP statusbar code compile.
-	
+
 	static void GetPlayers(Array<BloodPlayer> players)
 	{
 		players.Clear();
@@ -53,8 +53,6 @@ struct BloodPlayer native
 {
 	native int GetHealth(); // health is stored in the XSPRITE which cannot be safely exported to scripting at the moment due to pending refactoring.
 	native int powerupCheck(int pwup);
-	//spritetype*     pSprite;
-	//XSPRITE*        pXSprite;
 	//DUDEINFO*       pDudeInfo;
 	//PlayerHorizon   horizon;
 	//PlayerAngle     angle;

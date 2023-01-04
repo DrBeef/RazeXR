@@ -22,7 +22,6 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 //-------------------------------------------------------------------------
 #pragma once
 
-#include "compat.h"
 #include "common_game.h"
 #include "actor.h"
 #include "db.h"
@@ -31,52 +30,52 @@ BEGIN_BLD_NS
 
 
 struct AISTATE {
-    int stateType; // By NoOne: current type of state. Basically required for kModernDudeTargetChanger, but can be used for something else.
-    int seqId;
-    int funcId; // seq callback
-    int stateTicks;
-    void(*enterFunc)(DBloodActor *);
-    void(*moveFunc)(DBloodActor *);
-    void(*thinkFunc)(DBloodActor *);
-    AISTATE *nextState;
+	int stateType; // By NoOne: current type of state. Basically required for kModernDudeTargetChanger, but can be used for something else.
+	int seqId;
+	int funcId; // seq callback
+	int stateTicks;
+	void(*enterFunc)(DBloodActor *);
+	void(*moveFunc)(DBloodActor *);
+	void(*thinkFunc)(DBloodActor *);
+	AISTATE *nextState;
 };
 extern AISTATE aiState[];
 extern AISTATE genIdle;
 extern AISTATE genRecoil;
 
 enum AI_SFX_PRIORITY {
-    AI_SFX_PRIORITY_0 = 0,
-    AI_SFX_PRIORITY_1,
-    AI_SFX_PRIORITY_2,
+	AI_SFX_PRIORITY_0 = 0,
+	AI_SFX_PRIORITY_1,
+	AI_SFX_PRIORITY_2,
 };
 
 
 struct DUDEEXTRA_STATS
 {
-    union {
-        int thinkTime;
-        int birthCounter;
-    };
+	union {
+		int thinkTime;
+		int birthCounter;
+	};
 	uint8_t active;
 };
 
 struct DUDEEXTRA
 {
-    int time;
-    uint8_t teslaHit;
-    int prio;
-    DUDEEXTRA_STATS stats;
+	int time;
+	uint8_t teslaHit;
+	int prio;
+	DUDEEXTRA_STATS stats;
 };
 
 struct TARGETTRACK {
-    int TotalKills;
-    int Kills;
-    int at8; // view angle
-    int atc;
-    int at10; // Move predict
+	int TotalKills;
+	int Kills;
+	int at8; // view angle
+	int atc;
+	int at10; // Move predict
 };
 
-extern const int dword_138BB0[5];
+extern const int gCultTeslaFireChance[5];
 
 bool dudeIsPlayingSeq(DBloodActor* pSprite, int nSeq);
 void aiPlay3DSound(DBloodActor* pSprite, int a2, AI_SFX_PRIORITY a3, int a4);

@@ -235,7 +235,7 @@ FTextureID FTextureManager::CheckForTexture (const char *name, ETextureType uset
 		}
 	}
 
-	
+
 	if (!(flags & TEXMAN_ShortNameOnly))
 	{
 		// We intentionally only look for textures in subdirectories.
@@ -376,18 +376,18 @@ bool FTextureManager::OkForLocalization(FTextureID texnum, const char *substitut
 	if (*substitute == '$') substitute = GStrings.GetString(substitute+1, &langtable);
 	else return true;	// String literals from the source data should never override graphics from the same definition.
 	if (substitute == nullptr) return true;	// The text does not exist.
-	
+
 	// Modes 2, 3 and 4 must not replace localized textures.
 	int localizedTex = ResolveLocalizedTexture(texnum.GetIndex());
 	if (localizedTex != texnum.GetIndex()) return true;	// Do not substitute a localized variant of the graphics patch.
-	
+
 	// For mode 4 we are done now.
 	if (locmode == 4) return false;
-	
+
 	// Mode 2 and 3 must reject any text replacement from the default language tables.
 	if ((langtable & MAKE_ID(255,0,0,0)) == MAKE_ID('*', 0, 0, 0)) return true;	// Do not substitute if the string comes from the default table.
 	if (locmode == 2) return false;
-	
+
 	// Mode 3 must also reject substitutions for non-IWAD content.
 	int file = fileSystem.GetFileContainer(Textures[texnum.GetIndex()].Texture->GetSourceLump());
 	if (file > fileSystem.GetMaxIwadNum()) return true;
@@ -771,7 +771,7 @@ void FTextureManager::ParseTextureDef(int lump, FMultipatchTextureBuilder &build
 		else if (sc.Compare("define")) // define a new "fake" texture
 		{
 			sc.GetString();
-					
+
 			FString base = ExtractFileBase(sc.String, false);
 			if (!base.IsEmpty())
 			{
@@ -810,6 +810,22 @@ void FTextureManager::ParseTextureDef(int lump, FMultipatchTextureBuilder &build
 				}
 			}				
 			//else Printf("Unable to define hires texture '%s'\n", tex->Name);
+		}
+		else if (sc.Compare("notrim"))
+		{
+			sc.MustGetString();
+
+			FTextureID id = TexMan.CheckForTexture(sc.String, ETextureType::Sprite);
+			if (id.isValid())
+			{
+				FGameTexture *tex = TexMan.GetGameTexture(id);
+
+				if (tex)	tex->SetNoTrimming(true);
+				else		sc.ScriptError("NoTrim: %s not found", sc.String);
+			}
+			else
+				sc.ScriptError("NoTrim: %s is not a sprite", sc.String);
+
 		}
 		else if (sc.Compare("texture"))
 		{
@@ -1170,19 +1186,19 @@ FGameTexture *CreateShaderTexture(bool, bool);
 void InitBuildTiles();
 FImageSource* CreateEmptyTexture();
 
-void FTextureManager::Init(void (*progressFunc_)(), void (*checkForHacks)(BuildInfo&))
+void FTextureManager::Init()
 {
-	progressFunc = progressFunc_;
 	DeleteAll();
-	//if (BuildTileFiles.Size() == 0) CountBuildTiles ();
 
+	// Add all the static content 
 	auto nulltex = MakeGameTexture(new FImageTexture(CreateEmptyTexture()), nullptr, ETextureType::Null);
 	AddGameTexture(nulltex);
 
 	// This is for binding to unused texture units, because accessing an unbound texture unit is undefined. It's a one pixel empty texture.
 	auto emptytex = MakeGameTexture(new FImageTexture(CreateEmptyTexture()), nullptr, ETextureType::Override);
 	emptytex->SetSize(1, 1);
-	AddGameTexture(emptytex);	
+	AddGameTexture(emptytex);
+
 	// some special textures used in the game.
 	AddGameTexture(CreateShaderTexture(false, false));
 	AddGameTexture(CreateShaderTexture(false, true));
@@ -1195,6 +1211,12 @@ void FTextureManager::Init(void (*progressFunc_)(), void (*checkForHacks)(BuildI
 	mt = MakeGameTexture(new AnimTexture(), "AnimTextureFrame2", ETextureType::Override);
 	mt->SetUpscaleFlag(false, true);
 	AddGameTexture(mt);
+}
+
+void FTextureManager::AddTextures(void (*progressFunc_)(), void (*checkForHacks)(BuildInfo&))
+{
+	progressFunc = progressFunc_;
+	//if (BuildTileFiles.Size() == 0) CountBuildTiles ();
 
 	int wadcnt = fileSystem.GetNumWads();
 
@@ -1386,7 +1408,7 @@ int FTextureManager::ResolveLocalizedTexture(int tex)
 int FTextureManager::GuesstimateNumTextures ()
 {
 	int numtex = 0;
-	
+
 	for(int i = fileSystem.GetNumEntries()-1; i>=0; i--)
 	{
 		int space = fileSystem.GetFileNamespace(i);
@@ -1593,7 +1615,7 @@ void FTextureManager::AddAlias(const char* name, FGameTexture* tex)
 //
 //==========================================================================
 
-FTextureID FTextureID::operator +(int offset) throw()
+FTextureID FTextureID::operator +(int offset) const noexcept(true)
 {
 	if (!isValid()) return *this;
 	if (texnum + offset >= TexMan.NumTextures()) return FTextureID(-1);

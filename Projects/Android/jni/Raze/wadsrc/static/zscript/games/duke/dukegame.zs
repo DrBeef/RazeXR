@@ -35,7 +35,7 @@ struct Duke native
 		MUS_BRIEFING = 1,
 		MUS_LOADING = 2,
 	};
-	
+
 	enum EPalette
 	{
 		BASEPAL = 0,
@@ -61,6 +61,12 @@ struct Duke native
 		ICON_BOOTS,
 		ICON_MAX
 	};
+	
+	enum EClipMask
+	{
+		CLIPMASK0 = (1 << 16) + 1,
+		CLIPMASK1 = (256 << 16) + 64
+	}
 
 	native static void PlaySpecialMusic(int which);
 	native static int PlaySound(int num, int channel = CHAN_AUTO, int flags = 0, float vol =0.8f);
@@ -69,20 +75,21 @@ struct Duke native
 	native static DukePlayer GetViewPlayer();
 	native static int MaxPlayerHealth();
 	native static int MaxAmmoAmount(int weap);
-	
+	native static DukePlayer checkcursectnums(sectortype sect);
+
 	static void PlayBonusMusic()
 	{
 		if (System.MusicEnabled())
 			PlaySound(DukeSnd.BONUSMUSIC, CHAN_AUTO, CHANF_UI);
 	}
-	
+
 	//==========================================================================
 	//
 	// wrappers around DrawText to allow easier reuse of the old code.
 	// The vertical displacements are to have the same positioning as with the original code.
 	//
 	//==========================================================================
-		
+
 	static void BigText(double x, double y, String text, int align = -1, double alpha = 1.)
 	{
 		let myfont = Raze.PickBigFont();
@@ -150,10 +157,10 @@ struct DukePlayer
 	native int16 psectlotag;
 
 	// From here on it is unaltered from JFDuke with the exception of a few fields that are no longer needed and were removed.
-	native int exitx, exity, loogiex[64], loogiey[64], numloogs, loogcnt;
+	native int numloogs, loogcnt;
 	native int invdisptime;
-	native int bobposx, bobposy, oposx, oposy, oposz, pyoff, opyoff;
-	native int posxv, posyv, poszv, last_pissed_time, truefz, truecz;
+	native int pyoff, opyoff;
+	native int last_pissed_time, truefz, truecz;
 	native int player_par, visibility;
 	native int bobcounter;
 	native int randomflamex, crack_time;
@@ -170,13 +177,12 @@ struct DukePlayer
 	native int16 jumping_counter, airleft, knee_incs, access_incs;
 	native int16 ftq;
 	native int16 got_access, weapon_ang, firstaid_amount;
-	native int16 i;
 	native int16 over_shoulder_on, fist_incs;
 	native int16 cheat_phase;
 	native int16 extra_extra8, quick_kick, last_quick_kick;
 	native int16 heat_amount, timebeforeexit, customexitsound;
-	//DDukeActor* actorsqu, *wackedbyactor, *on_crane, *holoduke_on, *somethingonplayer, *access_spritenum, *dummyplayersprite, *newOwner; // later
-	native voidptr holoduke_on; // cannot do it as a proper actor pointer yet - but the status bar needs it.
+	native DukeActor actor, actorsqu, wackedbyactor, on_crane, somethingonplayer, access_spritenum, dummyplayersprite, newOwner, holoduke_on;
+	native sectortype cursector;
 
 	native int16 weaprecs[256], weapreccnt;
 	native uint interface_toggle_flag;
@@ -210,7 +216,7 @@ struct DukePlayer
 	// Items were reordered by size.
 	native int stairs;
 	native int detonate_count; // at57e
-	native int noise_x, noise_y, noise_radius; // at286, at28a, at290
+	native int noise_radius; // at286, at28a, at290
 	native int drink_timer; // at58e
 	native int eat_timer; // at592
 	native int SlotWin;
@@ -261,6 +267,9 @@ struct DukePlayer
 
 	native bool IsFrozen();
 	native int GetGameVar(String varname, int defval);
+	native int angleAsBuild();
+	native void backuppos();
+	native void setpos(Vector3 pos);
 
 
 }

@@ -38,38 +38,43 @@ enum
 
 struct Flash
 {
+    union
+    {
+        walltype* pWall;
+        sectortype* pSector;
+        TObjPtr<DExhumedActor*> pActor;
+    };
+    int next;
     int8_t nType;
     int8_t shade;
-    DExhumedActor* pActor;
-    int nIndex;
-    int next;
 };
 
 struct Glow
 {
-    short field_0;
-    short field_2;
-    int nSector;
-    short field_6;
+    sectortype* pSector;
+
+    int16_t nShade;
+    int16_t nCounter;
+    int16_t nThreshold;
 };
 
 struct Flicker
 {
-    short field_0;
-    int nSector;
-    unsigned int field_4;
+    sectortype* pSector;
+    int16_t nShade;
+    unsigned int nMask;
 };
 
 struct Flow
 {
-    int objindex;
+    union
+    {
+        walltype* pWall;
+        sectortype* pSector;
+    };
     int type;
-    int xdelta;
-    int ydelta;
-    int angcos;
-    int angsin;
-    int xacc;
-    int yacc;
+    float angcos;
+    float angsin;
 };
 
 
@@ -80,27 +85,39 @@ Flicker sFlicker[kMaxFlickers];
 Flow sFlowInfo[kMaxFlows];
 int flickermask[kMaxFlickerMask];
 
-short bTorch = 0;
-short nFirstFlash = -1;
-short nLastFlash = -1;
-short nFlashDepth = 2;
-short nFlowCount;
-short nFlickerCount;
-short nGlowCount;
+int bTorch = 0;
+int nFirstFlash = -1;
+int nLastFlash = -1;
+int nFlashDepth = 2;
+int nFlowCount;
+int nFlickerCount;
+int nGlowCount;
 
 int bDoFlicks = 0;
 int bDoGlows = 0;
 
+size_t MarkLighting()
+{
+    for (int i = 0; i < kMaxFlashes; i++)
+    {
+        auto& f = sFlash[i];
+        if (f.nType & 4) GC::Mark(f.pActor);
+    }
+    return kMaxFlashes;
+}
 
 FSerializer& Serialize(FSerializer& arc, const char* keyname, Flash& w, Flash* def)
 {
     if (arc.BeginObject(keyname))
     {
-        arc("at0", w.nType)
+        arc("type", w.nType)
             ("shade", w.shade)
-            ("at1", w.nIndex)
-            ("next", w.next)
-            .EndObject();
+            ("next", w.next);
+
+        if (w.nType & 4) arc("index", w.pActor);
+        else if (w.nType & 1) arc("index", w.pSector);
+        else arc("index", w.pWall);
+        arc.EndObject();
     }
     return arc;
 }
@@ -109,10 +126,10 @@ FSerializer& Serialize(FSerializer& arc, const char* keyname, Glow& w, Glow* def
 {
     if (arc.BeginObject(keyname))
     {
-        arc("at0", w.field_0)
-            ("at2", w.field_2)
-            ("sector", w.nSector)
-            ("at6", w.field_6)
+        arc("shade", w.nShade)
+            ("counter", w.nCounter)
+            ("sector", w.pSector)
+            ("threshold", w.nThreshold)
             .EndObject();
     }
     return arc;
@@ -122,9 +139,9 @@ FSerializer& Serialize(FSerializer& arc, const char* keyname, Flicker& w, Flicke
 {
     if (arc.BeginObject(keyname))
     {
-        arc("at0", w.field_0)
-            ("sector", w.nSector)
-            ("at4", w.field_4)
+        arc("shade", w.nShade)
+            ("sector", w.pSector)
+            ("mask", w.nMask)
             .EndObject();
     }
     return arc;
@@ -134,15 +151,12 @@ FSerializer& Serialize(FSerializer& arc, const char* keyname, Flow& w, Flow* def
 {
     if (arc.BeginObject(keyname))
     {
-        arc("objindex", w.objindex)
-            ("type", w.type)
-            ("xdelta", w.xdelta)
-            ("ydelta", w.ydelta)
-            ("atc", w.angcos)
-            ("at10", w.angsin)
-            ("xacc", w.xacc)
-            ("yacc", w.yacc)
-            .EndObject();
+        arc("type", w.type)
+            ("angcos", w.angcos)
+            ("angsin", w.angsin);
+        if (w.type < 2) arc("index", w.pSector);
+        else arc("index", w.pWall);
+        arc.EndObject();
     }
     return arc;
 }
@@ -212,11 +226,8 @@ void InitLights()
     nLastFlash  = -1;
 }
 
-void AddFlash(int nSector, int x, int y, int z, int val)
+void AddFlash(sectortype* pSector, int x, int y, int z, int val)
 {
-    assert(nSector >= 0 && nSector < kMaxSectors);
-    auto sectp = &sector[nSector];
-
     int var_28 = 0;
     int var_1C = val >> 8;
 
@@ -231,144 +242,123 @@ void AddFlash(int nSector, int x, int y, int z, int val)
 
     int var_14 = 0;
 
-	for (auto& wal : wallsofsector(sectp))
+	for (auto& wal : wallsofsector(pSector))
     {
 		auto average = wal.center();
 
         sectortype *pNextSector = NULL;
-        if (wal.nextsector > -1)
+        if (wal.twoSided())
             pNextSector = wal.nextSector();
 
-        int ebx = -255;
+        int walldist = -255;
 
         if (!var_18)
         {
-            int x2 = x - average.x;
-            if (x2 < 0) {
-                x2 = -x2;
-            }
-
-            ebx = x2;
-
-            int y2 = y - average.y;
-            if (y2 < 0) {
-                y2 = -y2;
-            }
-
-            ebx = ((y2 + ebx) >> 4) - 255;
+            walldist = (int)sqrt(SquareDistToWall(x * inttoworld, y * inttoworld, &wal)) - 255;
         }
 
-        if (ebx < 0)
+        if (walldist < 0)
         {
             var_14++;
-            var_28 += ebx;
+            var_28 += walldist;
 
             if (wal.pal < 5)
             {
-                if (!pNextSector || pNextSector->floorz < sectp->floorz)
+                if (!pNextSector || pNextSector->floorz < pSector->floorz)
                 {
-                    short nFlash = GrabFlash();
+                    int nFlash = GrabFlash();
                     if (nFlash < 0) {
                         return;
                     }
 
                     sFlash[nFlash].nType = var_20 | 2;
                     sFlash[nFlash].shade = wal.shade;
-					sFlash[nFlash].nIndex = wallnum(&wal);
+					sFlash[nFlash].pWall = &wal;
 
                     wal.pal += 7;
 
-                    ebx += wal.shade;
-                    int eax = ebx;
-
-                    if (ebx < -127) {
-                        eax = -127;
-                    }
-
-                    wal.shade = eax;
+                    wal.shade = max( -127, wal.shade + walldist);
 
                     if (!var_1C && !wal.overpicnum && pNextSector)
                     {
-                        AddFlash(wal.nextsector, x, y, z, val);
+                        AddFlash(pNextSector, x, y, z, val);
                     }
                 }
             }
         }
     }
 
-    if (var_14 && sectp->floorpal < 4)
+    if (var_14 && pSector->floorpal < 4)
     {
-        short nFlash = GrabFlash();
+        int nFlash = GrabFlash();
         if (nFlash < 0) {
             return;
         }
 
         sFlash[nFlash].nType = var_20 | 1;
-        sFlash[nFlash].nIndex = nSector;
-        sFlash[nFlash].shade = sectp->floorshade;
+        sFlash[nFlash].pSector = pSector;;
+        sFlash[nFlash].shade = pSector->floorshade;
 
-        sectp->floorpal += 7;
+        pSector->floorpal += 7;
 
-        int edx = sectp->floorshade + var_28;
+        int edx = pSector->floorshade + var_28;
         int eax = edx;
 
         if (edx < -127) {
             eax = -127;
         }
 
-        sectp->floorshade = eax;
+        pSector->floorshade = eax;
 
-        if (!(sectp->ceilingstat & 1))
+        if (!(pSector->ceilingstat & CSTAT_SECTOR_SKY))
         {
-            if (sectp->ceilingpal < 4)
+            if (pSector->ceilingpal < 4)
             {
-                short nFlash2 = GrabFlash();
+                int nFlash2 = GrabFlash();
                 if (nFlash2 >= 0)
                 {
                     sFlash[nFlash2].nType = var_20 | 3;
-                    sFlash[nFlash2].nIndex = nSector;
-                    sFlash[nFlash2].shade = sectp->ceilingshade;
+                    sFlash[nFlash2].pSector = pSector;
+                    sFlash[nFlash2].shade = pSector->ceilingshade;
 
-                    sectp->ceilingpal += 7;
+                    pSector->ceilingpal += 7;
 
-                    int edx = sectp->ceilingshade + var_28;
-                    int eax = edx;
+                    edx = pSector->ceilingshade + var_28;
+                    eax = edx;
 
                     if (edx < -127) {
                         eax = -127;
                     }
 
-                    sectp->ceilingshade = eax;
+                    pSector->ceilingshade = eax;
                 }
             }
         }
 
-        ExhumedSectIterator it(nSector);
+        ExhumedSectIterator it(pSector);
         while (auto pActor = it.Next())
         {
-			auto pSprite = &pActor->s();
-            if (pSprite->pal < 4)
+            if (pActor->spr.pal < 4)
             {
-                short nFlash3 = GrabFlash();
+                int nFlash3 = GrabFlash();
                 if (nFlash3 >= 0)
                 {
                     sFlash[nFlash3].nType = var_20 | 4;
-                    sFlash[nFlash3].shade = pSprite->shade;
-                    sFlash[nFlash3].nIndex = -1;
+                    sFlash[nFlash3].shade = pActor->spr.shade;
                     sFlash[nFlash3].pActor = pActor;
 
-                    pSprite->pal += 7;
+                    pActor->spr.pal += 7;
 
-                    int eax = -255;
+                    eax = -255;
 
                     if (!var_18)
                     {
-                        int xDiff = x - pSprite->x;
+                        int xDiff = x - pActor->spr.pos.X;
                         if (xDiff < 0) {
                             xDiff = -xDiff;
                         }
 
-                        int yDiff = y - pSprite->y;
+                        int yDiff = y - pActor->spr.pos.Y;
                         if (yDiff < 0) {
                             yDiff = -yDiff;
                         }
@@ -378,12 +368,12 @@ void AddFlash(int nSector, int x, int y, int z, int val)
 
                     if (eax < 0)
                     {
-                        short shade = pSprite->shade + eax;
+                        int shade = pActor->spr.shade + eax;
                         if (shade < -127) {
                             shade = -127;
                         }
 
-                        pSprite->shade = (int8_t)shade;
+                        pActor->spr.shade = (int8_t)shade;
                     }
                 }
             }
@@ -400,11 +390,11 @@ void UndoFlashes()
     for (int nFlash = nFirstFlash; nFlash >= 0; nFlash = sFlash[nFlash].next)
     {
         assert(nFlash < 2000 && nFlash >= 0);
+        auto pFlash = &sFlash[nFlash];
 
-        uint8_t type = sFlash[nFlash].nType & 0x3F;
-        int nIndex = sFlash[nFlash].nIndex;
+        uint8_t type = pFlash->nType & 0x3F;
 
-        if (sFlash[nFlash].nType & 0x80)
+        if (pFlash->nType & 0x80)
         {
             int flashtype = type - 1;
             assert(flashtype >= 0);
@@ -415,36 +405,28 @@ void UndoFlashes()
             {
                 case 0:
                 {
-                    assert(nIndex >= 0 && nIndex < kMaxSectors);
-
-                    pShade = &sector[nIndex].floorshade;
+                    pShade = &pFlash->pSector->floorshade;
                     break;
                 }
 
                 case 1:
                 {
-                    assert(nIndex >= 0 && nIndex < kMaxWalls);
-
-                    pShade = &wall[nIndex].shade;
+                    pShade = &pFlash->pWall->shade;
                     break;
                 }
 
                 case 2:
                 {
-                    assert(nIndex >= 0 && nIndex < kMaxSectors);
-
-                    pShade = &sector[nIndex].ceilingshade;
+                    pShade = &pFlash->pSector->ceilingshade;
                     break;
                 }
 
                 case 3:
                 {
-                    auto ac = sFlash[nFlash].pActor;
-                    if (!ac) continue;
-                    auto sp = &ac->s();
-                    if (sp->pal >= 7)
+                    DExhumedActor* ac = pFlash->pActor;
+                    if (ac && ac->spr.pal >= 7)
                     {
-                        pShade = &sp->shade;
+                        pShade = &ac->spr.shade;
                     }
                     else {
                         goto loc_1868A;
@@ -460,7 +442,7 @@ void UndoFlashes()
             assert(pShade != NULL);
 
             int thisshade = (*pShade) + 6;
-            int maxshade = sFlash[nFlash].shade;
+            int maxshade = pFlash->shade;
 
             if (thisshade < maxshade)
             {
@@ -481,33 +463,32 @@ void UndoFlashes()
 
             case 0:
             {
-                sector[nIndex].floorpal -= 7;
-                sector[nIndex].floorshade = sFlash[nFlash].shade;
+                pFlash->pSector->floorpal -= 7;
+                pFlash->pSector->floorshade = pFlash->shade;
                 break;
             }
 
             case 1:
             {
-                wall[nIndex].pal -= 7;
-                wall[nIndex].shade = sFlash[nFlash].shade;
+                pFlash->pWall->pal -= 7;
+                pFlash->pWall->shade = pFlash->shade;
                 break;
             }
 
             case 2:
             {
-                sector[nIndex].ceilingpal -= 7;
-                sector[nIndex].ceilingshade = sFlash[nFlash].shade;
+                pFlash->pSector->ceilingpal -= 7;
+                pFlash->pSector->ceilingshade = pFlash->shade;
                 break;
             }
 
             case 3:
             {
-                auto ac = sFlash[nFlash].pActor;
-                auto sp = &ac->s();
-                if (sp->pal >= 7)
+                DExhumedActor* ac = pFlash->pActor;
+                if (ac && ac->spr.pal >= 7)
                 {
-                    sp->pal -= 7;
-                    sp->shade = sFlash[nFlash].shade;
+                    ac->spr.pal -= 7;
+                    ac->spr.shade = pFlash->shade;
                 }
 
                 break;
@@ -518,7 +499,7 @@ loc_1868A:
 
         if (edi != -1)
         {
-            sFlash[edi].next = sFlash[nFlash].next;
+            sFlash[edi].next = pFlash->next;
         }
 
         if (nFlash == nFirstFlash)
@@ -530,39 +511,40 @@ loc_1868A:
         {
             nLastFlash = edi;
         }
+        pFlash->pActor = nullptr;
         sFlash.Release(nFlash);
     }
 }
 
-void AddGlow(int nSector, int nVal)
+void AddGlow(sectortype* pSector, int nVal)
 {
     if (nGlowCount >= kMaxGlows) {
         return;
     }
 
-    sGlow[nGlowCount].field_6 = nVal;
-    sGlow[nGlowCount].nSector = nSector;
-    sGlow[nGlowCount].field_0 = -1;
-    sGlow[nGlowCount].field_2 = 0;
+    sGlow[nGlowCount].nThreshold = nVal;
+    sGlow[nGlowCount].pSector = pSector;
+    sGlow[nGlowCount].nShade = -1;
+    sGlow[nGlowCount].nCounter = 0;
 
     nGlowCount++;
 }
 
 // ok
-void AddFlicker(int nSector, int nVal)
+void AddFlicker(sectortype* pSector, int nVal)
 {
     if (nFlickerCount >= kMaxFlickers) {
         return;
     }
 
-    sFlicker[nFlickerCount].field_0 = nVal;
-    sFlicker[nFlickerCount].nSector = nSector;
+    sFlicker[nFlickerCount].nShade = nVal;
+    sFlicker[nFlickerCount].pSector = pSector;
 
     if (nVal >= 25) {
         nVal = 24;
     }
 
-    sFlicker[nFlickerCount].field_4 = flickermask[nVal];
+    sFlicker[nFlickerCount].nMask = flickermask[nVal];
 
     nFlickerCount++;
 }
@@ -579,29 +561,23 @@ void DoGlows()
 
     for (int i = 0; i < nGlowCount; i++)
     {
-        sGlow[i].field_2++;
+        sGlow[i].nCounter++;
 
-        int nSector =sGlow[i].nSector;
-        auto sectp = &sector[nSector];
-        short nShade = sGlow[i].field_0;
+        auto pSector = sGlow[i].pSector;
+        int nShade = sGlow[i].nShade;
 
-        if (sGlow[i].field_2 >= sGlow[i].field_6)
+        if (sGlow[i].nCounter >= sGlow[i].nThreshold)
         {
-            sGlow[i].field_2 = 0;
-            sGlow[i].field_0 = -sGlow[i].field_0;
+            sGlow[i].nCounter = 0;
+            sGlow[i].nShade = -sGlow[i].nShade;
         }
 
-        sectp->ceilingshade += nShade;
-        sectp->floorshade   += nShade;
+        pSector->ceilingshade += nShade;
+        pSector->floorshade   += nShade;
 
-        int startwall = sectp->wallptr;
-        int endwall = startwall + sectp->wallnum - 1;
-
-        for (int nWall = startwall; nWall <= endwall; nWall++)
+		for(auto& wal : wallsofsector(pSector))
         {
-            wall[nWall].shade += nShade;
-
-            // CHECKME - ASM has edx decreasing here. why?
+            wal.shade += nShade;
         }
     }
 }
@@ -615,95 +591,80 @@ void DoFlickers()
 
     for (int i = 0; i < nFlickerCount; i++)
     {
-        int nSector =sFlicker[i].nSector;
-        auto sectp = &sector[nSector];
- 
-        unsigned int eax = (sFlicker[i].field_4 & 1);
-        unsigned int edx = (sFlicker[i].field_4 & 1) << 31;
-        unsigned int ebp = sFlicker[i].field_4 >> 1;
+        auto pSector = sFlicker[i].pSector;
+
+        unsigned int eax = (sFlicker[i].nMask & 1);
+        unsigned int edx = (sFlicker[i].nMask & 1) << 31;
+        unsigned int ebp = sFlicker[i].nMask >> 1;
 
         ebp |= edx;
         edx = ebp & 1;
 
-        sFlicker[i].field_4 = ebp;
+        sFlicker[i].nMask = ebp;
 
         if (edx ^ eax)
         {
-            short shade;
+            int shade;
 
             if (eax)
             {
-                shade = sFlicker[i].field_0;
+                shade = sFlicker[i].nShade;
             }
             else
             {
-                shade = -sFlicker[i].field_0;
+                shade = -sFlicker[i].nShade;
             }
 
-            sectp->ceilingshade += shade;
-            sectp->floorshade += shade;
+            pSector->ceilingshade += shade;
+            pSector->floorshade += shade;
 
-            int startwall = sectp->wallptr;
-            int endwall = startwall + sectp->wallnum - 1;
-
-            for (int nWall = endwall; nWall >= startwall; nWall--)
+			for(auto& wal : wallsofsector(pSector))
             {
-                wall[nWall].shade += shade;
-
-                // CHECKME - ASM has edx decreasing here. why?
+                wal.shade += shade;
             }
         }
     }
 }
 
-// nWall can also be passed in here via nSprite parameter - TODO - rename nSprite parameter :)
-void AddFlow(int nIndex, int nSpeed, int b, int nAngle)
+void AddFlow(sectortype* pSector, int nSpeed, int b, int nAngle)
 {
-    if (nFlowCount >= kMaxFlows)
+    if (nFlowCount >= kMaxFlows || b >= 2)
         return;
 
-    short nFlow = nFlowCount;
+    int nFlow = nFlowCount;
+    nFlowCount++;
+
+    int nPic = pSector->floorpicnum;
+
+    sFlowInfo[nFlow].angcos  = float(-cos(nAngle * BAngRadian) * nSpeed);
+    sFlowInfo[nFlow].angsin = float(sin(nAngle * BAngRadian) * nSpeed);
+    sFlowInfo[nFlow].pSector = pSector;
+
+    StartInterpolation(pSector, b ? Interp_Sect_CeilingPanX : Interp_Sect_FloorPanX);
+    StartInterpolation(pSector, b ? Interp_Sect_CeilingPanY : Interp_Sect_FloorPanY);
+
+    sFlowInfo[nFlow].type = b;
+}
+
+
+void AddFlow(walltype* pWall, int nSpeed, int b, int nAngle)
+{
+    if (nFlowCount >= kMaxFlows || b < 2)
+        return;
+
+    int nFlow = nFlowCount;
     nFlowCount++;
 
 
-    if (b < 2)
-    {
-        short nPic = sector[nIndex].floorpicnum;
+    // only moves up or down
+    StartInterpolation(pWall, Interp_Wall_PanY);
 
-        sFlowInfo[nFlow].xacc = (tileWidth(nPic) << 14) - 1;
-        sFlowInfo[nFlow].yacc = (tileHeight(nPic) << 14) - 1;
-        sFlowInfo[nFlow].angcos  = -bcos(nAngle) * nSpeed;
-        sFlowInfo[nFlow].angsin = bsin(nAngle) * nSpeed;
-        sFlowInfo[nFlow].objindex = nIndex;
+    int nPic = pWall->picnum;
 
-        StartInterpolation(nIndex, b ? Interp_Sect_CeilingPanX : Interp_Sect_FloorPanX);
-        StartInterpolation(nIndex, b ? Interp_Sect_CeilingPanY : Interp_Sect_FloorPanY);
-    }
-    else
-    {
-        StartInterpolation(nIndex, Interp_Wall_PanX);
-        StartInterpolation(nIndex, Interp_Wall_PanY);
+    sFlowInfo[nFlow].angcos = 0;
+    sFlowInfo[nFlow].angsin = b == 2 ? 1 : -1;
+    sFlowInfo[nFlow].pWall = pWall;
 
-        int nAngle;
-
-        if (b == 2) {
-            nAngle = 512;
-        }
-        else {
-            nAngle = 1536;
-        }
-
-        short nPic = wall[nIndex].picnum;
-
-        sFlowInfo[nFlow].xacc = (tileWidth(nPic) * wall[nIndex].xrepeat) << 8;
-        sFlowInfo[nFlow].yacc = (tileHeight(nPic) * wall[nIndex].yrepeat) << 8;
-        sFlowInfo[nFlow].angcos = -bcos(nAngle) * nSpeed;
-        sFlowInfo[nFlow].angsin = bsin(nAngle) * nSpeed;
-        sFlowInfo[nFlow].objindex = nIndex;
-    }
-
-    sFlowInfo[nFlow].ydelta = 0;
-    sFlowInfo[nFlow].xdelta = 0;
     sFlowInfo[nFlow].type = b;
 }
 
@@ -711,71 +672,35 @@ void DoFlows()
 {
     for (int i = 0; i < nFlowCount; i++)
     {
-        sFlowInfo[i].xdelta += sFlowInfo[i].angcos;
-        sFlowInfo[i].ydelta += sFlowInfo[i].angsin;
-
         switch (sFlowInfo[i].type)
         {
             case 0:
             {
-                sFlowInfo[i].xdelta &= sFlowInfo[i].xacc;
-                sFlowInfo[i].ydelta &= sFlowInfo[i].yacc;
-
-                int nSector =sFlowInfo[i].objindex;
-                sector[nSector].setfloorxpan(sFlowInfo[i].xdelta / 16384.f);
-                sector[nSector].setfloorypan(sFlowInfo[i].ydelta / 16384.f);
+                auto pSector =sFlowInfo[i].pSector;
+                pSector->addfloorxpan(sFlowInfo[i].angcos);
+                pSector->addfloorypan(sFlowInfo[i].angsin);
                 break;
             }
 
             case 1:
             {
-                int nSector =sFlowInfo[i].objindex;
-
-                sector[nSector].setceilingxpan(sFlowInfo[i].xdelta / 16384.f);
-                sector[nSector].setceilingypan(sFlowInfo[i].ydelta / 16384.f);
-
-                sFlowInfo[i].xdelta &= sFlowInfo[i].xacc;
-                sFlowInfo[i].ydelta &= sFlowInfo[i].yacc;
+                auto pSector = sFlowInfo[i].pSector;
+                pSector->addceilingxpan(sFlowInfo[i].angcos);
+                pSector->addceilingypan(sFlowInfo[i].angsin);
                 break;
             }
 
             case 2:
             {
-                int nWall = sFlowInfo[i].objindex;
-
-                wall[nWall].setxpan(sFlowInfo[i].xdelta / 16384.f);
-                wall[nWall].setypan(sFlowInfo[i].ydelta / 16384.f);
-
-                if (sFlowInfo[i].xdelta < 0)
-                {
-                    sFlowInfo[i].xdelta += sFlowInfo[i].xacc;
-                }
-
-                if (sFlowInfo[i].ydelta < 0)
-                {
-                    sFlowInfo[i].ydelta += sFlowInfo[i].yacc;
-                }
-
+                auto pWall = sFlowInfo[i].pWall;
+                pWall->addypan(sFlowInfo[i].angsin);
                 break;
             }
 
             case 3:
             {
-                int nWall = sFlowInfo[i].objindex;
-
-                wall[nWall].setxpan(sFlowInfo[i].xdelta / 16384.f);
-                wall[nWall].setypan(sFlowInfo[i].ydelta / 16384.f);
-
-                if (sFlowInfo[i].xdelta >= sFlowInfo[i].xacc)
-                {
-                    sFlowInfo[i].xdelta -= sFlowInfo[i].xacc;
-                }
-
-                if (sFlowInfo[i].ydelta >= sFlowInfo[i].yacc)
-                {
-                    sFlowInfo[i].ydelta -= sFlowInfo[i].yacc;
-                }
-
+                auto pWall = sFlowInfo[i].pWall;
+                pWall->addypan(sFlowInfo[i].angsin);
                 break;
             }
         }
@@ -807,7 +732,7 @@ void SetTorch(int nPlayer, int bTorchOnOff)
     }
 
     if (bTorch) {
-        PlayLocalSound(StaticSound[kSoundTorchOn], 0);
+        PlayLocalSound(StaticSound[kSoundTorchOn], 0, false, CHANF_UI);
     }
 
     const char* buf = bTorch ? "TXT_EX_TORCHLIT" : "TXT_EX_TORCHOUT";

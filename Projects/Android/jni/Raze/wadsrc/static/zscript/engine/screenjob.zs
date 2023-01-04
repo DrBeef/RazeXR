@@ -1,5 +1,5 @@
 
-class ScreenJob : Object
+class ScreenJob : Object UI
 {
 	int flags;
 	float fadetime;	// in milliseconds
@@ -25,6 +25,11 @@ class ScreenJob : Object
 		fadeout = 2,
 		stopmusic = 4,
 		stopsound = 8,
+		transition_shift = 4,
+		transition_mask = 48,
+		transition_melt = 16,
+		transition_burn = 32,
+		transition_crossfade = 48,
 	};
 
 	void Init(int fflags = 0, float fadet = 250.f)
@@ -60,6 +65,7 @@ class ScreenJob : Object
 		if (flags & stopmusic) System.StopMusic();
 		if (flags & stopsound) System.StopAllSounds();
 	}
+
 }
 
 //---------------------------------------------------------------------------
@@ -298,7 +304,7 @@ class MoviePlayerJob : SkippableScreenJob
 //
 //---------------------------------------------------------------------------
 
-class ScreenJobRunner : Object
+class ScreenJobRunner : Object UI
 {
 	enum ERunState
 	{
@@ -317,6 +323,8 @@ class ScreenJobRunner : Object
 	int terminateState;
 	int fadeticks;
 	int last_paused_tic;
+	
+	native static void setTransition(int type);
 
 	void Init(bool clearbefore_, bool skipall_)
 	{
@@ -378,6 +386,10 @@ class ScreenJobRunner : Object
 		{
 			jobs[index].fadestate = !paused && jobs[index].flags & ScreenJob.fadein? ScreenJob.fadein : ScreenJob.visible;
 			jobs[index].Start();
+			if (jobs[index].flags & ScreenJob.transition_mask)
+			{
+				setTransition((jobs[index].flags & ScreenJob.transition_mask) >> ScreenJob.Transition_Shift);
+			}
 		}
 	}
 
@@ -533,7 +545,7 @@ class ScreenJobRunner : Object
 		if (snd > 0) sounds.Pushv(1, snd);
 		Append(MoviePlayerJob.CreateWithSoundInfo(fn, sounds, 0, framerate));
 	}
-	
+
 	//==========================================================================
 	//
 	// This also gets used by the title loop.
@@ -572,7 +584,7 @@ class ScreenJobRunner : Object
 		}
 		y = hudheight * 0.9 - height;
 		if (y < 0) y = 0;
-		
+
 		Screen.Dim(0, 0.5f, int(x * hscale), int(y * vscale), int(w * hscale), int(height * vscale));
 		x += 20;
 		y += 10;
@@ -662,7 +674,7 @@ class TextTypeOnOverlay
 	bool usesDefault;
 	int mTicker;
 	int mTextDelay;
-	
+
 	//==========================================================================
 	//
 	//
@@ -676,7 +688,7 @@ class TextTypeOnOverlay
 
 		tt.Split(lines, "\n");
 		mLineCount = lines.Size();
-		
+
 		mText = "";
 		for (int i = 0; i < lines.Size(); i++)
 		{
@@ -727,7 +739,7 @@ class TextTypeOnOverlay
 		mTextColor = cr;
 		mPalette = pal;
 	}
-	
+
 	//==========================================================================
 	//
 	//

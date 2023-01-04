@@ -16,7 +16,6 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 */
 //-------------------------------------------------------------------------
 #include "ns.h"
-#include "compat.h"
 #include "engine.h"
 #include "gamefuncs.h"
 #include "names.h"
@@ -33,43 +32,40 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 #include "render.h"
 #include <string.h>
 
-EXTERN_CVAR(Bool, testnewrenderer)
+EXTERN_CVAR(Bool, vid_renderer)
 
 BEGIN_PS_NS
 
-short bSubTitles = true;
+bool bSubTitles = true;
 
 int zbob;
 
-short dVertPan[kMaxPlayers];
+int16_t dVertPan[kMaxPlayers];
 int nCamerax;
 int nCameray;
 int nCameraz;
 
 
-short bTouchFloor;
+bool bTouchFloor;
 
-short nQuake[kMaxPlayers] = { 0 };
+int16_t nQuake[kMaxPlayers] = { 0 };
 
-short nChunkTotal = 0;
+int nChunkTotal = 0;
 
 binangle nCameraa;
 fixedhoriz nCamerapan;
-short nViewTop;
+int nViewTop;
 bool bCamera = false;
 
 int viewz;
 
-DExhumedActor* pEnemy;
-
-short nEnemyPal = 0;
 
 // We cannot drag these through the entire event system... :(
-spritetype* mytsprite;
+tspritetype* mytsprite;
 int* myspritesortcnt;
 
 // NOTE - not to be confused with Ken's analyzesprites()
-static void analyzesprites(spritetype* tsprite, int& spritesortcnt, int x, int y, int z, double const smoothratio)
+static void analyzesprites(tspritetype* tsprite, int& spritesortcnt, int x, int y, int z, double const smoothratio)
 {
     tspritetype *pTSprite;
 
@@ -77,28 +73,28 @@ static void analyzesprites(spritetype* tsprite, int& spritesortcnt, int x, int y
     myspritesortcnt = &spritesortcnt;
 
     for (int i = 0; i < spritesortcnt; i++) {
+        validateTSpriteSize(tsprite, spritesortcnt);
         pTSprite = &tsprite[i];
 
-        if (pTSprite->owner != -1)
+        if (pTSprite->ownerActor)
         {
             // interpolate sprite position
-            pTSprite->pos = pTSprite->interpolatedvec3(smoothratio);
-            pTSprite->ang = pTSprite->interpolatedang(smoothratio);
+            pTSprite->pos = pTSprite->ownerActor->interpolatedvec3(smoothratio);
+            pTSprite->ang = pTSprite->ownerActor->interpolatedang(smoothratio);
         }
     }
 
-    auto pPlayerActor = PlayerList[nLocalPlayer].Actor();
+    auto pPlayerActor = PlayerList[nLocalPlayer].pActor;
 
     int var_38 = 20;
     int var_2C = 30000;
 
-    spritetype *pPlayerSprite = &pPlayerActor->s();
 
     bestTarget = nullptr;
 
-    int nSector =pPlayerSprite->sectnum;
+    auto pSector =pPlayerActor->sector();
 
-    int nAngle = (2048 - pPlayerSprite->ang) & kAngleMask;
+    int nAngle = (2048 - pPlayerActor->spr.ang) & kAngleMask;
 
     int nTSprite;
 
@@ -106,14 +102,12 @@ static void analyzesprites(spritetype* tsprite, int& spritesortcnt, int x, int y
 
     for (nTSprite = spritesortcnt-1, pTSprite = &tsprite[nTSprite]; nTSprite >= 0; nTSprite--, pTSprite--)
     {
-        int nSprite = pTSprite->owner;
-        auto pActor = &exhumedActors[nSprite];
-        spritetype *pSprite = &pActor->s();
+        auto pActor = static_cast<DExhumedActor*>(pTSprite->ownerActor);
 
-        if (pTSprite->sectnum >= 0)
+        if (pTSprite->sectp != nullptr)
         {
-            sectortype *pSector = &sector[pTSprite->sectnum];
-            int nSectShade = (pSector->ceilingstat & 1) ? pSector->ceilingshade : pSector->floorshade;
+            sectortype *pTSector = pTSprite->sectp;
+            int nSectShade = (pTSector->ceilingstat & CSTAT_SECTOR_SKY) ? pTSector->ceilingshade : pTSector->floorshade;
             int nShade = pTSprite->shade + nSectShade + 6;
             pTSprite->shade = clamp(nShade, -128, 127);
         }
@@ -121,23 +115,25 @@ static void analyzesprites(spritetype* tsprite, int& spritesortcnt, int x, int y
         pTSprite->pal = RemapPLU(pTSprite->pal);
 
         // PowerSlaveGDX: Torch bouncing fix
-        if ((pTSprite->picnum == kTorch1 || pTSprite->picnum == kTorch2) && (pTSprite->cstat & 0x80) == 0)
+        if ((pTSprite->picnum == kTorch1 || pTSprite->picnum == kTorch2) && (pTSprite->cstat & CSTAT_SPRITE_YCENTER) == 0)
         {
-            pTSprite->cstat |= 0x80;
+            pTSprite->cstat |= CSTAT_SPRITE_YCENTER;
             int nTileY = (tileHeight(pTSprite->picnum) * pTSprite->yrepeat) * 2;
-            pTSprite->z -= nTileY;
+            pTSprite->pos.Z -= nTileY;
         }
 
-        if (pSprite->statnum > 0)
+        if (pTSprite->pal == 4 && pTSprite->shade >= numshades) pTSprite->shade = numshades - 1;
+
+        if (pActor->spr.statnum > 0)
         {
             RunListEvent ev{};
             ev.pTSprite = pTSprite;
-            runlist_SignalRun(pSprite->lotag - 1, nTSprite, &ExhumedAI::Draw, &ev);
+            runlist_SignalRun(pActor->spr.lotag - 1, nTSprite, &ExhumedAI::Draw, &ev);
 
-            if ((pSprite->statnum < 150) && (pSprite->cstat & 0x101) && (pActor != pPlayerActor))
+            if ((pActor->spr.statnum < 150) && (pActor->spr.cstat & CSTAT_SPRITE_BLOCK_ALL) && (pActor != pPlayerActor))
             {
-                int xval = pSprite->x - x;
-                int yval = pSprite->y - y;
+                int xval = pActor->spr.pos.X - x;
+                int yval = pActor->spr.pos.Y - y;
 
                 int vcos = bcos(nAngle);
                 int vsin = bsin(nAngle);
@@ -171,13 +167,12 @@ static void analyzesprites(spritetype* tsprite, int& spritesortcnt, int x, int y
             }
         }
     }
-    if (bestTarget != nullptr)
+    auto targ = bestTarget;
+    if (targ != nullptr)
     {
-        spritetype *pTarget = &bestTarget->s();
-
         nCreepyTimer = kCreepyCount;
 
-        if (!cansee(x, y, z, nSector, pTarget->x, pTarget->y, pTarget->z - GetActorHeight(bestTarget), pTarget->sectnum))
+        if (!cansee(x, y, z, pSector, targ->spr.pos.X, targ->spr.pos.Y, targ->spr.pos.Z - GetActorHeight(targ), targ->sector()))
         {
             bestTarget = nullptr;
         }
@@ -190,7 +185,7 @@ static void analyzesprites(spritetype* tsprite, int& spritesortcnt, int x, int y
 
 void ResetView()
 {
-    EraseScreen(overscanindex);
+    EraseScreen(0);
 #ifdef USE_OPENGL
     videoTintBlood(0, 0, 0);
 #endif
@@ -200,10 +195,12 @@ static TextOverlay subtitleOverlay;
 
 void DrawView(double smoothRatio, bool sceneonly)
 {
+    DExhumedActor* pEnemy = nullptr;
+    int nEnemyPal = -1;
     int playerX;
     int playerY;
     int playerZ;
-    int nSector;
+    sectortype* pSector = nullptr;
     binangle nAngle, rotscrnang;
     fixedhoriz pan = {};
 
@@ -212,22 +209,20 @@ void DrawView(double smoothRatio, bool sceneonly)
     DoInterpolations(smoothRatio / 65536.);
     pm_smoothratio = (int)smoothRatio;
 
-    auto pPlayerActor = PlayerList[nLocalPlayer].Actor();
-	auto pPlayerSprite = &pPlayerActor->s();
-    int nPlayerOldCstat = pPlayerSprite->cstat;
-    auto pDop = &PlayerList[nLocalPlayer].pDoppleSprite->s();
-    int nDoppleOldCstat = pDop->cstat;
+    auto pPlayerActor = PlayerList[nLocalPlayer].pActor;
+    auto nPlayerOldCstat = pPlayerActor->spr.cstat;
+    auto pDop = PlayerList[nLocalPlayer].pDoppleSprite;
+    auto nDoppleOldCstat = pDop->spr.cstat;
 
     if (nSnakeCam >= 0 && !sceneonly)
     {
-        auto pActor = SnakeList[nSnakeCam].pSprites[0];
-		auto pSprite = &pActor->s();
+        DExhumedActor* pActor = SnakeList[nSnakeCam].pSprites[0];
 
-        playerX = pSprite->x;
-        playerY = pSprite->y;
-        playerZ = pSprite->z;
-        nSector = pSprite->sectnum;
-        nAngle = buildang(pSprite->ang);
+        playerX = pActor->spr.pos.X;
+        playerY = pActor->spr.pos.Y;
+        playerZ = pActor->spr.pos.Z;
+        pSector = pActor->sector();
+        nAngle = buildang(pActor->spr.ang);
         rotscrnang = buildang(0);
 
         SetGreenPal();
@@ -240,18 +235,19 @@ void DrawView(double smoothRatio, bool sceneonly)
         }
         else
         {
-            nEnemyPal = pEnemy->s().pal;
-            pEnemy->s().pal = 5;
+            nEnemyPal = pEnemy->spr.pal;
+            pEnemy->spr.pal = 5;
         }
     }
     else
     {
-        playerX = pPlayerSprite->interpolatedx(smoothRatio);
-        playerY = pPlayerSprite->interpolatedy(smoothRatio);
-        playerZ = pPlayerSprite->interpolatedz(smoothRatio) + interpolatedvalue(PlayerList[nLocalPlayer].oeyelevel, PlayerList[nLocalPlayer].eyelevel, smoothRatio);
+        playerX = pPlayerActor->interpolatedx(smoothRatio);
+        playerY = pPlayerActor->interpolatedy(smoothRatio);
+        playerZ = pPlayerActor->interpolatedz(smoothRatio) + interpolatedvalue(PlayerList[nLocalPlayer].oeyelevel, PlayerList[nLocalPlayer].eyelevel, smoothRatio);
 
-        nSector = PlayerList[nLocalPlayer].nPlayerViewSect;
-        updatesector(playerX, playerY, &nSector);
+        pSector = PlayerList[nLocalPlayer].pPlayerViewSect;
+        updatesector(playerX, playerY, &pSector);
+        if (pSector == nullptr) pSector = PlayerList[nLocalPlayer].pPlayerViewSect;
 
         if (!SyncInput())
         {
@@ -268,13 +264,13 @@ void DrawView(double smoothRatio, bool sceneonly)
 
         if (!bCamera)
         {
-            pPlayerSprite->cstat |= CSTAT_SPRITE_INVISIBLE;
-            pDop->cstat |= CSTAT_SPRITE_INVISIBLE;
+            pPlayerActor->spr.cstat |= CSTAT_SPRITE_INVISIBLE;
+            pDop->spr.cstat |= CSTAT_SPRITE_INVISIBLE;
         }
         else
         {
-            pPlayerSprite->cstat |= CSTAT_SPRITE_TRANSLUCENT;
-            pDop->cstat |= CSTAT_SPRITE_INVISIBLE;
+            pPlayerActor->spr.cstat |= CSTAT_SPRITE_TRANSLUCENT;
+            pDop->spr.cstat |= CSTAT_SPRITE_INVISIBLE;
         }
         pan = q16horiz(clamp(pan.asq16(), gi->playerHorizMin(), gi->playerHorizMax()));
     }
@@ -289,7 +285,7 @@ void DrawView(double smoothRatio, bool sceneonly)
     else
     {
         viewz = playerZ + nQuake[nLocalPlayer];
-        int floorZ = pPlayerSprite->sector()->floorz;
+        int floorZ = pPlayerActor->sector()->floorz;
 
         if (viewz > floorZ)
             viewz = floorZ;
@@ -299,28 +295,30 @@ void DrawView(double smoothRatio, bool sceneonly)
         if (bCamera)
         {
             viewz -= 2560;
-            if (!calcChaseCamPos(&playerX, &playerY, &viewz, pPlayerSprite, &nSector, nAngle, pan, smoothRatio))
+            if (!calcChaseCamPos(&playerX, &playerY, &viewz, pPlayerActor, &pSector, nAngle, pan, smoothRatio))
             {
                 viewz += 2560;
-                calcChaseCamPos(&playerX, &playerY, &viewz, pPlayerSprite, &nSector, nAngle, pan, smoothRatio);
+                calcChaseCamPos(&playerX, &playerY, &viewz, pPlayerActor, &pSector, nAngle, pan, smoothRatio);
             }
         }
     }
-
     nCamerax = playerX;
     nCameray = playerY;
     nCameraz = playerZ;
 
-    int Z = sector[nSector].ceilingz + 256;
-    if (Z <= viewz)
+    if (pSector != nullptr)
     {
-        Z = sector[nSector].floorz - 256;
+        int Z = pSector->ceilingz + 256;
+        if (Z <= viewz)
+        {
+            Z = pSector->floorz - 256;
 
-        if (Z < viewz)
+            if (Z < viewz)
+                viewz = Z;
+        }
+        else {
             viewz = Z;
-    }
-    else {
-        viewz = Z;
+        }
     }
 
     nCamerapan = pan;
@@ -335,55 +333,58 @@ void DrawView(double smoothRatio, bool sceneonly)
 
     if (nFreeze != 3)
     {
-        TArray<uint8_t> paldata(numsectors * 2 + numwalls, true);
-        uint8_t* sectorFloorPal = &paldata[0];
-        uint8_t* sectorCeilingPal = &paldata[numsectors];
-        uint8_t* wallPal = &paldata[2*numsectors];
-        int const viewingRange = viewingrange;
-        int const vr = xs_CRoundToInt(65536. * tan(r_fov * (pi::pi() / 360.)));
-
-
-        videoSetCorrectedAspect();
-        renderSetAspect(MulScale(vr, viewingrange, 16), yxaspect);
+        TArray<uint8_t> paldata(sector.Size() * 2 + wall.Size(), true);
 
         if (HavePLURemap())
         {
-            for (int i = 0; i < numsectors; i++)
+            auto p = paldata.Data();
+            for (auto& sect: sector)
             {
-                sectorFloorPal[i] = sector[i].floorpal;
-                sectorCeilingPal[i] = sector[i].ceilingpal;
-                sector[i].floorpal = RemapPLU(sectorFloorPal[i]);
-                sector[i].ceilingpal = RemapPLU(sectorCeilingPal[i]);
+                uint8_t v;
+                v = *p++ = sect.floorpal;
+                sect.floorpal = RemapPLU(v);
+                v = *p++ = sect.ceilingpal;
+                sect.ceilingpal = RemapPLU(v);
             }
-            for (int i = 0; i < numwalls; i++)
+            for (auto& wal : wall)
             {
-                wallPal[i] = wall[i].pal;
-                wall[i].pal = RemapPLU(wallPal[i]);
+                uint8_t v;
+                v = *p++ = wal.pal;
+                wal.pal = RemapPLU(v);
             }
         }
 
-        if (!testnewrenderer)
+        if (!vid_renderer)
         {
+            // this little block of code is Exhumed's entire interface to Polymost.
+            int const vr = xs_CRoundToInt(65536. * tan(r_fov * (pi::pi() / 360.)));
+            videoSetCorrectedAspect();
+            renderSetAspect(MulScale(vr, viewingrange, 16), yxaspect);
             renderSetRollAngle((float)rotscrnang.asbuildf());
-            renderDrawRoomsQ16(nCamerax, nCameray, viewz, nCameraa.asq16(), nCamerapan.asq16(), nSector, false);
+            renderDrawRoomsQ16(nCamerax, nCameray, viewz, nCameraa.asq16(), nCamerapan.asq16(), sectnum(pSector), false);
             analyzesprites(pm_tsprite, pm_spritesortcnt, nCamerax, nCameray, viewz, smoothRatio);
             renderDrawMasks();
+            if (!nFreeze && !sceneonly)
+                DrawWeapons(smoothRatio);
         }
         else
         {
-            render_drawrooms(nullptr, { nCamerax, nCameray, viewz }, nSector, nCameraa, nCamerapan, rotscrnang, smoothRatio);
+            if (!nFreeze && !sceneonly)
+                DrawWeapons(smoothRatio);
+            render_drawrooms(nullptr, { nCamerax, nCameray, viewz }, sectnum(pSector), nCameraa, nCamerapan, rotscrnang, smoothRatio);
         }
 
         if (HavePLURemap())
         {
-            for (int i = 0; i < numsectors; i++)
+            auto p = paldata.Data();
+            for (auto& sect: sector)
             {
-                sector[i].floorpal = sectorFloorPal[i];
-                sector[i].ceilingpal = sectorCeilingPal[i];
+                sect.floorpal = *p++;
+                sect.ceilingpal = *p++;
             }
-            for (int i = 0; i < numwalls; i++)
+            for (auto& wal : wall)
             {
-                wall[i].pal = wallPal[i];
+                wal.pal = *p++;
             }
         }
 
@@ -397,9 +398,9 @@ void DrawView(double smoothRatio, bool sceneonly)
                 {
                     nHeadStage = 5;
 
-                    pPlayerSprite->cstat |= 0x8000;
+                    pPlayerActor->spr.cstat |= CSTAT_SPRITE_INVISIBLE;
 
-                    int ang2 = nCameraa.asbuild() - pPlayerSprite->ang;
+                    int ang2 = nCameraa.asbuild() - pPlayerActor->spr.ang;
                     if (ang2 < 0)
                         ang2 = -ang2;
 
@@ -436,14 +437,13 @@ void DrawView(double smoothRatio, bool sceneonly)
         {
             if (nSnakeCam < 0)
             {
-                DrawWeapons(smoothRatio);
                 DrawMap(smoothRatio);
             }
             else
             {
                 RestoreGreenPal();
                 if (nEnemyPal > -1) {
-                    pEnemy->s().pal = (uint8_t)nEnemyPal;
+                    pEnemy->spr.pal = (uint8_t)nEnemyPal;
                 }
 
                 DrawMap(smoothRatio);
@@ -455,8 +455,8 @@ void DrawView(double smoothRatio, bool sceneonly)
         twod->ClearScreen();
     }
 
-    pPlayerSprite->cstat = nPlayerOldCstat;
-    pDop->cstat = nDoppleOldCstat;
+    pPlayerActor->spr.cstat = nPlayerOldCstat;
+    pDop->spr.cstat = nDoppleOldCstat;
     RestoreInterpolations();
 
     flash = 0;
@@ -468,7 +468,7 @@ bool GameInterface::GenerateSavePic()
     return true;
 }
 
-void GameInterface::processSprites(spritetype* tsprite, int& spritesortcnt, int viewx, int viewy, int viewz, binangle viewang, double smoothRatio)
+void GameInterface::processSprites(tspritetype* tsprite, int& spritesortcnt, int viewx, int viewy, int viewz, binangle viewang, double smoothRatio)
 {
     analyzesprites(tsprite, spritesortcnt, viewx, viewy, viewz, smoothRatio);
 }
@@ -495,8 +495,6 @@ void SerializeView(FSerializer& arc)
             ("camerapan", nCamerapan)
             ("camera", bCamera)
             ("viewz", viewz)
-            ("enemy", pEnemy)
-            ("enemypal", nEnemyPal)
             .Array("vertpan", dVertPan, countof(dVertPan))
             .Array("quake", nQuake, countof(nQuake))
             .EndObject();

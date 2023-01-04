@@ -27,11 +27,10 @@ BEGIN_SW_NS
 
 #define RECT_CLIP 1
 
-int MultiClipMove(PLAYERp pp, int z, int floor_dist);
-short MultiClipTurn(PLAYERp pp, short new_ang, int z, int floor_dist);
-int testquadinsect(int *point_num, vec2_t const * q, short sectnum);
-int RectClipMove(PLAYERp pp, int *qx, int *qy);
+Collision MultiClipMove(PLAYER* pp, int z, int floor_dist);
+short MultiClipTurn(PLAYER* pp, short new_ang, int z, int floor_dist);
+int RectClipMove(PLAYER* pp, int *qx, int *qy);
 int testpointinquad(int x, int y, int *qx, int *qy);
-//short RectClipTurn(PLAYERp pp, short new_ang, int z, int floor_dist, int *qx, int *qy);
-short RectClipTurn(PLAYERp pp, short new_ang, int *qx, int *qy, int *ox, int *oy);
+//short RectClipTurn(PLAYER* pp, short new_ang, int z, int floor_dist, int *qx, int *qy);
+short RectClipTurn(PLAYER* pp, short new_ang, int *qx, int *qy, int *ox, int *oy);
 END_SW_NS

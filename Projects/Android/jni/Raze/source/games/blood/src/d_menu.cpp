@@ -25,7 +25,6 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 #include "ns.h"	// Must come before everything else!
 
 #include "build.h"
-#include "compat.h"
 #include "c_bind.h"
 #include "razemenu.h"
 #include "gamestate.h"
@@ -50,6 +49,12 @@ public:
 	void Draw(void);
 };
 
+//---------------------------------------------------------------------------
+//
+//
+//
+//---------------------------------------------------------------------------
+
 CGameMenuItemQAV::CGameMenuItemQAV(int a3, int a4, const char* name, bool widescreen, bool clearbackground)
 {
 	bWideScreen = widescreen;
@@ -67,6 +72,12 @@ CGameMenuItemQAV::CGameMenuItemQAV(int a3, int a4, const char* name, bool widesc
 		}
 	}
 }
+
+//---------------------------------------------------------------------------
+//
+//
+//
+//---------------------------------------------------------------------------
 
 void CGameMenuItemQAV::Draw(void)
 {
@@ -88,7 +99,7 @@ void CGameMenuItemQAV::Draw(void)
 
 		if (bWideScreen)
 		{
-			int xdim43 = scale(ydim, 4, 3);
+			int xdim43 = Scale(ydim, 4, 3);
 			int nCount = (twod->GetWidth() + xdim43 - 1) / xdim43;
 			int backX = data->x;
 			for (int i = 0; i < nCount; i++)
@@ -103,6 +114,12 @@ void CGameMenuItemQAV::Draw(void)
 	}
 }
 
+
+//---------------------------------------------------------------------------
+//
+//
+//
+//---------------------------------------------------------------------------
 
 static std::unique_ptr<CGameMenuItemQAV> itemBloodQAV;	// This must be global to ensure that the animation remains consistent across menus.
 
@@ -144,7 +161,7 @@ void GameInterface::MenuClosed()
 
 bool GameInterface::CanSave()
 {
-	return (gamestate == GS_LEVEL && gPlayer[myconnectindex].pXSprite->health != 0);
+	return (gamestate == GS_LEVEL && gPlayer[myconnectindex].actor->xspr.health != 0);
 }
 
 FSavegameInfo GameInterface::GetSaveSig()

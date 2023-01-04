@@ -25,7 +25,6 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include "compat.h"
 #include "build.h"
 
 #include "blood.h"
@@ -43,6 +42,12 @@ uint8_t surfType[kMaxTiles];
 int8_t tileShade[kMaxTiles];
 short voxelIndex[kMaxTiles];
 
+//---------------------------------------------------------------------------
+//
+// 
+//
+//---------------------------------------------------------------------------
+
 void GameInterface::LoadGameTextures()
 {
     auto hFile = fileSystem.OpenFileReader("SURFACE.DAT");
@@ -54,7 +59,7 @@ void GameInterface::LoadGameTextures()
     if (hFile.isOpen())
     {
         hFile.Read(voxelIndex, sizeof(voxelIndex));
-#if B_BIG_ENDIAN == 1
+#if WORDS_BIGENDIAN
         for (int i = 0; i < kMaxTiles; i++)
             voxelIndex[i] = LittleShort(voxelIndex[i]);
 #endif
@@ -71,25 +76,37 @@ void GameInterface::LoadGameTextures()
     }
 }
 
+//---------------------------------------------------------------------------
+//
+// 
+//
+//---------------------------------------------------------------------------
+
 int tileGetSurfType(int hit)
 {
     return surfType[hit];
 }
 
-int tileGetSurfType(Collision& hit)
+int tileGetSurfType(CollisionBase& hit)
 {
     switch (hit.type)
     {
     default:
         return 0;
     case kHitSector:
-        return surfType[sector[hit.index].floorpicnum];
+        return surfType[hit.hitSector->floorpicnum];
     case kHitWall:
-        return surfType[wall[hit.index].picnum];
+        return surfType[hit.hitWall->picnum];
     case kHitSprite:
-        return surfType[hit.actor->s().picnum];
+        return surfType[hit.hitActor->spr.picnum];
     }
 }
+
+//---------------------------------------------------------------------------
+//
+// 
+//
+//---------------------------------------------------------------------------
 
 void GameInterface::SetTileProps(int tile, int surf, int vox, int shade)
 {

@@ -32,6 +32,7 @@
 **
 */
 
+#include <SDL.h>
 #include <signal.h>
 
 #include "i_system.h"
@@ -58,6 +59,7 @@ void I_ShutdownGraphics ()
 	if (Video)
 		delete Video, Video = NULL;
 
+	SDL_QuitSubSystem (SDL_INIT_VIDEO);
 }
 
 void I_InitGraphics ()
@@ -65,10 +67,19 @@ void I_InitGraphics ()
 #ifdef __APPLE__
 	SDL_SetHint(SDL_HINT_VIDEO_MAC_FULLSCREEN_SPACES, "0");
 #endif // __APPLE__
+	SDL_SetHint(SDL_HINT_VIDEO_MINIMIZE_ON_FOCUS_LOSS, "0");
+
+	if (SDL_InitSubSystem (SDL_INIT_VIDEO) < 0)
+	{
+		I_FatalError ("Could not initialize SDL video:\n%s\n", SDL_GetError());
+		return;
+	}
+
+	Printf("Using video driver %s\n", SDL_GetCurrentVideoDriver());
 
 	extern IVideo *gl_CreateVideo();
 	Video = gl_CreateVideo();
-	
+
 	if (Video == NULL)
 		I_FatalError ("Failed to initialize display");
 }

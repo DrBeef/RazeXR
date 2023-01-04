@@ -32,6 +32,7 @@
 #include "hw_renderstate.h"
 #include "hw_skydome.h"
 #include "hw_drawstructs.h"
+#include "hw_vertexmap.h"
 #include "gamefuncs.h"
 #include "cmdlib.h"
 
@@ -39,6 +40,7 @@
 #include "flatvertices.h"
 #include "glbackend/glbackend.h"
 
+DCoreActor* wall_to_sprite_actors[8]; // gets updated each frame. Todo: Encapsulate this better without having to permanently store actors in the wall object.
 
 //==========================================================================
 //
@@ -46,125 +48,59 @@
 //
 //==========================================================================
 
-static int GetClosestPointOnWall(spritetype* spr, walltype* wal, vec2_t* const n)
+static walltype* IsOnWall(tspritetype* tspr, int height, DVector2& outpos)
 {
-	auto w = wal->pos;
-	auto d = wall[wal->point2].pos - w;
-	auto pos = spr->pos;
+	double maxorthdist = 3 * maptoworld; // maximum orthogonal distance to be considered an attached sprite.
+	double maxdistsq = maxorthdist * maxorthdist;
+	walltype* best = nullptr;
 
-	// avoid the math below for orthogonal walls. Here we allow only sprites that exactly match the line's coordinate and orientation
-	if (d.x == 0 && d.y == 0)
+	auto sect = tspr->sectp;
+
+	float tx = tspr->pos.X * (float)inttoworld;
+	float ty = tspr->pos.Y * (float)inttoworld;
+
+	for(auto& wal : wallsofsector(sect))
 	{
-		// line has no length.
-		// In Blood's E1M1 this gets triggered for wall 522.
-		return 1;
-	}
-	else if (d.x == 0)
-	{
-		// line is vertical.
-		if (abs(pos.x - w.x) <= 1 && (spr->ang & 0x3ff) == 0)
+		// Intentionally include two sided walls. Even on them the sprite should be projected onto the wall for better results.
+		auto d = wal.delta();
+		int walang = getangle(d.X, d.Y);
+		int deltaang = abs((((walang - tspr->ang) & 2047) << 21) >> 21);
+		const int maxangdelta = 1;
+
+		// angle of the sprite must either be the wall's normal or the negative wall's normal to be aligned.
+		if (deltaang >= 512 - maxangdelta && deltaang <= 512 + maxangdelta)
 		{
-			*n = pos.vec2;
-			return 0;
-		}
-		return 1;
-	}
-	else if (d.y == 0)
-	{
-		// line is horizontal.
-		if (abs(pos.y - w.y) <= 1 && (spr->ang & 0x3ff) == 0x200)
-		{
-			*n = pos.vec2;
-			return 0;
-		}
-		return 1;
-	}
-
-
-	int64_t i = d.x * ((int64_t)pos.x - w.x) + d.y * ((int64_t)pos.y - w.y);
-
-
-	if (i < 0)
-		return 1;
-
-	int64_t j = (int64_t)d.x * d.x + (int64_t)d.y * d.y;
-
-	if (i > j)
-		return 1;
-
-	i = ((i << 15) / j) << 15;
-
-	n->x = w.x + ((d.x * i) >> 30);
-	n->y = w.y + ((d.y * i) >> 30);
-
-	return 0;
-}
-
-//==========================================================================
-//
-//
-//
-//==========================================================================
-
-static int IsOnWall(spritetype* tspr, int height)
-{
-	int dist = 3, closest = -1;
-	auto sect = &sector[tspr->sectnum];
-	vec2_t n;
-
-	int topz = (tspr->z - ((height * tspr->yrepeat) << 2));
-	for (int i = sect->wallptr; i < sect->wallptr + sect->wallnum; i++)
-	{
-		auto wal = &wall[i];
-		if ((wal->nextsector == -1 || ((sector[wal->nextsector].ceilingz > topz) ||
-			sector[wal->nextsector].floorz < tspr->z)) && !GetClosestPointOnWall(tspr, wal, &n))
-		{
-			int const dst = abs(tspr->x - n.x) + abs(tspr->y - n.y);
-
-			if (dst <= dist)
+			// orthogonal lines do not check the actual position so that certain off-sector sprites get handled properly. 
+			// In Wanton Destruction's airplane level there's such a sprite assigned to the wrong sector.
+			if (d.X == 0)
 			{
-				dist = dst;
-				closest = i;
+				double newdist = fabs(tx - wal.pos.X);
+				if (newdist < maxorthdist)
+				{
+					maxorthdist = newdist;
+					best = &wal;
+				}
+			}
+			else if (d.Y == 0)
+			{
+				double newdist = fabs(ty - wal.pos.Y);
+				if (newdist < maxorthdist)
+				{
+					maxorthdist = newdist;
+					best = &wal;
+				}
+			}
+			else
+			{
+				double wdist = SquareDistToWall(tx, ty, &wal, &outpos);
+				if (wdist <= maxdistsq)
+				{
+					return &wal;
+				}
 			}
 		}
 	}
-	return closest == -1? -1 : dist;
-}
-
-//==========================================================================
-//
-// Create vertices for one wall
-//
-//==========================================================================
-
-int HWWall::CreateVertices(FFlatVertex*& ptr, bool split)
-{
-	auto oo = ptr;
-	ptr->Set(glseg.x1, zbottom[0], glseg.y1, tcs[LOLFT].u, tcs[LOLFT].v);
-	ptr++;
-	ptr->Set(glseg.x1, ztop[0], glseg.y1, tcs[UPLFT].u, tcs[UPLFT].v);
-	ptr++;
-	ptr->Set(glseg.x2, ztop[1], glseg.y2, tcs[UPRGT].u, tcs[UPRGT].v);
-	ptr++;
-	ptr->Set(glseg.x2, zbottom[1], glseg.y2, tcs[LORGT].u, tcs[LORGT].v);
-	ptr++;
-	return int(ptr - oo);
-}
-
-//==========================================================================
-//
-// build the vertices for this wall
-//
-//==========================================================================
-
-void HWWall::MakeVertices(HWDrawInfo* di, bool nosplit)
-{
-	if (vertcount == 0)
-	{
-		auto ret = screen->mVertexData->AllocVertices(4);
-		vertindex = ret.second;
-		vertcount = CreateVertices(ret.first, false);
-	}
+	return best;
 }
 
 //==========================================================================
@@ -193,7 +129,7 @@ void HWWall::RenderFogBoundary(HWDrawInfo *di, FRenderState &state)
 	if (gl_fogmode)// && !di->isFullbrightScene())
 	{
 		state.EnableDrawBufferAttachments(false);
-		SetLightAndFog(state, fade, palette, shade, visibility, alpha);
+		SetLightAndFog(di, state, fade, palette, shade, visibility, alpha);
 		state.SetEffect(EFF_FOGBOUNDARY);
 		state.AlphaFunc(Alpha_GEqual, 0.f);
 		state.SetDepthBias(-1, -128);
@@ -220,7 +156,7 @@ void HWWall::RenderMirrorSurface(HWDrawInfo *di, FRenderState &state)
 
 	// Use sphere mapping for this
 	state.SetEffect(EFF_SPHEREMAP);
-	SetLightAndFog(state, fade, palette, min<int>(shade, numshades), visibility, alpha);
+	SetLightAndFog(di, state, fade, palette, min<int>(shade, numshades), visibility, alpha);
 	state.SetColor(PalEntry(25, globalr >> 1, globalg >> 1, globalb >> 1));
 
 	state.SetRenderStyle(STYLE_Add);
@@ -247,7 +183,7 @@ void HWWall::RenderMirrorSurface(HWDrawInfo *di, FRenderState &state)
 
 void HWWall::RenderTexturedWall(HWDrawInfo *di, FRenderState &state, int rflags)
 {
-	SetLightAndFog(state, fade, palette, shade, visibility, alpha);
+	SetLightAndFog(di, state, fade, palette, shade, visibility, alpha);
 
 	state.SetMaterial(texture, UF_Texture, 0, (flags & (HWF_CLAMPX | HWF_CLAMPY)), TRANSLATION(Translation_Remap + curbasepal, palette), -1);
 
@@ -272,7 +208,7 @@ void HWWall::RenderTexturedWall(HWDrawInfo *di, FRenderState &state, int rflags)
 	else if (!(rflags & RWF_TRANS))
 	{
 		auto oldbias = state.GetDepthBias();
-		if (walldist >= 0) state.SetDepthBias(-1, glseg.x1 == glseg.x2 || glseg.y1 == glseg.y2? -129 : -192);
+		if (walldist) state.SetDepthBias(-1, -129);
 		else state.ClearDepthBias();
 		RenderWall(di, state, rflags);
 		state.SetDepthBias(oldbias);
@@ -323,6 +259,7 @@ void HWWall::RenderTranslucentWall(HWDrawInfo *di, FRenderState &state)
 //==========================================================================
 void HWWall::DrawWall(HWDrawInfo *di, FRenderState &state, bool translucent)
 {
+	rendered_lines++;
 	if (screen->BuffersArePersistent())
 	{
 		/*
@@ -481,7 +418,7 @@ void HWWall::PutWall(HWDrawInfo *di, bool translucent)
 		tcs[LORGT].v = 1.f - tcs[LORGT].v;
 	}
 
-	
+
 	if (!screen->BuffersArePersistent())
 	{
 		/*
@@ -589,8 +526,8 @@ void HWWall::PutPortal(HWDrawInfo *di, int ptype, int plane)
 
 	case PORTALTYPE_LINETOSPRITE:
 		// These are also unique.
-		assert(seg->portalnum >= 0 && seg->portalnum < MAXSPRITES);
-		portal = new HWLineToSpritePortal(&portalState, seg, &::sprite[seg->portalnum]);
+		assert(seg->portalnum >= 0 && seg->portalnum < 8);
+		portal = new HWLineToSpritePortal(&portalState, seg, wall_to_sprite_actors[seg->portalnum]);
 		di->Portals.Push(portal);
 		portal->AddLine(this);
 		break;
@@ -810,7 +747,7 @@ void HWWall::DoTexture(HWDrawInfo* di, walltype* wal, walltype* refwall, float r
 
 	tcs[LOLFT].u = tcs[UPLFT].u = ((leftdist * 8.f * wal->xrepeat) + refwall->xpan_) / tw;
 	tcs[LORGT].u = tcs[UPRGT].u = ((rightdist * 8.f * wal->xrepeat) + refwall->xpan_) / tw;
-	 
+
 	auto setv = [=](float hl, float hr, float frac) -> float
 	{
 		float h = hl + (hr - hl) * frac;
@@ -850,7 +787,7 @@ void HWWall::DoOneSidedTexture(HWDrawInfo* di, walltype* wal, sectortype* fronts
 	if ((wal->cstat & CSTAT_WALL_1WAY) && backsector)
 	{
 		if ((!(wal->cstat & CSTAT_WALL_BOTTOM_SWAP) && (wal->cstat & CSTAT_WALL_1WAY)) ||
-			((wal->cstat & CSTAT_WALL_BOTTOM_SWAP) && (wall[wal->nextwall].cstat & CSTAT_WALL_ALIGN_BOTTOM)))
+			((wal->cstat & CSTAT_WALL_BOTTOM_SWAP) && (wal->nextWall()->cstat & CSTAT_WALL_ALIGN_BOTTOM)))
 			refheight = frontsector->ceilingz;
 		else
 			refheight = backsector->floorz;
@@ -891,7 +828,7 @@ void HWWall::DoLowerTexture(HWDrawInfo* di, walltype* wal, sectortype* frontsect
 {
 	// get the alignment reference position.
 	int refheight;
-	auto refwall = (wal->cstat & CSTAT_WALL_BOTTOM_SWAP) ? &wall[wal->nextwall] : wal;
+	auto refwall = (wal->cstat & CSTAT_WALL_BOTTOM_SWAP) ? wal->nextWall() : wal;
 	refheight = (refwall->cstat & CSTAT_WALL_ALIGN_BOTTOM) ? frontsector->ceilingz : backsector->floorz;
 
 	shade = refwall->shade;
@@ -929,11 +866,28 @@ void HWWall::DoMidTexture(HWDrawInfo* di, walltype* wal,
 		else
 			refheight = max(front->ceilingz, back->ceilingz);
 	}
-
-	topleft = min(bch1,fch1);
-	topright = min(bch2,fch2);
-	bottomleft = max(bfh1,ffh1);
-	bottomright = max(bfh2,ffh2);
+	if ((bch1 - fch1) * (bch2 - fch2) >= 0)
+	{
+		topleft = min(bch1, fch1);
+		topright = min(bch2, fch2);
+	}
+	else
+	{
+		// Front ceiling slope obstructs part of the wall
+		topleft = bch1;
+		topright = bch2;
+	}
+	if ((bfh1 - ffh1) * (bfh2 - ffh2) >= 0)
+	{
+		bottomleft = max(bfh1, ffh1);
+		bottomright = max(bfh2, ffh2);
+	}
+	else
+	{
+		// Front floor slope obstructs part of the wall
+		bottomleft = bfh1;
+		bottomright = bfh2;
+	}
 	if (topleft<=bottomleft && topright<=bottomright) return;
 	type = seg->cstat & CSTAT_WALL_1WAY ? RENDERWALL_M1S : RENDERWALL_M2S;
 
@@ -952,8 +906,8 @@ void HWWall::DoMidTexture(HWDrawInfo* di, walltype* wal,
 //==========================================================================
 void HWWall::Process(HWDrawInfo* di, walltype* wal, sectortype* frontsector, sectortype* backsector)
 {
-	auto backwall = wal->nextwall >= 0 && wal->nextwall < numwalls ? &wall[wal->nextwall] : nullptr;
-	auto p2wall = &wall[wal->point2];
+	auto backwall = wal->twoSided()? wal->nextWall() : nullptr;
+	auto p2wall = wal->point2Wall();
 
 	float fch1;
 	float ffh1;
@@ -963,12 +917,12 @@ void HWWall::Process(HWDrawInfo* di, walltype* wal, sectortype* frontsector, sec
 	FVector2 v1(WallStartX(wal), WallStartY(wal));
 	FVector2 v2(WallEndX(wal), WallEndY(wal));
 
-	PlanesAtPoint(frontsector, wal->x, wal->y, &fch1, &ffh1);
-	PlanesAtPoint(frontsector, p2wall->x, p2wall->y, &fch2, &ffh2);
+	PlanesAtPoint(frontsector, wal->pos.X, wal->pos.Y, &fch1, &ffh1);
+	PlanesAtPoint(frontsector, p2wall->pos.X, p2wall->pos.Y, &fch2, &ffh2);
 
 
 #ifdef _DEBUG
-	if (wallnum(wal) == 6468)
+	if (wallnum(wal) == 34)
 	{
 		int a = 0;
 	}
@@ -997,6 +951,14 @@ void HWWall::Process(HWDrawInfo* di, walltype* wal, sectortype* frontsector, sec
 	alpha = 1.0f;
 	RenderStyle = STYLE_Translucent;
 	texture = NULL;
+
+	if (gl_seamless)
+	{
+		auto v = &vertices[vertexMap[wallnum(wal)]];
+		if (v->dirty) v->RecalcVertexHeights();
+		v = &vertices[vertexMap[wal->point2]];
+		if (v->dirty) v->RecalcVertexHeights();
+	}
 
 	/*
 	if (wal->linedef->special == Line_Horizon)
@@ -1035,7 +997,7 @@ void HWWall::Process(HWDrawInfo* di, walltype* wal, sectortype* frontsector, sec
 		// normal texture
 
 		int tilenum = ((wal->cstat & CSTAT_WALL_1WAY) && wal->nextwall != -1) ? wal->overpicnum : wal->picnum;
-		setgotpic(tilenum);
+		gotpic.Set(tilenum);
 		tileUpdatePicnum(&tilenum, wallnum(wal) + 16384, wal->cstat);
 		texture = tileGetTexture(tilenum);
 		if (texture && texture->isValid())
@@ -1049,8 +1011,8 @@ void HWWall::Process(HWDrawInfo* di, walltype* wal, sectortype* frontsector, sec
 		float bfh2;
 		float bch1;
 		float bch2;
-		PlanesAtPoint(backsector, wal->x, wal->y, &bch1, &bfh1);
-		PlanesAtPoint(backsector, p2wall->x, p2wall->y, &bch2, &bfh2);
+		PlanesAtPoint(backsector, wal->pos.X, wal->pos.Y, &bch1, &bfh1);
+		PlanesAtPoint(backsector, p2wall->pos.X, p2wall->pos.Y, &bch2, &bfh2);
 
 		SkyTop(di, wal, frontsector, backsector, v1, v2, fch1, fch2);
 		SkyBottom(di, wal, frontsector, backsector, v1, v2, ffh1, ffh2);
@@ -1073,7 +1035,7 @@ void HWWall::Process(HWDrawInfo* di, walltype* wal, sectortype* frontsector, sec
 			if (bch1a < fch1 || bch2a < fch2)
 			{
 				int tilenum = wal->picnum;
-				setgotpic(tilenum);
+				gotpic.Set(tilenum);
 				tileUpdatePicnum(&tilenum, wallnum(wal) + 16384, wal->cstat);
 				texture = tileGetTexture(tilenum);
 				if (texture && texture->isValid())
@@ -1086,7 +1048,7 @@ void HWWall::Process(HWDrawInfo* di, walltype* wal, sectortype* frontsector, sec
 		if (wal->cstat & (CSTAT_WALL_MASKED | CSTAT_WALL_1WAY))
 		{
 			int tilenum = wal->overpicnum;
-			setgotpic(tilenum);
+			gotpic.Set(tilenum);
 			tileUpdatePicnum(&tilenum, wallnum(wal) + 16384, wal->cstat);
 			texture = tileGetTexture(tilenum);
 			if (texture && texture->isValid())
@@ -1112,7 +1074,7 @@ void HWWall::Process(HWDrawInfo* di, walltype* wal, sectortype* frontsector, sec
 			{
 				auto w = (wal->cstat & CSTAT_WALL_BOTTOM_SWAP) ? backwall : wal;
 				int tilenum = w->picnum;
-				setgotpic(tilenum);
+				gotpic.Set(tilenum);
 				tileUpdatePicnum(&tilenum, wallnum(wal) + 16384, w->cstat);
 				texture = tileGetTexture(tilenum);
 				if (texture && texture->isValid())
@@ -1124,7 +1086,39 @@ void HWWall::Process(HWDrawInfo* di, walltype* wal, sectortype* frontsector, sec
 	}
 }
 
-void HWWall::ProcessWallSprite(HWDrawInfo* di, spritetype* spr, sectortype* sector)
+//==========================================================================
+//
+// checks if the wall sprite has changed since the last call.
+// Returns:
+//  0 if identical or only render style changed
+//  1 if vertical orientation changed
+//  2 if horizontal orientation changed
+//  3 if positioning changed
+//
+//==========================================================================
+
+int HWWall::CheckWallSprite(tspritetype* spr, tspritetype* last)
+{
+	// If the position changed we need to recalculate everything.
+	if (spr->pos.X != last->pos.X || spr->pos.Y != last->pos.Y || spr->sectp != last->sectp || spr->ang != last->ang) return 3;
+	
+	// if the horizontal orientation changes we need to recalculate the walls this attaches to, but not the positioning.
+	if (spr->xrepeat != last->xrepeat || spr->xoffset != last->xoffset || spr->picnum != last->picnum || ((spr->cstat ^ last->cstat) & CSTAT_SPRITE_XFLIP)) return 2;
+	
+	// only y-positioning changed - we need to re-check the wall tiers this sprite attaches to
+	if(spr->yrepeat != last->yrepeat || spr->yoffset != last->yoffset || ((spr->cstat ^ last->cstat) & (CSTAT_SPRITE_YFLIP|CSTAT_SPRITE_YCENTER))) return 1;
+
+	// all remaining properties only affect the render style which is not relevant for positioning a wall sprite
+	return 0;
+}
+
+//==========================================================================
+//
+//
+//
+//==========================================================================
+
+void HWWall::ProcessWallSprite(HWDrawInfo* di, tspritetype* spr, sectortype* sector)
 {
 	auto tex = tileGetTexture(spr->picnum);
 	if (!tex || !tex->isValid()) return;
@@ -1132,15 +1126,15 @@ void HWWall::ProcessWallSprite(HWDrawInfo* di, spritetype* spr, sectortype* sect
 	seg = nullptr;
 	Sprite = spr;
 	vec2_t pos[2];
-	int sprz = spr->pos.z;
+	int sprz = spr->pos.Z;
 
 	GetWallSpritePosition(spr, spr->pos.vec2, pos, true);
-	glseg.x1 = pos[0].x * (1 / 16.f);
-	glseg.y1 = pos[0].y * (1 / -16.f);
-	glseg.x2 = pos[1].x * (1 / 16.f);
-	glseg.y2 = pos[1].y * (1 / -16.f);
+	glseg.x1 = pos[0].X * (1 / 16.f);
+	glseg.y1 = pos[0].Y * (1 / -16.f);
+	glseg.x2 = pos[1].X * (1 / 16.f);
+	glseg.y2 = pos[1].Y * (1 / -16.f);
 
-	if (spr->cstat & CSTAT_SPRITE_ONE_SIDED)
+	if (spr->cstat & CSTAT_SPRITE_ONE_SIDE)
 	{
 		if (PointOnLineSide(di->Viewpoint.Pos.X, di->Viewpoint.Pos.Y, glseg.x1, glseg.y1, glseg.x2 - glseg.x1, glseg.y2 - glseg.y1) <= 0)
 		{
@@ -1176,7 +1170,19 @@ void HWWall::ProcessWallSprite(HWDrawInfo* di, spritetype* spr, sectortype* sect
 		topofs = ((int)tex->GetDisplayTopOffset() + spr->yoffset);
 	}
 
-	walldist = IsOnWall(spr, height);
+	DVector2 vec{};
+	walldist = IsOnWall(spr, height, vec);
+	if (walldist)
+	{
+		// project the sprite right onto the wall.
+		auto v1 = NearestPointLine(glseg.x1, -glseg.y1, walldist);
+		auto v2 = NearestPointLine(glseg.x2, -glseg.y2, walldist);
+		glseg.x1 = v1.X;
+		glseg.y1 = -v1.Y;
+		glseg.x2 = v2.X;
+		glseg.y2 = -v2.Y;
+
+	}
 
 	if (spr->cstat & CSTAT_SPRITE_YFLIP)
 		topofs = -topofs;
@@ -1207,13 +1213,13 @@ void HWWall::ProcessWallSprite(HWDrawInfo* di, spritetype* spr, sectortype* sect
 		tcs[UPLFT].v = tcs[UPRGT].v = 1.f - tcs[UPLFT].v;
 		tcs[LOLFT].v = tcs[LORGT].v = 1.f - tcs[LOLFT].v;
 	}
-
+	
 	// Clip sprites to ceilings/floors
 	if (!(sector->ceilingstat & CSTAT_SECTOR_SKY))
 	{
 		float polyh = (ztop[0] - zbottom[0]);
 		float ceilingz = sector->ceilingz * (1 / -256.f);
-		if (ceilingz < ztop[0] && ceilingz > zbottom[0])
+		if (ceilingz < ztop[0] && ceilingz >= zbottom[0])
 		{
 			float newv = (ceilingz - zbottom[0]) / polyh;
 			tcs[UPLFT].v = tcs[UPRGT].v = tcs[LOLFT].v + newv * (tcs[UPLFT].v - tcs[LOLFT].v);
@@ -1224,13 +1230,15 @@ void HWWall::ProcessWallSprite(HWDrawInfo* di, spritetype* spr, sectortype* sect
 	{
 		float polyh = (ztop[0] - zbottom[0]);
 		float floorz = sector->floorz * (1 / -256.f);
-		if (floorz < ztop[0] && floorz > zbottom[0])
+		if (floorz <= ztop[0] && floorz > zbottom[0])
 		{
 			float newv = (floorz - zbottom[0]) / polyh;
 			tcs[LOLFT].v = tcs[LORGT].v = tcs[LOLFT].v + newv * (tcs[UPLFT].v - tcs[LOLFT].v);
 			zbottom[0] = zbottom[1] = floorz;
 		}
 	}
+	if (zbottom[0] >= ztop[0])
+		return; // nothing left to render.
 
 	// If the sprite is backward, flip it around so that we have guaranteed orientation when this is about to be sorted.
 	if (PointOnLineSide(di->Viewpoint.Pos.XY(), DVector2(glseg.x1, glseg.y1), DVector2(glseg.x2, glseg.y2)) < 0)

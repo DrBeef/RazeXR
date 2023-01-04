@@ -30,38 +30,37 @@ Prepared for public release: 03/28/2005 - Charlie Wiederhold, 3D Realms
 BEGIN_SW_NS
 
 // Call functions based on a random range value
-typedef struct
+struct DECISION
 {
-    short range;
-    ANIMATORp action;
-} DECISION, *DECISIONp;
+    int range;
+    ANIMATOR* action;
+};
 
 // Personality structure
-struct PERSONALITYstruct
+struct PERSONALITY
 {
-    DECISIONp Battle;
-    DECISIONp Offense;
-    DECISIONp Broadcast;
-    DECISIONp Surprised;
-    DECISIONp Evasive;
-    DECISIONp LostTarget;
-    DECISIONp CloseRange;
-    DECISIONp TouchTarget;
+    DECISION* Battle;
+    DECISION* Offense;
+    DECISION* Broadcast;
+    DECISION* Surprised;
+    DECISION* Evasive;
+    DECISION* LostTarget;
+    DECISION* CloseRange;
+    DECISION* TouchTarget;
 };
 
 enum ActorStates { SLOW_SPEED, NORM_SPEED, MID_SPEED, FAST_SPEED, MAX_SPEED};
 
-#define MAXATTRIBSNDS   11
-typedef enum
+enum ATTRIB_SNDS
 {
     attr_ambient, attr_alert, attr_attack, attr_pain, attr_die,
     attr_extra1, attr_extra2, attr_extra3,attr_extra4,attr_extra5,
-    attr_extra6
-} ATTRIB_SNDS;
+    attr_extra6, MAXATTRIBSNDS
+};
 
-struct ATTRIBUTEstruct
+struct ATTRIBUTE
 {
-    short Speed[MAX_SPEED];
+    int16_t Speed[MAX_SPEED];
     int8_t TicAdjust[MAX_SPEED];
     uint8_t MaxWeapons;
     /*ATTRIB_SNDS*/ int Sounds[MAXATTRIBSNDS];  // JBF: ATTRIB_SNDS? Somehow I don't think this is what was intended...
@@ -71,7 +70,7 @@ extern ATTRIBUTE DefaultAttrib;
 
 // AI.C functions
 bool ActorMoveHitReact(DSWActor* actor);
-short ChooseActionNumber(short decision[]);
+int ChooseActionNumber(int16_t decision[]);
 bool CanSeePlayer(DSWActor* actor);
 int DoActorPickClosePlayer(DSWActor* actor);
 int InitActorDecide(DSWActor* actor);
@@ -90,8 +89,8 @@ int InitActorExtra6Noise(DSWActor* actor);
 int InitActorMoveCloser(DSWActor* actor);
 int DoActorCantMoveCloser(DSWActor* actor);
 int DoActorMoveCloser(DSWActor* actor);
-short FindTrackToPlayer(DSWActor* actor);
-short FindTrackAwayFromPlayer(DSWActor* actor);
+int FindTrackToPlayer(DSWActor* actor);
+int FindTrackAwayFromPlayer(DSWActor* actor);
 int InitActorRunAway(DSWActor* actor);
 int InitActorRunToward(DSWActor* actor);
 int InitActorAttack(DSWActor* actor);

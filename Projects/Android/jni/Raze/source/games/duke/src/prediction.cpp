@@ -50,14 +50,14 @@ short myangbak[MOVEFIFOSIZ];
 
 void resetmys()
 {
-	myx = omyx = ps[myconnectindex].pos.x;
-	myy = omyy = ps[myconnectindex].pos.y;
-	myz = omyz = ps[myconnectindex].pos.z;
+	myx = omyx = ps[myconnectindex].pos.X;
+	myy = omyy = ps[myconnectindex].pos.Y;
+	myz = omyz = ps[myconnectindex].pos.Z;
 	myxvel = myyvel = myzvel = 0;
 	myang = ps[myconnectindex].angle.ang;
 	myhoriz = omyhoriz = ps[myconnectindex].horizon.horiz;
 	myhorizoff = omyhorizoff = ps[myconnectindex].horizon.horizoff;
-	mycursectnum = ps[myconnectindex].cursectnum;
+	mycursectnum = sectnum(ps[myconnectindex].cursector);
 	myjumpingcounter = ps[myconnectindex].jumping_counter;
 	myjumpingtoggle = ps[myconnectindex].jumping_toggle;
 	myonground = ps[myconnectindex].on_ground;
@@ -82,7 +82,7 @@ void fakedomovethingscorrect(void)
 	 myy = p->pos.y; omyy = p->oposy; myyvel = p->posyv;
 	 myz = p->pos.z; omyz = p->oposz; myzvel = p->poszv;
 	 myang = p->ang; omyang = p->oang;
-	 mycursectnum = p->cursectnum;
+	 mycursectnum = p->cursector;
 	 myhoriz = p->horiz; omyhoriz = p->ohoriz;
 	 myhorizoff = p->horizoff; omyhorizoff = p->ohorizoff;
 	 myjumpingcounter = p->jumping_counter;
@@ -112,7 +112,7 @@ void fakedomovethings(void)
 		p = &ps[myconnectindex];
 
 		backcstat = p->GetActor()->s.cstat;
-		p->GetActor()->s.cstat &= ~257;
+		p->GetActor()->s.cstat &= ~CSTAT_SPRITE_BLOCK_ALL;
 
 		actions = syn->actions;
 
@@ -165,7 +165,7 @@ void fakedomovethings(void)
 
 		if(chz.type == kHitSprite)
 		{
-				if (chz.actor->s.statnum == 1 && chz.actor->s.extra >= 0)
+				if (chz.actor()->s.statnum == 1 && chz.actor()->s.extra >= 0)
 				{
 					chz.type = kHitNone;
 					cz = getceilzofslope(psect,myx,myy);
@@ -174,14 +174,14 @@ void fakedomovethings(void)
 
 		if (clz.type == kHitSprite)
 		{
-				 if ((clz.actor->s.cstat&33) == 33)
+				 if ((clz.actor()->s.cstat&33) == 33)
 				 {
 						psectlotag = 0;
 						spritebridge = 1;
 				 }
-				 if(badguy(chz.actor) && chz.actor->s.xrepeat > 24 && abs(p->GetActor()->s.z- chz.actor->s.z) < (84<<8) )
+				 if(badguy(chz.actor) && chz.actor()->s.xrepeat > 24 && abs(p->GetActor()->s.z- chz.actor()->s.z) < (84<<8) )
 				 {
-					j = getangle(chz.actor->s.x-myx, chz.actor->s.y-myy);
+					j = getangle(chz.actor()->s.x-myx, chz.actor()->s.y-myy);
 					myxvel -= bcos(j, 4);
 					myyvel -= bsin(j, 4);
 				}
@@ -273,7 +273,7 @@ void fakedomovethings(void)
 
 				 if(shrunk) j = 512;
 				 else j = 2048;
-				 
+
 				 if ((sb_snum&1) && !(p->OnMotorcycle || p->OnBoat))
 							myz -= j;
 				 if ((sb_snum&(1<<1)) && !(p->OnMotorcycle || p->OnBoat))

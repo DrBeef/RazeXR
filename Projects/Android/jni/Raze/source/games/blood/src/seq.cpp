@@ -126,13 +126,8 @@ void seqPrecacheId(int id, int palette)
 //
 //---------------------------------------------------------------------------
 
-void UpdateCeiling(int nXSector, SEQFRAME* pFrame)
+void UpdateCeiling(sectortype* pSector, SEQFRAME* pFrame)
 {
-	assert(nXSector > 0 && nXSector < kMaxXSectors);
-	int nSector = xsector[nXSector].reference;
-	assert(nSector >= 0 && nSector < kMaxSectors);
-	sectortype* pSector = &sector[nSector];
-	assert(pSector->extra == nXSector);
 	pSector->ceilingpicnum = seqGetTile(pFrame);
 	pSector->ceilingshade = pFrame->shade;
 	if (pFrame->palette)
@@ -145,13 +140,8 @@ void UpdateCeiling(int nXSector, SEQFRAME* pFrame)
 //
 //---------------------------------------------------------------------------
 
-void UpdateFloor(int nXSector, SEQFRAME* pFrame)
+void UpdateFloor(sectortype* pSector, SEQFRAME* pFrame)
 {
-	assert(nXSector > 0 && nXSector < kMaxXSectors);
-	int nSector = xsector[nXSector].reference;
-	assert(nSector >= 0 && nSector < kMaxSectors);
-	sectortype* pSector = &sector[nSector];
-	assert(pSector->extra == nXSector);
 	pSector->floorpicnum = seqGetTile(pFrame);
 	pSector->floorshade = pFrame->shade;
 	if (pFrame->palette)
@@ -164,32 +154,28 @@ void UpdateFloor(int nXSector, SEQFRAME* pFrame)
 //
 //---------------------------------------------------------------------------
 
-void UpdateWall(int nXWall, SEQFRAME* pFrame)
+void UpdateWall(walltype* pWall, SEQFRAME* pFrame)
 {
-	assert(nXWall > 0 && nXWall < kMaxXWalls);
-	int nWall = xwall[nXWall].reference;
-	assert(nWall >= 0 && nWall < kMaxWalls);
-	walltype* pWall = &wall[nWall];
-	assert(pWall->extra == nXWall);
+	assert(pWall->hasX());
 	pWall->picnum = seqGetTile(pFrame);
 	if (pFrame->palette)
 		pWall->pal = pFrame->palette;
 	if (pFrame->transparent)
-		pWall->cstat |= 128;
+		pWall->cstat |= CSTAT_WALL_TRANSLUCENT;
 	else
-		pWall->cstat &= ~128;
+		pWall->cstat &= ~CSTAT_WALL_TRANSLUCENT;
 	if (pFrame->transparent2)
-		pWall->cstat |= 512;
+		pWall->cstat |= CSTAT_WALL_TRANS_FLIP;
 	else
-		pWall->cstat &= ~512;
+		pWall->cstat &= ~CSTAT_WALL_TRANS_FLIP;
 	if (pFrame->blockable)
-		pWall->cstat |= 1;
+		pWall->cstat |= CSTAT_WALL_BLOCK;
 	else
-		pWall->cstat &= ~1;
+		pWall->cstat &= ~CSTAT_WALL_BLOCK;
 	if (pFrame->hittable)
-		pWall->cstat |= 64;
+		pWall->cstat |= CSTAT_WALL_BLOCK_HITSCAN;
 	else
-		pWall->cstat &= ~64;
+		pWall->cstat &= ~CSTAT_WALL_BLOCK_HITSCAN;
 }
 
 //---------------------------------------------------------------------------
@@ -198,57 +184,52 @@ void UpdateWall(int nXWall, SEQFRAME* pFrame)
 //
 //---------------------------------------------------------------------------
 
-void UpdateMasked(int nXWall, SEQFRAME* pFrame)
+void UpdateMasked(walltype* pWall, SEQFRAME* pFrame)
 {
-	assert(nXWall > 0 && nXWall < kMaxXWalls);
-	int nWall = xwall[nXWall].reference;
-	assert(nWall >= 0 && nWall < kMaxWalls);
-	walltype* pWall = &wall[nWall];
-	assert(pWall->extra == nXWall);
-	assert(pWall->nextwall >= 0);
-	walltype* pWallNext = &wall[pWall->nextwall];
+	assert(pWall->hasX());
+	walltype* pWallNext = pWall->nextWall();
 	pWall->overpicnum = pWallNext->overpicnum = seqGetTile(pFrame);
 	if (pFrame->palette)
 		pWall->pal = pWallNext->pal = pFrame->palette;
 	if (pFrame->transparent)
 	{
-		pWall->cstat |= 128;
-		pWallNext->cstat |= 128;
+		pWall->cstat |= CSTAT_WALL_TRANSLUCENT;
+		pWallNext->cstat |= CSTAT_WALL_TRANSLUCENT;
 	}
 	else
 	{
-		pWall->cstat &= ~128;
-		pWallNext->cstat &= ~128;
+		pWall->cstat &= ~CSTAT_WALL_TRANSLUCENT;
+		pWallNext->cstat &= ~CSTAT_WALL_TRANSLUCENT;
 	}
 	if (pFrame->transparent2)
 	{
-		pWall->cstat |= 512;
-		pWallNext->cstat |= 512;
+		pWall->cstat |= CSTAT_WALL_TRANS_FLIP;
+		pWallNext->cstat |= CSTAT_WALL_TRANS_FLIP;
 	}
 	else
 	{
-		pWall->cstat &= ~512;
-		pWallNext->cstat &= ~512;
+		pWall->cstat &= ~CSTAT_WALL_TRANS_FLIP;
+		pWallNext->cstat &= ~CSTAT_WALL_TRANS_FLIP;
 	}
 	if (pFrame->blockable)
 	{
-		pWall->cstat |= 1;
-		pWallNext->cstat |= 1;
+		pWall->cstat |= CSTAT_WALL_BLOCK;
+		pWallNext->cstat |= CSTAT_WALL_BLOCK;
 	}
 	else
 	{
-		pWall->cstat &= ~1;
-		pWallNext->cstat &= ~1;
+		pWall->cstat &= ~CSTAT_WALL_BLOCK;
+		pWallNext->cstat &= ~CSTAT_WALL_BLOCK;
 	}
 	if (pFrame->hittable)
 	{
-		pWall->cstat |= 64;
-		pWallNext->cstat |= 64;
+		pWall->cstat |= CSTAT_WALL_BLOCK_HITSCAN;
+		pWallNext->cstat |= CSTAT_WALL_BLOCK_HITSCAN;
 	}
 	else
 	{
-		pWall->cstat &= ~64;
-		pWallNext->cstat &= ~64;
+		pWall->cstat &= ~CSTAT_WALL_BLOCK_HITSCAN;
+		pWallNext->cstat &= ~CSTAT_WALL_BLOCK_HITSCAN;
 	}
 }
 
@@ -260,70 +241,69 @@ void UpdateMasked(int nXWall, SEQFRAME* pFrame)
 
 void UpdateSprite(DBloodActor* actor, SEQFRAME* pFrame)
 {
-	spritetype* pSprite = &actor->s();
 	assert(actor->hasX());
-	if (pSprite->flags & 2)
+	if (actor->spr.flags & 2)
 	{
-		if (tileHeight(pSprite->picnum) != tileHeight(seqGetTile(pFrame)) || tileTopOffset(pSprite->picnum) != tileTopOffset(seqGetTile(pFrame))
-			|| (pFrame->yrepeat && pFrame->yrepeat != pSprite->yrepeat))
-			pSprite->flags |= 4;
+		if (tileHeight(actor->spr.picnum) != tileHeight(seqGetTile(pFrame)) || tileTopOffset(actor->spr.picnum) != tileTopOffset(seqGetTile(pFrame))
+			|| (pFrame->yrepeat && pFrame->yrepeat != actor->spr.yrepeat))
+			actor->spr.flags |= 4;
 	}
-	pSprite->picnum = seqGetTile(pFrame);
+	actor->spr.picnum = seqGetTile(pFrame);
 	if (pFrame->palette)
-		pSprite->pal = pFrame->palette;
-	pSprite->shade = pFrame->shade;
+		actor->spr.pal = pFrame->palette;
+	actor->spr.shade = pFrame->shade;
 
-	int scale = actor->x().scale; // SEQ size scaling
+	int scale = actor->xspr.scale; // SEQ size scaling
 	if (pFrame->xrepeat) {
-		if (scale) pSprite->xrepeat = ClipRange(MulScale(pFrame->xrepeat, scale, 8), 0, 255);
-		else pSprite->xrepeat = pFrame->xrepeat;
+		if (scale) actor->spr.xrepeat = ClipRange(MulScale(pFrame->xrepeat, scale, 8), 0, 255);
+		else actor->spr.xrepeat = pFrame->xrepeat;
 	}
 
 	if (pFrame->yrepeat) {
-		if (scale) pSprite->yrepeat = ClipRange(MulScale(pFrame->yrepeat, scale, 8), 0, 255);
-		else pSprite->yrepeat = pFrame->yrepeat;
+		if (scale) actor->spr.yrepeat = ClipRange(MulScale(pFrame->yrepeat, scale, 8), 0, 255);
+		else actor->spr.yrepeat = pFrame->yrepeat;
 	}
 
 	if (pFrame->transparent)
-		pSprite->cstat |= 2;
+		actor->spr.cstat |= CSTAT_SPRITE_TRANSLUCENT;
 	else
-		pSprite->cstat &= ~2;
+		actor->spr.cstat &= ~CSTAT_SPRITE_TRANSLUCENT;
 	if (pFrame->transparent2)
-		pSprite->cstat |= 512;
+		actor->spr.cstat |= CSTAT_SPRITE_TRANS_FLIP;
 	else
-		pSprite->cstat &= ~512;
+		actor->spr.cstat &= ~CSTAT_SPRITE_TRANS_FLIP;
 	if (pFrame->blockable)
-		pSprite->cstat |= 1;
+		actor->spr.cstat |= CSTAT_SPRITE_BLOCK;
 	else
-		pSprite->cstat &= ~1;
+		actor->spr.cstat &= ~CSTAT_SPRITE_BLOCK;
 	if (pFrame->hittable)
-		pSprite->cstat |= 256;
+		actor->spr.cstat |= CSTAT_SPRITE_BLOCK_HITSCAN;
 	else
-		pSprite->cstat &= ~256;
+		actor->spr.cstat &= ~CSTAT_SPRITE_BLOCK_HITSCAN;
 	if (pFrame->invisible)
-		pSprite->cstat |= 32768;
+		actor->spr.cstat |= CSTAT_SPRITE_INVISIBLE;
 	else
-		pSprite->cstat &= (unsigned short)~32768;
+		actor->spr.cstat &= ~CSTAT_SPRITE_INVISIBLE;
 	if (pFrame->pushable)
-		pSprite->cstat |= 4096;
+		actor->spr.cstat |= CSTAT_SPRITE_BLOOD_BIT1;
 	else
-		pSprite->cstat &= ~4096;
+		actor->spr.cstat &= ~CSTAT_SPRITE_BLOOD_BIT1;
 	if (pFrame->smoke)
-		pSprite->flags |= 256;
+		actor->spr.flags |= 256;
 	else
-		pSprite->flags &= ~256;
+		actor->spr.flags &= ~256;
 	if (pFrame->aiming)
-		pSprite->flags |= 8;
+		actor->spr.flags |= 8;
 	else
-		pSprite->flags &= ~8;
+		actor->spr.flags &= ~8;
 	if (pFrame->flipx)
-		pSprite->flags |= 1024;
+		actor->spr.flags |= 1024;
 	else
-		pSprite->flags &= ~1024;
+		actor->spr.flags &= ~1024;
 	if (pFrame->flipy)
-		pSprite->flags |= 2048;
+		actor->spr.flags |= 2048;
 	else
-		pSprite->flags &= ~2048;
+		actor->spr.flags &= ~2048;
 }
 
 //---------------------------------------------------------------------------
@@ -337,17 +317,22 @@ void SEQINST::Update()
 	assert(frameIndex < pSequence->nFrames);
 	switch (type)
 	{
-	case 0:
-		UpdateWall(seqindex, &pSequence->frames[frameIndex]);
+	case SS_WALL:
+		assert(target.isWall());
+		UpdateWall(target.wall(), &pSequence->frames[frameIndex]);
 		break;
-	case 1:
-		UpdateCeiling(seqindex, &pSequence->frames[frameIndex]);
+	case SS_CEILING:
+		assert(target.isSector());
+		UpdateCeiling(target.sector(), &pSequence->frames[frameIndex]);
 		break;
-	case 2:
-		UpdateFloor(seqindex, &pSequence->frames[frameIndex]);
+	case SS_FLOOR:
+		assert(target.isSector());
+		UpdateFloor(target.sector(), &pSequence->frames[frameIndex]);
 		break;
-	case 3:
+	case SS_SPRITE:
 	{
+		assert(target.isActor());
+		auto actor = target.actor();
 		if (!actor) break;
 		UpdateSprite(actor, &pSequence->frames[frameIndex]);
 		if (pSequence->frames[frameIndex].playsound) {
@@ -363,11 +348,10 @@ void SEQINST::Update()
 
 
 		// by NoOne: add surfaceSound trigger feature
-		spritetype* pSprite = &actor->s();
-		if (!VanillaMode() && pSequence->frames[frameIndex].surfaceSound && actor->zvel == 0 && actor->xvel != 0) {
+		if (!VanillaMode() && pSequence->frames[frameIndex].surfaceSound && actor->vel.Z == 0 && actor->vel.X != 0) {
 
-			if (getUpperLink(pSprite->sectnum)) break; // don't play surface sound for stacked sectors
-			int surf = tileGetSurfType(sector[pSprite->sectnum].floorpicnum); 
+			if (actor->sector()->upperLink) break; // don't play surface sound for stacked sectors
+			int surf = tileGetSurfType(actor->sector()->floorpicnum);
 			if (!surf) break;
 			static int surfSfxMove[15][4] = {
 				/* {snd1, snd2, gameVolume, myVolume} */
@@ -394,21 +378,22 @@ void SEQINST::Update()
 			{
 				auto udata = soundEngine->GetUserData(snd);
 				int relVol = udata ? udata[2] : 255;
-				sfxPlay3DSoundCP(pSprite, sndId, -1, 0, 0, (surfSfxMove[surf][2] != relVol) ? relVol : surfSfxMove[surf][3]);
+				sfxPlay3DSoundCP(actor, sndId, -1, 0, 0, (surfSfxMove[surf][2] != relVol) ? relVol : surfSfxMove[surf][3]);
 			}
 		}
 		break;
 	}
-	case 4:
-		UpdateMasked(seqindex, &pSequence->frames[frameIndex]);
+	case SS_MASKED:
+		assert(target.isWall());
+		UpdateMasked(target.wall(), &pSequence->frames[frameIndex]);
 		break;
 	}
 
 	// all seq callbacks are for sprites, but there's no sanity checks here that what gets passed is meant to be for a sprite...
 	if (pSequence->frames[frameIndex].trigger && callback != -1)
 	{
-		assert(type == 3);
-		if (type == 3) seqClientCallback[callback](type, actor);
+		assert(type == SS_SPRITE);
+		if (target.isActor()) seqClientCallback[callback](type, target.actor());
 	}
 
 }
@@ -426,8 +411,8 @@ struct ActiveList
 	void clear() { list.Clear(); }
 	int getSize() { return list.Size(); }
 	SEQINST* getInst(int num) { return &list[num]; }
-	int getIndex(int num) { return list[num].seqindex; }
-	DBloodActor* getActor(int num) { return list[num].actor; }
+	EventObject getElement(int num) { return list[num].target; }
+	//DBloodActor* getActor(int num) { return list[num].actor; }
 	int getType(int num) { return list[num].type; }
 
 	void remove(int num)
@@ -442,30 +427,26 @@ struct ActiveList
 		return &list.Last();
 	}
 
-	SEQINST* get(int type, int index)
+	SEQINST* get(int type, const EventObject& eob)
 	{
 		for (auto& n : list)
 		{
-			if (n.type == type && n.seqindex == index) return &n;
+			if (n.type == type && n.target == eob) return &n;
 		}
 		return nullptr;
 	}
 
 	SEQINST* get(DBloodActor* actor)
 	{
-		for (auto& n : list)
-		{
-			if (n.type == 3 && n.actor == actor) return &n;
-		}
-		return nullptr;
+		return get(SS_SPRITE, EventObject(actor));
 	}
 
-	void remove(int type, int index)
+	void remove(int type, const EventObject& eob)
 	{
 		for (unsigned i = 0; i < list.Size(); i++)
 		{
 			auto& n = list[i];
-			if (n.type == type && n.seqindex == index)
+			if (n.type == type && n.target == eob)
 			{
 				remove(i);
 				return;
@@ -475,15 +456,7 @@ struct ActiveList
 
 	void remove(DBloodActor* actor)
 	{
-		for (unsigned i = 0; i < list.Size(); i++)
-		{
-			auto& n = list[i];
-			if (n.type == 3 && n.actor == actor)
-			{
-				remove(i);
-				return;
-			}
-		}
+		remove(SS_SPRITE, EventObject(actor));
 	}
 
 };
@@ -496,9 +469,9 @@ static ActiveList activeList;
 //
 //---------------------------------------------------------------------------
 
-SEQINST* GetInstance(int type, int nXIndex)
+SEQINST* GetInstance(int type, const EventObject& eob)
 {
-	return activeList.get(type, nXIndex);
+	return activeList.get(type, eob);
 }
 
 SEQINST* GetInstance(DBloodActor* actor)
@@ -506,29 +479,24 @@ SEQINST* GetInstance(DBloodActor* actor)
 	return activeList.get(actor);
 }
 
-int seqGetStatus(DBloodActor* actor)
+void seqKill(int type, const EventObject& nIndex)
 {
-	SEQINST* pInst = activeList.get(actor);
-	if (pInst) return pInst->frameIndex;
-	return -1;
-}
-
-int seqGetID(DBloodActor* actor)
-{
-	SEQINST* pInst = activeList.get(actor);
-	if (pInst) return pInst->nSeqID;
-	return -1;
-}
-
-void seqKill(int type, int nXIndex)
-{
-	assert(type != SS_SPRITE);
-	activeList.remove(type, nXIndex);
+	activeList.remove(type, nIndex);
 }
 
 void seqKillAll()
 {
 	activeList.clear();
+}
+
+void seqKill(int type, sectortype* actor)
+{
+	activeList.remove(type, EventObject(actor));
+}
+
+void seqKill(int type, walltype* actor)
+{
+	activeList.remove(type, EventObject(actor));
 }
 
 void seqKill(DBloodActor* actor)
@@ -545,7 +513,6 @@ void seqKill(DBloodActor* actor)
 
 static void ByteSwapSEQ(Seq* pSeq)
 {
-#if 1//B_BIG_ENDIAN == 1
 	pSeq->version = LittleShort(pSeq->version);
 	pSeq->nFrames = LittleShort(pSeq->nFrames);
 	pSeq->ticksPerFrame = LittleShort(pSeq->ticksPerFrame);
@@ -579,7 +546,6 @@ static void ByteSwapSEQ(Seq* pSeq)
 		swapFrame.reserved = bitReader.readUnsigned(2);
 		*pFrame = swapFrame;
 	}
-#endif
 }
 
 FMemArena seqcache;
@@ -608,14 +574,13 @@ Seq* getSequence(int res_id)
 //
 //---------------------------------------------------------------------------
 
-void seqSpawn(int nSeqID, int type, int nXIndex, int callback)
+void seqSpawn_(int nSeqID, int type, const EventObject& eob, int callback)
 {
-	assert(type != SS_SPRITE);
 	Seq* pSequence = getSequence(nSeqID);
 
 	if (pSequence == nullptr) return;
 
-	SEQINST* pInst = activeList.get(type, nXIndex);
+	SEQINST* pInst = activeList.get(type, eob);
 	if (!pInst)
 	{
 		pInst = activeList.getNew();
@@ -633,38 +598,25 @@ void seqSpawn(int nSeqID, int type, int nXIndex, int callback)
 	pInst->timeCounter = (short)pSequence->ticksPerFrame;
 	pInst->frameIndex = 0;
 	pInst->type = type;
-	pInst->seqindex = nXIndex;
-	pInst->actor = nullptr;
+	pInst->target = eob;
 	pInst->Update();
 }
 
 void seqSpawn(int nSeqID, DBloodActor* actor, int callback)
 {
-	Seq* pSequence = getSequence(nSeqID);
+	seqSpawn_(nSeqID, SS_SPRITE, EventObject(actor), callback);
+}
 
-	if (pSequence == nullptr) return;
+void seqSpawn(int nSeqID, int type, sectortype* sect, int callback)
+{
+	assert(type == SS_FLOOR || type == SS_CEILING);
+	seqSpawn_(nSeqID, type, EventObject(sect), callback);
+}
 
-	SEQINST* pInst = activeList.get(actor);
-	if (!pInst)
-	{
-		pInst = activeList.getNew();
-	}
-	else
-	{
-		// already playing this sequence?
-		if (pInst->nSeqID == nSeqID)
-			return;
-	}
-
-	pInst->pSequence = pSequence;
-	pInst->nSeqID = nSeqID;
-	pInst->callback = callback;
-	pInst->timeCounter = (short)pSequence->ticksPerFrame;
-	pInst->frameIndex = 0;
-	pInst->type = SS_SPRITE;
-	pInst->seqindex = 0;
-	pInst->actor = actor;
-	pInst->Update();
+void seqSpawn(int nSeqID, int type, walltype* wal, int callback)
+{
+	assert(type == SS_WALL || type == SS_MASKED);
+	seqSpawn_(nSeqID, type, EventObject(wal), callback);
 }
 
 //---------------------------------------------------------------------------
@@ -673,19 +625,48 @@ void seqSpawn(int nSeqID, DBloodActor* actor, int callback)
 //
 //---------------------------------------------------------------------------
 
-int seqGetStatus(int type, int nXIndex)
+int seqGetStatus(int type, sectortype* nIndex)
 {
-	SEQINST* pInst = activeList.get(type, nXIndex);
+	SEQINST* pInst = activeList.get(type, EventObject(nIndex));
 	if (pInst) return pInst->frameIndex;
 	return -1;
 }
 
-int seqGetID(int type, int nXIndex)
+int seqGetID(int type, sectortype* nIndex)
 {
-	SEQINST* pInst = activeList.get(type, nXIndex);
+	SEQINST* pInst = activeList.get(type, EventObject(nIndex));
 	if (pInst) return pInst->nSeqID;
 	return -1;
 }
+
+int seqGetStatus(int type, walltype* nIndex)
+{
+	SEQINST* pInst = activeList.get(type, EventObject(nIndex));
+	if (pInst) return pInst->frameIndex;
+	return -1;
+}
+
+int seqGetID(int type, walltype* nIndex)
+{
+	SEQINST* pInst = activeList.get(type, EventObject(nIndex));
+	if (pInst) return pInst->nSeqID;
+	return -1;
+}
+
+int seqGetStatus(DBloodActor* actor)
+{
+	SEQINST* pInst = activeList.get(actor);
+	if (pInst) return pInst->frameIndex;
+	return -1;
+}
+
+int seqGetID(DBloodActor* actor)
+{
+	SEQINST* pInst = activeList.get(actor);
+	if (pInst) return pInst->nSeqID;
+	return -1;
+}
+
 
 //---------------------------------------------------------------------------
 //
@@ -699,8 +680,7 @@ void seqProcess(int nTicks)
 	{
 		SEQINST* pInst = activeList.getInst(i);
 		Seq* pSeq = pInst->pSequence;
-		int index = pInst->seqindex;
-		auto actor = pInst->actor;
+		auto target = pInst->target;
 
 		assert(pInst->frameIndex < pSeq->nFrames);
 
@@ -718,22 +698,24 @@ void seqProcess(int nTicks)
 					{
 						if (pInst->type == SS_SPRITE)
 						{
+							assert(target.isActor());
+							auto actor = target.actor();
 							if (actor)
 							{
 								evKillActor(actor);
-								if ((actor->s().hitag & kAttrRespawn) != 0 && (actor->s().inittype >= kDudeBase && actor->s().inittype < kDudeMax))
-								evPostActor(actor, gGameOptions.nMonsterRespawnTime, kCallbackRespawn);
+								if ((actor->spr.hitag & kAttrRespawn) != 0 && (actor->spr.inittype >= kDudeBase && actor->spr.inittype < kDudeMax))
+									evPostActor(actor, gGameOptions.nMonsterRespawnTime, kCallbackRespawn);
 								else DeleteSprite(actor);	// safe to not use actPostSprite here
 							}
 						}
 
 						else if (pInst->type == SS_MASKED)
 						{
-							int nWall = xwall[index].reference;
-							assert(nWall >= 0 && nWall < kMaxWalls);
-							wall[nWall].cstat &= ~(8 + 16 + 32);
-							if (wall[nWall].nextwall != -1)
-								wall[wall[nWall].nextwall].cstat &= ~(8 + 16 + 32);
+							assert(target.isWall());
+							auto pWall = target.wall();
+							pWall->cstat &= ~(CSTAT_WALL_XFLIP | CSTAT_WALL_MASKED | CSTAT_WALL_1WAY);
+							if (pWall->twoSided())
+								pWall->nextWall()->cstat &= ~(CSTAT_WALL_XFLIP | CSTAT_WALL_MASKED | CSTAT_WALL_1WAY);
 						}
 					}
 
@@ -759,20 +741,14 @@ FSerializer& Serialize(FSerializer& arc, const char* keyname, SEQINST& w, SEQINS
 {
 	if (arc.BeginObject(keyname))
 	{
-		arc	("type", w.type)
+		arc("type", w.type)
 			("callback", w.callback)
 			("seqid", w.nSeqID)
 			("timecounter", w.timeCounter)
-			("frameindex", w.frameIndex);
-#ifdef OLD_SAVEGAME
-		if (w.type == SS_SPRITE) arc("index", w.actor);
-		else arc("index", w.seqindex);
-#else
-		arc("index", w.seqindex)
-			("actor", w.actor);
-#endif
-			
-			arc.EndObject();
+			("frameindex", w.frameIndex)
+			("target", w.target);
+
+		arc.EndObject();
 	}
 	return arc;
 }

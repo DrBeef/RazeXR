@@ -174,7 +174,7 @@ void HWPortal::DrawPortalStencil(FRenderState &state, int pass)
 	if (mPrimIndices.Size() == 0)
 	{
 		mPrimIndices.Resize(2 * lines.Size());
-		
+
 		for (unsigned int i = 0; i < lines.Size(); i++)
 		{
 			mPrimIndices[i * 2] = lines[i].vertindex;
@@ -208,7 +208,7 @@ void HWPortal::DrawPortalStencil(FRenderState &state, int pass)
 		}
 
 	}
-	
+
 	for (unsigned int i = 0; i < mPrimIndices.Size(); i += 2)
 	{
 		state.Draw(DT_TriangleFan, mPrimIndices[i], mPrimIndices[i + 1], i == 0);
@@ -243,7 +243,7 @@ void HWPortal::SetupStencil(HWDrawInfo *di, FRenderState &state, bool usestencil
 	Clocker c(PortalAll);
 
 	rendered_portals++;
-	
+
 	if (usestencil)
 	{
 		// Create stencil
@@ -253,20 +253,20 @@ void HWPortal::SetupStencil(HWDrawInfo *di, FRenderState &state, bool usestencil
 		state.EnableTexture(false);
 		state.ResetColor();
 		state.SetDepthFunc(DF_Less);
-			
+
 		if (NeedDepthBuffer())
 		{
 			state.SetDepthMask(false);							// don't write to Z-buffer!
-				
+
 			DrawPortalStencil(state, STP_Stencil);
-				
+
 			// Clear Z-buffer
 			state.SetStencil(1, SOP_Keep); // draw sky into stencil. This stage doesn't modify the stencil.
 			state.SetDepthMask(true);							// enable z-buffer again
 			state.SetDepthRange(1, 1);
 			state.SetDepthFunc(DF_Always);
 			DrawPortalStencil(state, STP_DepthClear);
-				
+
 			// set normal drawing mode
 			state.EnableTexture(true);
 			state.SetDepthRange(0, 1);
@@ -278,7 +278,7 @@ void HWPortal::SetupStencil(HWDrawInfo *di, FRenderState &state, bool usestencil
 		{
 			// No z-buffer is needed therefore we can skip all the complicated stuff that is involved
 			// Note: We must draw the stencil with z-write enabled here because there is no second pass!
-				
+
 			state.SetDepthMask(true);
 			DrawPortalStencil(state, STP_AllInOne);
 			state.SetStencil(1, SOP_Keep); // draw sky into stencil. This stage doesn't modify the stencil.
@@ -289,8 +289,8 @@ void HWPortal::SetupStencil(HWDrawInfo *di, FRenderState &state, bool usestencil
 			state.SetDepthMask(false);							// don't write to Z-buffer!
 		}
 		screen->stencilValue++;
-		
-		
+
+
 	}
 	else
 	{
@@ -320,12 +320,12 @@ void HWPortal::RemoveStencil(HWDrawInfo *di, FRenderState &state, bool usestenci
 
 	if (usestencil)
 	{
-		
+
 		state.SetColorMask(false);						// no graphics
 		state.SetEffect(EFF_NONE);
 		state.ResetColor();
 		state.EnableTexture(false);
-		
+
 		if (needdepth)
 		{
 			// first step: reset the depth buffer to max. depth
@@ -337,20 +337,20 @@ void HWPortal::RemoveStencil(HWDrawInfo *di, FRenderState &state, bool usestenci
 		{
 			state.EnableDepthTest(true);
 		}
-		
+
 		// second step: restore the depth buffer to the previous values and reset the stencil
 		state.SetDepthFunc(DF_LEqual);
 		state.SetDepthRange(0, 1);
 		state.SetStencil(0, SOP_Decrement);
 		DrawPortalStencil(state, STP_DepthRestore);
 		state.SetDepthFunc(DF_Less);
-		
-		
+
+
 		state.EnableTexture(true);
 		state.SetEffect(EFF_NONE);
 		state.SetColorMask(true);
 		screen->stencilValue--;
-		
+
 		// restore old stencil op.
 		state.SetStencil(0, SOP_Keep);
 	}
@@ -365,10 +365,10 @@ void HWPortal::RemoveStencil(HWDrawInfo *di, FRenderState &state, bool usestenci
 			state.EnableDepthTest(true);
 			state.SetDepthMask(true);
 		}
-		
+
 		// This draws a valid z-buffer into the stencil's contents to ensure it
 		// doesn't get overwritten by the level's geometry.
-		
+
 		state.ResetColor();
 		state.SetDepthFunc(DF_LEqual);
 		state.SetDepthRange(0, 1);
@@ -396,9 +396,9 @@ void HWScenePortalBase::DrawContents(HWDrawInfo* di, FRenderState& state)
 	if (Setup(di, state, di->mClipper))
 	{
 		auto type = GetType();
-		gi->EnterPortal(di->Viewpoint.CameraSprite, type);
+		gi->EnterPortal(di->Viewpoint.CameraActor, type);
 		di->DrawScene(DM_PORTAL, type == PORTAL_SECTOR_CEILING);
-		gi->LeavePortal(di->Viewpoint.CameraSprite, type);
+		gi->LeavePortal(di->Viewpoint.CameraActor, type);
 		Shutdown(di, state);
 	}
 	else state.ClearScreen();
@@ -481,7 +481,7 @@ int HWLinePortal::ClipSector(sectortype *sub)
 	// this seg is completely behind the mirror
 	for (int i = 0; i<sub->wallnum; i++)
 	{
-		if (PointOnLineSide(WallStart(&wall[sub->wallptr]), line) == 0) return PClip_Inside;
+		if (PointOnLineSide(WallStart(sub->firstWall()), line) == 0) return PClip_Inside;
 	}
 	return PClip_InFront;
 }
@@ -524,22 +524,21 @@ bool HWMirrorPortal::Setup(HWDrawInfo *di, FRenderState &rstate, Clipper *clippe
 
 	di->mClipPortal = this;
 
-	int x = line->x;
-	int y = line->y;
-	int dx = wall[line->point2].x - x;
-	int dy = wall[line->point2].y - y;
+	double x = line->pos.X;
+	double y = line->pos.Y;
+	double dx = line->point2Wall()->pos.X - x;
+	double dy = line->point2Wall()->pos.Y - y;
 
-	// this can overflow so use 64 bit math.
-	const int64_t j = int64_t(dx) * dx + int64_t(dy) * dy;
+	const double j = dx * dx + dy * dy;
 	if (j == 0)
 		return false;
 
-	vec2_t view = { int(vp.Pos.X * 16), int(vp.Pos.Y * -16) };
+	DVector2 view = { vp.Pos.X, -vp.Pos.Y };
 
-	int64_t i = ((int64_t(view.x) - x) * dx + (int64_t(view.y) - y) * dy) << 1;
+	double i = ((view.X - x) * dx + (view.Y - y) * dy) * 2;
 
-	int newx = int((x << 1) + Scale(dx, i, j) - view.x);
-	int newy = int((y << 1) + Scale(dy, i, j) - view.y);
+	double newx = x * 2 + dx * i / j - view.X;
+	double newy = y * 2 + dy * i / j - view.Y;
 
 	auto myan = bvectangbam(dx, dy);
 	auto newan = myan + myan - bamang(vp.RotAngle);
@@ -548,8 +547,8 @@ bool HWMirrorPortal::Setup(HWDrawInfo *di, FRenderState &rstate, Clipper *clippe
 	vp.SectNums = nullptr;
 	vp.SectCount = line->sector;
 
-	vp.Pos.X = newx / 16.f;
-	vp.Pos.Y = newy / -16.f;
+	vp.Pos.X = newx;
+	vp.Pos.Y = -newy;
 	vp.HWAngles.Yaw = -90.f + newan.asdeg();
 
 	double FocalTangent = tan(vp.FieldOfView.Radians() / 2);
@@ -561,11 +560,12 @@ bool HWMirrorPortal::Setup(HWDrawInfo *di, FRenderState &rstate, Clipper *clippe
 	state->MirrorFlag++;
 	di->SetClipLine(line);
 	di->SetupView(rstate, vp.Pos.X, vp.Pos.Y, vp.Pos.Z, !!(state->MirrorFlag & 1), !!(state->PlaneMirrorFlag & 1));
+	  
 
 	ClearClipper(di, clipper);
 
-	auto startan = bvectangbam(line->x - newx, line->y - newy);
-	auto endan = bvectangbam(wall[line->point2].x - newx, wall[line->point2].y - newy);
+	auto startan = bvectangbam(line->pos.X - newx, line->pos.Y - newy);
+	auto endan = bvectangbam(line->point2Wall()->pos.X - newx, line->point2Wall()->pos.Y - newy);
 	clipper->RestrictVisibleRange(endan, startan);  // we check the line from the backside so angles are reversed.
 	return true;
 }
@@ -608,10 +608,10 @@ bool HWLineToLinePortal::Setup(HWDrawInfo *di, FRenderState &rstate, Clipper *cl
 	DVector2 npos = vp.Pos - srccenter + destcenter;
 
 #if 0 // Blood does not rotate these. Needs map checking to make sure it can be added.
-	int dx = wall[origin->point2].x - origin->x;
-	int dy = wall[origin->point2].y - origin->y;
-	int dx2 = wall[line->point2].x - line->x;
-	int dy2 = wall[line->point2].y - line->y;
+	int dx = origin->point2Wall()->x - origin->x;
+	int dy = origin->point2Wall()->y - origin->y;
+	int dx2 = line->point2Wall()->x - line->x;
+	int dy2 = line->point2Wall()->y - line->y;
 
 	auto srcang = bvectangbam(dx, dy);
 	auto destang = bvectangbam(-dx, -dy);
@@ -631,11 +631,11 @@ bool HWLineToLinePortal::Setup(HWDrawInfo *di, FRenderState &rstate, Clipper *cl
 
 	di->SetClipLine(line);
 	di->SetupView(rstate, vp.Pos.X, vp.Pos.Y, vp.Pos.Z, !!(state->MirrorFlag & 1), !!(state->PlaneMirrorFlag & 1));
-	
+
 	ClearClipper(di, clipper);
 
-	auto startan = bvectangbam(origin->x - origx, origin->y - origy);
-	auto endan = bvectangbam(wall[origin->point2].x - origx, wall[origin->point2].y - origy);
+	auto startan = bvectangbam(origin->wall_int_pos().X - origx, origin->wall_int_pos().Y - origy);
+	auto endan = bvectangbam(origin->point2Wall()->wall_int_pos().X - origx, origin->point2Wall()->wall_int_pos().Y - origy);
 	clipper->RestrictVisibleRange(startan, endan);
 	return true;
 }
@@ -670,24 +670,24 @@ bool HWLineToSpritePortal::Setup(HWDrawInfo* di, FRenderState& rstate, Clipper* 
 	di->mClipPortal = this;
 
 	auto srccenter = (WallStart(origin) + WallEnd(origin)) / 2;
-	DVector2 destcenter ={ camera->x / 16.f, camera->y / -16.f };
+	DVector2 destcenter ={ camera->spr.pos.X / 16.f, camera->spr.pos.Y / -16.f };
 	DVector2 npos = vp.Pos - srccenter + destcenter;
 
-	int origx = vp.Pos.X * 16;
-	int origy = vp.Pos.Y * -16;
+	double origx = vp.Pos.X;
+	double origy = vp.Pos.Y;
 
 	vp.SectNums = nullptr;
-	vp.SectCount = camera->sectnum;
+	vp.SectCount = camera->sectno();
 	vp.Pos.X = npos.X;
 	vp.Pos.Y = npos.Y;
 
 	di->SetClipLine(line);
 	di->SetupView(rstate, vp.Pos.X, vp.Pos.Y, vp.Pos.Z, !!(state->MirrorFlag & 1), !!(state->PlaneMirrorFlag & 1));
-	
+
 	ClearClipper(di, clipper);
 
-	auto startan = bvectangbam(origin->x - origx, origin->y - origy);
-	auto endan = bvectangbam(wall[origin->point2].x - origx, wall[origin->point2].y - origy);
+	auto startan = bvectangbam(origin->pos.X - origx, origin->pos.Y - origy);
+	auto endan = bvectangbam(origin->point2Wall()->pos.X - origx, origin->point2Wall()->pos.Y - origy);
 	clipper->RestrictVisibleRange(startan, endan);
 	return true;
 }

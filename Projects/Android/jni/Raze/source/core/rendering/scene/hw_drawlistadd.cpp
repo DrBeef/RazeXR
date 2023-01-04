@@ -53,7 +53,7 @@ void HWDrawInfo::AddWall(HWWall *wall)
 		else if (wall->Sprite == nullptr) list = GLDL_MASKEDWALLS;
 		else if (wall->glseg.x1 == wall->glseg.x2) list = GLDL_MASKEDWALLSV;
 		else if (wall->glseg.y1 == wall->glseg.y2) list = GLDL_MASKEDWALLSH;
-		else list = GLDL_MASKEDWALLSS;
+		else list = wall->walldist? GLDL_MASKEDWALLSD : GLDL_MASKEDWALLSS;
 		auto newwall = drawlists[list].NewWall();
 		*newwall = *wall;
 	}
@@ -94,17 +94,19 @@ void HWDrawInfo::AddMirrorSurface(HWWall *w)
 void HWDrawInfo::AddFlat(HWFlat *flat)
 {
 	int list;;
+	bool slopespr = false;
 
 	if (flat->RenderStyle != LegacyRenderStyles[STYLE_Translucent] || flat->alpha < 1.f - FLT_EPSILON || checkTranslucentReplacement(flat->texture->GetID(), flat->palette))
 	{
 		// translucent portals go into the translucent border list.
 		list = flat->Sprite? GLDL_TRANSLUCENT : GLDL_TRANSLUCENTBORDER;
+		slopespr = !!(flat->Sprite);//&& flat->Sprite->clipdist& TSPR_SLOPESPRITE);
 	}
 	else
 	{
-		list = flat->Sprite ? GLDL_MASKEDFLATS : GLDL_PLAINFLATS;
+		list = flat->Sprite ? ((flat->Sprite->clipdist & TSPR_SLOPESPRITE)? GLDL_MASKEDSLOPEFLATS : GLDL_MASKEDFLATS) : GLDL_PLAINFLATS;
 	}
-	auto newflat = drawlists[list].NewFlat();
+	auto newflat = drawlists[list].NewFlat(slopespr);
 	*newflat = *flat;
 }
 
@@ -119,7 +121,7 @@ void HWDrawInfo::AddSprite(HWSprite *sprite, bool translucent)
 	int list;
 	if (translucent || sprite->modelframe == 0) list = GLDL_TRANSLUCENT;
 	else list = GLDL_MODELS;
-	
+
 	auto newsprt = drawlists[list].NewSprite();
 	*newsprt = *sprite;
 }

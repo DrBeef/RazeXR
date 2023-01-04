@@ -41,15 +41,14 @@ BEGIN_SW_NS
 
 void ReverseSlidor(DSWActor* actor)
 {
-    USERp u = actor->u();
-    ROTATORp r;
+    ROTATOR* r;
 
-    r = u->rotator.Data();
+    r = actor->user.rotator.Data();
 
     // if paused go ahead and start it up again
-    if (u->Tics)
+    if (actor->user.Tics)
     {
-        u->Tics = 0;
+        actor->user.Tics = 0;
         SetSlidorActive(actor);
         return;
     }
@@ -70,18 +69,15 @@ void ReverseSlidor(DSWActor* actor)
 
 bool SlidorSwitch(short match, short setting)
 {
-    SPRITEp sp;
     bool found = false;
 
     SWStatIterator it(STAT_DEFAULT);
     while (auto actor = it.Next())
     {
-        sp = &actor->s();
-
-        if (sp->lotag == TAG_SPRITE_SWITCH_VATOR && sp->hitag == match)
+        if (actor->spr.lotag == TAG_SPRITE_SWITCH_VATOR && actor->spr.hitag == match)
         {
             found = true;
-            AnimateSwitch(sp, setting);
+            AnimateSwitch(actor, setting);
         }
     }
 
@@ -90,46 +86,41 @@ bool SlidorSwitch(short match, short setting)
 
 void SetSlidorActive(DSWActor* actor)
 {
-    USERp u = actor->u();
-    SPRITEp sp = &actor->s();
-    ROTATORp r;
+    ROTATOR* r;
 
-    r = u->rotator.Data();
+    r = actor->user.rotator.Data();
 
     DoSlidorInterp(actor, StartInterpolation);
 
     // play activate sound
-    DoSoundSpotMatch(SP_TAG2(sp), 1, SOUND_OBJECT_TYPE);
+    DoSoundSpotMatch(SP_TAG2(actor), 1, SOUND_OBJECT_TYPE);
 
-    SET(u->Flags, SPR_ACTIVE);
-    u->Tics = 0;
+    actor->user.Flags |= (SPR_ACTIVE);
+    actor->user.Tics = 0;
 
     // moving to the OFF position
     if (r->tgt == 0)
-        VatorSwitch(SP_TAG2(sp), OFF);
+        VatorSwitch(SP_TAG2(actor), false);
     else
-        VatorSwitch(SP_TAG2(sp), ON);
+        VatorSwitch(SP_TAG2(actor), true);
 }
 
 void SetSlidorInactive(DSWActor* actor)
 {
-    USERp u = actor->u();
-    SPRITEp sp = &actor->s();
-
     DoSlidorInterp(actor, StopInterpolation);
 
     // play inactivate sound
-    DoSoundSpotMatch(SP_TAG2(sp), 2, SOUND_OBJECT_TYPE);
+    DoSoundSpotMatch(SP_TAG2(actor), 2, SOUND_OBJECT_TYPE);
 
-    RESET(u->Flags, SPR_ACTIVE);
+    actor->user.Flags &= ~(SPR_ACTIVE);
 }
 
 // called for operation from the space bar
-void DoSlidorOperate(PLAYERp pp, short sectnum)
+void DoSlidorOperate(PLAYER* pp, sectortype* sect)
 {
     short match;
 
-    match = sector[sectnum].hitag;
+    match = sect->hitag;
 
 
     if (match > 0)
@@ -141,44 +132,34 @@ void DoSlidorOperate(PLAYERp pp, short sectnum)
 
 // called from switches and triggers
 // returns first vator found
-void DoSlidorMatch(PLAYERp pp, short match, bool manual)
+void DoSlidorMatch(PLAYER* pp, short match, bool manual)
 {
-    USERp fu;
-    SPRITEp fsp;
-    short sectnum;
-
     SWStatIterator it(STAT_SLIDOR);
     while (auto actor = it.Next())
     {
-        fsp = &actor->s();
-
-        if (SP_TAG1(fsp) == SECT_SLIDOR && SP_TAG2(fsp) == match)
+        if (SP_TAG1(actor) == SECT_SLIDOR && SP_TAG2(actor) == match)
         {
-            fu = actor->u();
-
             // single play only vator
             // bool 8 must be set for message to display
-            if (TEST_BOOL4(fsp) && (gNet.MultiGameType == MULTI_GAME_COMMBAT || gNet.MultiGameType == MULTI_GAME_AI_BOTS))
+            if (TEST_BOOL4(actor) && (gNet.MultiGameType == MULTI_GAME_COMMBAT || gNet.MultiGameType == MULTI_GAME_AI_BOTS))
             {
-                if (pp && TEST_BOOL11(fsp)) PutStringInfo(pp, GStrings("TXTS_SPONLY"));
+                if (pp && TEST_BOOL11(actor)) PutStringInfo(pp, GStrings("TXTS_SPONLY"));
                 continue;
             }
 
             // switch trigger only
-            if (SP_TAG3(fsp) == 1)
+            if (SP_TAG3(actor) == 1)
             {
                 // tried to manually operat a switch/trigger only
                 if (manual)
                     continue;
             }
 
-            sectnum = fsp->sectnum;
+            auto sect = actor->sector();
 
-            if (pp && SectUser[sectnum].Data() && SectUser[sectnum]->stag == SECT_LOCK_DOOR && SectUser[sectnum]->number)
+            if (pp && sect->hasU() && sect->stag == SECT_LOCK_DOOR && sect->number)
             {
-                short key_num;
-
-                key_num = SectUser[sectnum]->number;
+                int key_num = sect->number;
 
                 {
                     PutStringInfo(pp, quoteMgr.GetQuote(QUOTE_DOORMSG + key_num - 1));
@@ -186,7 +167,7 @@ void DoSlidorMatch(PLAYERp pp, short match, bool manual)
                 }
             }
 
-            if (TEST(fu->Flags, SPR_ACTIVE))
+            if (actor->user.Flags & (SPR_ACTIVE))
             {
                 ReverseSlidor(actor);
                 continue;
@@ -200,23 +181,16 @@ void DoSlidorMatch(PLAYERp pp, short match, bool manual)
 
 bool TestSlidorMatchActive(short match)
 {
-    USERp fu;
-    SPRITEp fsp;
-
     SWStatIterator it(STAT_SLIDOR);
     while (auto actor = it.Next())
     {
-        fsp = &actor->s();
-
-        if (SP_TAG1(fsp) == SECT_SLIDOR && SP_TAG2(fsp) == match)
+        if (SP_TAG1(actor) == SECT_SLIDOR && SP_TAG2(actor) == match)
         {
-            fu = actor->u();
-
             // Does not have to be inactive to be operated
-            if (TEST_BOOL6(fsp))
+            if (TEST_BOOL6(actor))
                 continue;
 
-            if (TEST(fu->Flags, SPR_ACTIVE) || fu->Tics)
+            if (actor->user.Flags & (SPR_ACTIVE) || actor->user.Tics)
                 return true;
         }
     }
@@ -226,162 +200,91 @@ bool TestSlidorMatchActive(short match)
 
 void DoSlidorInterp(DSWActor* actor, INTERP_FUNC interp_func)
 {
-    auto sp = &actor->s();
-    short w, pw, startwall, endwall;
+    auto sect = actor->sector();
 
-    w = startwall = sector[sp->sectnum].wallptr;
-    endwall = startwall + sector[sp->sectnum].wallnum - 1;
-
+    // this code is just weird.
+    auto startWall = sect->firstWall();
+    auto endWall = sect->lastWall();
+    auto wal = startWall;
     do
     {
-        switch (wall[w].lotag)
+        EInterpolationType type = Interp_Invalid;;
+        switch (wal->lotag)
         {
         case TAG_WALL_SLIDOR_LEFT:
-        {
-            // prev wall
-            pw = w - 1;
-            if (w < startwall)
-                pw = endwall;
-
-            uint16_t const nextwall = wall[w].nextwall;
-            if (!validWallIndex(nextwall))
-            {
-                // white wall - move 4 points
-                interp_func(w, Interp_Wall_X);
-                interp_func(pw, Interp_Wall_X);
-                interp_func(wall[w].point2, Interp_Wall_X);
-                interp_func(wall[wall[w].point2].point2, Interp_Wall_X);
-            }
-            else
-            {
-                // red wall - move 2 points
-                interp_func(w, Interp_Wall_X);
-                interp_func(wall[nextwall].point2, Interp_Wall_X);
-                interp_func(wall[w].point2, Interp_Wall_X);
-                interp_func(wall[wall[wall[w].point2].nextwall].point2, Interp_Wall_X);
-            }
-
-            break;
-        }
-
         case TAG_WALL_SLIDOR_RIGHT:
+            type = Interp_Wall_X;
+            break;
+        case TAG_WALL_SLIDOR_UP:
+        case TAG_WALL_SLIDOR_DOWN:
+            type = Interp_Wall_Y;
+            break;
+        }
+        if (type != Interp_Invalid)
         {
-            // prev wall
-            pw = w - 1;
-            if (w < startwall)
-                pw = endwall;
+            auto pwal = wal - 1;
+            if (wal < startWall) // original code - this makes no sense as in a correctly formed sector this condition is never true.
+                pwal = endWall;
 
-            uint16_t const nextwall = wall[w].nextwall;
-            if (!validWallIndex(nextwall))
+            // prev wall
+            if (!wal->twoSided())
             {
                 // white wall - move 4 points
-                interp_func(w, Interp_Wall_X);
-                interp_func(pw, Interp_Wall_X);
-                interp_func(wall[w].point2, Interp_Wall_X);
-                interp_func(wall[wall[w].point2].point2, Interp_Wall_X);
+                interp_func(wal, type);
+                interp_func(pwal, type);
+                interp_func(wal->point2Wall(), type);
+                interp_func(wal->point2Wall()->point2Wall(), type);
             }
             else
             {
                 // red wall - move 2 points
-                interp_func(w, Interp_Wall_X);
-                interp_func(wall[nextwall].point2, Interp_Wall_X);
-                interp_func(wall[w].point2, Interp_Wall_X);
-                interp_func(wall[wall[wall[w].point2].nextwall].point2, Interp_Wall_X);
+                interp_func(wal, type);
+                interp_func(wal->nextWall()->point2Wall(), type);
+                interp_func(wal->point2Wall(), type);
+                if (wal->point2Wall()->twoSided())
+                    interp_func(wal->point2Wall()->nextWall()->point2Wall(), type);
             }
-
-            break;
         }
-
-        case TAG_WALL_SLIDOR_UP:
-        {
-            // prev wall
-            pw = w - 1;
-            if (w < startwall)
-                pw = endwall;
-
-            uint16_t const nextwall = wall[w].nextwall;
-            if (!validWallIndex(nextwall))
-            {
-                interp_func(w, Interp_Wall_Y);
-                interp_func(pw, Interp_Wall_Y);
-                interp_func(wall[w].point2, Interp_Wall_Y);
-                interp_func(wall[wall[w].point2].point2, Interp_Wall_Y);
-            }
-            else
-            {
-                interp_func(w, Interp_Wall_Y);
-                interp_func(wall[nextwall].point2, Interp_Wall_Y);
-                interp_func(wall[w].point2, Interp_Wall_Y);
-                interp_func(wall[wall[wall[w].point2].nextwall].point2, Interp_Wall_Y);
-            }
-
-            break;
-        }
-
-        case TAG_WALL_SLIDOR_DOWN:
-        {
-            // prev wall
-            pw = w - 1;
-            if (w < startwall)
-                pw = endwall;
-
-            uint16_t const nextwall = wall[w].nextwall;
-            if (!validWallIndex(nextwall))
-            {
-                interp_func(w, Interp_Wall_Y);
-                interp_func(pw, Interp_Wall_Y);
-                interp_func(wall[w].point2, Interp_Wall_Y);
-                interp_func(wall[wall[w].point2].point2, Interp_Wall_Y);
-            }
-            else
-            {
-                interp_func(w, Interp_Wall_Y);
-                interp_func(wall[nextwall].point2, Interp_Wall_Y);
-                interp_func(wall[w].point2, Interp_Wall_Y);
-                interp_func(wall[wall[wall[w].point2].nextwall].point2, Interp_Wall_Y);
-            }
-
-            break;
-        }
-        }
-
-        w = wall[w].point2;
+        wal = wal->point2Wall();
     }
-    while (w != startwall);
+    while (wal != startWall);
 }
 
-int DoSlidorMoveWalls(DSWActor* actor, int amt)
+int DoSlidorMoveWalls(DSWActor* actor, double amt)
 {
-    auto sp = &actor->s();
-    short w, pw, startwall, endwall;
+    auto sect = actor->sector();
 
-    w = startwall = sector[sp->sectnum].wallptr;
-    endwall = startwall + sector[sp->sectnum].wallnum - 1;
+    // this code is just weird.
+    auto startWall = sect->firstWall();
+    auto endWall = sect->lastWall();
+    auto wal = startWall;
+    walltype* pwal;
 
     do
     {
-        switch (wall[w].lotag)
+        switch (wal->lotag)
         {
         case TAG_WALL_SLIDOR_LEFT:
 
             // prev wall
-            pw = w - 1;
-            if (w < startwall)
-                pw = endwall;
+            pwal = wal - 1;
+            if (wal < startWall) // original code - this makes no sense as in a correctly formed sector this condition is never true.
+                pwal = endWall;
 
-            if (!validWallIndex(wall[w].nextwall))
+            if (!wal->twoSided())
             {
                 // white wall - move 4 points
-                wall[w].x -= amt;
-                wall[pw].x -= amt;
-                wall[wall[w].point2].x -= amt;
-                wall[wall[wall[w].point2].point2].x -= amt;
+                wal->move({ wal->pos.X - amt, wal->pos.Y });
+                pwal->move({ pwal->pos.X - amt, pwal->pos.Y });
+                wal->point2Wall()->move({ wal->point2Wall()->pos.X - amt, wal->point2Wall()->pos.Y });
+                auto pwal2 = wal->point2Wall()->point2Wall();
+                pwal2->move({ pwal2->pos.X - amt, pwal2->pos.Y });
             }
             else
             {
                 // red wall - move 2 points
-                dragpoint(w, wall[w].x - amt, wall[w].y);
-                dragpoint(wall[w].point2, wall[wall[w].point2].x - amt, wall[wall[w].point2].y);
+                dragpoint(wal, { wal->pos.X - amt, wal->pos.Y });
+                dragpoint(wal->point2Wall(), { wal->point2Wall()->pos.X - amt, wal->point2Wall()->pos.Y });
             }
 
             break;
@@ -389,23 +292,24 @@ int DoSlidorMoveWalls(DSWActor* actor, int amt)
         case TAG_WALL_SLIDOR_RIGHT:
 
             // prev wall
-            pw = w - 1;
-            if (w < startwall)
-                pw = endwall;
+            pwal = wal - 1;
+            if (wal < startWall) // original code - this makes no sense as in a correctly formed sector this condition is never true.
+                pwal = endWall;
 
-            if (!validWallIndex(wall[w].nextwall))
+            if (!wal->twoSided())
             {
                 // white wall - move 4 points
-                wall[w].x += amt;
-                wall[pw].x += amt;
-                wall[wall[w].point2].x += amt;
-                wall[wall[wall[w].point2].point2].x += amt;
+                wal->move({ wal->pos.X + amt, wal->pos.Y });
+                pwal->move({ pwal->pos.X + amt, pwal->pos.Y });
+                wal->point2Wall()->move({ wal->point2Wall()->pos.X + amt, wal->point2Wall()->pos.Y });
+                auto pwal2 = wal->point2Wall()->point2Wall();
+                pwal2->move({ pwal2->pos.X + amt, pwal2->pos.Y });
             }
             else
             {
                 // red wall - move 2 points
-                dragpoint(w, wall[w].x + amt, wall[w].y);
-                dragpoint(wall[w].point2, wall[wall[w].point2].x + amt, wall[wall[w].point2].y);
+                dragpoint(wal, { wal->pos.X + amt, wal->pos.Y });
+                dragpoint(wal->point2Wall(), { wal->point2Wall()->pos.X + amt, wal->point2Wall()->pos.Y });
             }
 
             break;
@@ -413,21 +317,22 @@ int DoSlidorMoveWalls(DSWActor* actor, int amt)
         case TAG_WALL_SLIDOR_UP:
 
             // prev wall
-            pw = w - 1;
-            if (w < startwall)
-                pw = endwall;
+            pwal = wal - 1;
+            if (wal < startWall) // original code - this makes no sense as in a correctly formed sector this condition is never true.
+                pwal = endWall;
 
-            if (!validWallIndex(wall[w].nextwall))
+            if (!wal->twoSided())
             {
-                wall[w].y -= amt;
-                wall[pw].y -= amt;
-                wall[wall[w].point2].y -= amt;
-                wall[wall[wall[w].point2].point2].y -= amt;
+                wal->move({ wal->pos.X, wal->pos.Y - amt });
+                pwal->move({ pwal->pos.X, pwal->pos.Y - amt });
+                wal->point2Wall()->move({ wal->point2Wall()->pos.X, wal->point2Wall()->pos.Y - amt });
+                auto pwal2 = wal->point2Wall()->point2Wall();
+                pwal2->move({ pwal2->pos.X, pwal2->pos.Y - amt });
             }
             else
             {
-                dragpoint(w, wall[w].x, wall[w].y - amt);
-                dragpoint(wall[w].point2, wall[wall[w].point2].x, wall[wall[w].point2].y - amt);
+                dragpoint(wal, { wal->pos.X, wal->pos.Y - amt });
+                dragpoint(wal->point2Wall(), { wal->point2Wall()->pos.X, wal->point2Wall()->pos.Y - amt });
             }
 
             break;
@@ -435,70 +340,71 @@ int DoSlidorMoveWalls(DSWActor* actor, int amt)
         case TAG_WALL_SLIDOR_DOWN:
 
             // prev wall
-            pw = w - 1;
-            if (w < startwall)
-                pw = endwall;
+            pwal = wal - 1;
+            if (wal < startWall) // original code - this makes no sense as in a correctly formed sector this condition is never true.
+                pwal = endWall;
 
-            if (!validWallIndex(wall[w].nextwall))
+            if (!wal->twoSided())
             {
-                wall[w].y += amt;
-                wall[pw].y += amt;
-                wall[wall[w].point2].y += amt;
-                wall[wall[wall[w].point2].point2].y += amt;
+                wal->move({ wal->pos.X, wal->pos.Y + amt });
+                pwal->move({ pwal->pos.X, pwal->pos.Y + amt });
+                wal->point2Wall()->move({ wal->point2Wall()->pos.X, wal->point2Wall()->pos.Y + amt });
+                auto pwal2 = wal->point2Wall()->point2Wall();
+                pwal2->move({ pwal2->pos.X, pwal2->pos.Y + amt });
             }
             else
             {
-                dragpoint(w, wall[w].x, wall[w].y + amt);
-                dragpoint(wall[w].point2, wall[wall[w].point2].x, wall[wall[w].point2].y + amt);
+                dragpoint(wal, { wal->pos.X, wal->pos.Y + amt });
+                dragpoint(wal->point2Wall(), { wal->point2Wall()->pos.X, wal->point2Wall()->pos.Y + amt });
             }
 
 
             break;
         }
 
-        w = wall[w].point2;
+
+        wal = wal->point2Wall();
     }
-    while (w != startwall);
+    while (wal != startWall);
 
     return 0;
 }
 
 int DoSlidorInstantClose(DSWActor* actor)
 {
-    SPRITEp sp = &actor->s();
-    short w, startwall;
-    int diff;
+    double diff;
 
-    w = startwall = sector[sp->sectnum].wallptr;
+    auto startwall = actor->sector()->firstWall();
+    auto wal = startwall;
 
     do
     {
-        switch (wall[w].lotag)
+        switch (wal->lotag)
         {
         case TAG_WALL_SLIDOR_LEFT:
-            diff = wall[w].x - sp->x;
+            diff = wal->pos.X - actor->float_pos().X;
             DoSlidorMoveWalls(actor, diff);
             break;
 
         case TAG_WALL_SLIDOR_RIGHT:
-            diff = wall[w].x - sp->x;
+            diff = wal->pos.X - actor->float_pos().X;
             DoSlidorMoveWalls(actor, -diff);
             break;
 
         case TAG_WALL_SLIDOR_UP:
-            diff = wall[w].y - sp->y;
+            diff = wal->pos.Y - actor->float_pos().Y;
             DoSlidorMoveWalls(actor, diff);
             break;
 
         case TAG_WALL_SLIDOR_DOWN:
-            diff = wall[w].y - sp->y;
+            diff = wal->pos.Y - actor->float_pos().Y;
             DoSlidorMoveWalls(actor, -diff);
             break;
         }
 
-        w = wall[w].point2;
+        wal = wal->point2Wall();
     }
-    while (w != startwall);
+    while (wal != startwall);
 
     return 0;
 }
@@ -506,13 +412,11 @@ int DoSlidorInstantClose(DSWActor* actor)
 
 int DoSlidor(DSWActor* actor)
 {
-    USERp u = actor->u();
-    SPRITEp sp = &actor->s();
-    ROTATORp r;
+    ROTATOR* r;
     int old_pos;
     bool kill = false;
 
-    r = u->rotator.Data();
+    r = actor->user.rotator.Data();
 
     // Example - ang pos moves from 0 to 512 <<OR>> from 0 to -512
 
@@ -551,18 +455,18 @@ int DoSlidor(DSWActor* actor)
             r->vel = -r->vel;
             SetSlidorInactive(actor);
 
-            if (SP_TAG6(sp) && !TEST_BOOL8(sp))
-                DoMatchEverything(nullptr, SP_TAG6(sp), -1);
+            if (SP_TAG6(actor) && !TEST_BOOL8(actor))
+                DoMatchEverything(nullptr, SP_TAG6(actor), -1);
 
             // wait a bit and close it
-            if (u->WaitTics)
-                u->Tics = u->WaitTics;
+            if (actor->user.WaitTics)
+                actor->user.Tics = actor->user.WaitTics;
         }
         else
         // If ang is CLOSED then
         if (r->pos == 0)
         {
-            short match = SP_TAG2(sp);
+            short match = SP_TAG2(actor);
 
             // new tgt is OPEN (open)
             r->speed = r->orig_speed;
@@ -571,7 +475,7 @@ int DoSlidor(DSWActor* actor)
             r->tgt = r->open_dest;
             SetSlidorInactive(actor);
 
-            RESET_BOOL8(sp);
+            RESET_BOOL8(actor);
 
             // set Owner swith back to OFF
             // only if ALL vators are inactive
@@ -580,33 +484,28 @@ int DoSlidor(DSWActor* actor)
                 //SlidorSwitch(match, OFF);
             }
 
-            if (SP_TAG6(sp) && TEST_BOOL8(sp))
-                DoMatchEverything(nullptr, SP_TAG6(sp), -1);
+            if (SP_TAG6(actor) && TEST_BOOL8(actor))
+                DoMatchEverything(nullptr, SP_TAG6(actor), -1);
         }
 
-        if (TEST_BOOL2(sp))
+        if (TEST_BOOL2(actor))
             kill = true;
     }
     else
     {
         // if heading for the OFF (original) position and should NOT CRUSH
-        if (TEST_BOOL3(sp) && r->tgt == 0)
+        if (TEST_BOOL3(actor) && r->tgt == 0)
         {
-            SPRITEp bsp;
-            USERp bu;
             bool found = false;
 
-            SWSectIterator it(sp->sectnum);
+            SWSectIterator it(actor->sector());
             while (auto itActor = it.Next())
             {
-                bsp = &itActor->s();
-                bu = itActor->u();
-
-                if (bu && TEST(bsp->cstat, CSTAT_SPRITE_BLOCK) && TEST(bsp->extra, SPRX_PLAYER_OR_ENEMY))
+                if (itActor->hasU() && (itActor->spr.cstat & CSTAT_SPRITE_BLOCK) && (itActor->spr.extra & SPRX_PLAYER_OR_ENEMY))
                 {
                     // found something blocking so reverse to ON position
                     ReverseSlidor(actor);
-                    SET_BOOL8(sp); // tell vator that something blocking door
+                    SET_BOOL8(actor); // tell vator that something blocking door
                     found = true;
                     break;
                 }
@@ -615,18 +514,18 @@ int DoSlidor(DSWActor* actor)
             if (!found)
             {
                 short pnum;
-                PLAYERp pp;
+                PLAYER* pp;
                 // go ahead and look for players clip box bounds
                 TRAVERSE_CONNECT(pnum)
                 {
                     pp = Player + pnum;
 
-                    if (pp->lo_sectp == &sector[sp->sectnum] ||
-                        pp->hi_sectp == &sector[sp->sectnum])
+                    if (pp->lo_sectp == actor->sector() ||
+                        pp->hi_sectp == actor->sector())
                     {
                         ReverseSlidor(actor);
 
-                        u->vel_rate = -u->vel_rate;
+                        actor->user.vel_rate = -actor->user.vel_rate;
                         found = true;
                     }
                 }
@@ -635,7 +534,7 @@ int DoSlidor(DSWActor* actor)
     }
 
 
-    DoSlidorMoveWalls(actor, r->pos - old_pos);
+    DoSlidorMoveWalls(actor, (r->pos - old_pos) * inttoworld);
 
     if (kill)
     {

@@ -18,7 +18,6 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 
 #pragma once
 
-#include "compat.h"
 #include "v_text.h"
 #include "printf.h"
 #include "gamecvars.h"
@@ -33,6 +32,7 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 #include "gamestruct.h"
 #include "names.h"
 #include "exhumedactor.h"
+#include "serialize_obj.h"
 
 BEGIN_PS_NS
 
@@ -58,8 +58,6 @@ void BlackOut();
 
 void DoGameOverScene(bool finallevel);
 
-int Query(short n, short l, ...);
-
 extern unsigned char curpal[];
 
 void TintPalette(int a, int b, int c);
@@ -81,11 +79,9 @@ void StatusMessage(int messageTime, const char *fmt, ...);
 
 void DoSpiritHead();
 
-void GameTicker();
 void InitLevel(MapRecord*);
 void InitNewGame();
 
-int showmap(short nLevel, short nLevelNew, short nLevelBest);
 void menu_DoPlasma();
 void DoEnergyTile();
 void InitEnergyTile();
@@ -101,50 +97,50 @@ extern int nNetPlayerCount;
 
 extern int nNetTime;
 
-extern short nTotalPlayers;
+extern int nTotalPlayers;
 
-extern short nFontFirstChar;
-extern short nBackgroundPic;
-extern short nShadowPic;
+extern int nFontFirstChar;
+extern int nBackgroundPic;
+extern int nShadowPic;
 
-extern short nCreaturesTotal, nCreaturesKilled;
+extern int nCreaturesTotal, nCreaturesKilled;
 
 extern int lLocalButtons;
 
-extern short nEnergyTowers;
+extern int nEnergyTowers;
 
-extern short nEnergyChan;
+extern int nEnergyChan;
 
-extern DExhumedActor* pSpiritSprite;
+extern TObjPtr<DExhumedActor*> pSpiritSprite;
 
-extern short bInDemo;
+extern bool bInDemo;
 
-extern short nFreeze;
+extern int nFreeze;
 
-extern short nCurBodyNum;
-extern short nBodyTotal;
+extern int nCurBodyNum;
+extern int nBodyTotal;
 
-extern short bSnakeCam;
+extern bool bSnakeCam;
 
-extern short nButtonColor;
+extern int nButtonColor;
 
-extern short nHeadStage;
+extern int nHeadStage;
 
 extern int flash;
 
-extern short nSnakeCam;
+extern int nSnakeCam;
 
-extern short bCoordinates;
+extern bool bCoordinates;
 
 extern int totalmoves;
 
 extern int lCountDown;
-extern short nAlarmTicks;
-extern short nRedTicks;
-extern short nClockVal;
+extern int nAlarmTicks;
+extern int nRedTicks;
+extern int nClockVal;
 
-extern short bSlipMode;
-extern short bDoFlashes;
+extern bool bSlipMode;
+extern bool bDoFlashes;
 
 extern int bVanilla;
 
@@ -175,7 +171,7 @@ class TextOverlay
 {
     FFont* font;
 	double nCrawlY;
-	short nLeft[50];
+	int16_t nLeft[50];
 	int nHeight;
     double lastclock;
 	TArray<FString> screentext;
@@ -229,6 +225,7 @@ struct GameInterface : public ::GameInterface
     void Ticker() override;
     void DrawBackground() override;
     void Render() override;
+    //void DrawWeapons() override;
     void GetInput(ControlInfo* const hidInput, double const scaleAdjust, InputPacket* packet = nullptr) override;
     void Startup() override;
     const char* GenericCheat(int player, int cheat) override;
@@ -244,7 +241,7 @@ struct GameInterface : public ::GameInterface
     int chaseCamX(binangle ang) { return -(ang.bcos() * 3) >> 5; }
     int chaseCamY(binangle ang) { return -(ang.bsin() * 3) >> 5; }
     int chaseCamZ(fixedhoriz horiz) { return (horiz.asq16() * 3) >> 10; }
-    void processSprites(spritetype* tsprite, int& spritesortcnt, int viewx, int viewy, int viewz, binangle viewang, double smoothRatio) override;
+    void processSprites(tspritetype* tsprite, int& spritesortcnt, int viewx, int viewy, int viewz, binangle viewang, double smoothRatio) override;
     int GetCurrentSkill() override;
 
 	::GameStats getStats() override;

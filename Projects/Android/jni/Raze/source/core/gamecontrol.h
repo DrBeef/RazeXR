@@ -34,8 +34,6 @@ extern MapRecord* g_nextmap;
 extern int g_nextskill;	
 extern int g_bossexit;
 
-extern FMemArena dump;	// this is for memory blocks than cannot be deallocated without some huge effort. Put them in here so that they do not register on shutdown.
-
 extern FStringCVar* const CombatMacros[];
 void CONFIG_ReadCombatMacros();
 
@@ -47,6 +45,8 @@ void updatePauseStatus();
 void DeferredStartGame(MapRecord* map, int skill, bool nostopsound = false);
 void ChangeLevel(MapRecord* map, int skill, bool bossexit = false);
 void CompleteLevel(MapRecord* map);
+
+void TITLE_InformName(const char* newname);
 
 struct UserConfig
 {
@@ -194,6 +194,11 @@ inline bool isShareware()
 	return g_gameType & GAMEFLAG_SHAREWARE;
 }
 
+inline bool isDukeLike()
+{
+	return g_gameType & (GAMEFLAG_NAM | GAMEFLAG_NAPALM | GAMEFLAG_WW2GI | GAMEFLAG_DUKE | GAMEFLAG_RRALL);
+}
+
 inline bool isBlood()
 {
 	return g_gameType & GAMEFLAG_BLOOD;
@@ -203,6 +208,12 @@ inline bool isSWALL()
 {
 	return g_gameType & (GAMEFLAG_SW | GAMEFLAG_SWWANTON | GAMEFLAG_SWTWINDRAG);
 }
+
+inline bool isExhumed()
+{
+	return g_gameType & GAMEFLAG_PSEXHUMED;
+}
+
 
 TArray<GrpEntry> GrpScan();
 void S_PauseSound(bool notmusic, bool notsfx);
@@ -254,3 +265,19 @@ enum gameaction_t : int
 	ga_fullconsole,
 };
 extern gameaction_t		gameaction;
+
+struct SpawnRec
+{
+	FName clsname;
+	PClass* cls;
+	int param;
+
+	PClass* Class()
+	{
+		if (!cls && clsname != NAME_None) cls = PClass::FindClass(clsname);
+		clsname = NAME_None;
+		return cls;
+	}
+};
+using SpawnMap = TMap<int, SpawnRec>;
+inline SpawnMap spawnMap;

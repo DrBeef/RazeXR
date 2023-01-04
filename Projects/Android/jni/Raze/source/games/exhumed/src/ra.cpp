@@ -37,6 +37,16 @@ static actionSeq RaSeq[] = {
     {2, 0}
 };
 
+size_t MarkRa()
+{
+    for (auto& r : Ra)
+    {
+        GC::Mark(r.pActor);
+        GC::Mark(r.pTarget);
+    }
+    return 2 * kMaxPlayers;
+}
+
 FSerializer& Serialize(FSerializer& arc, const char* keyname, RA& w, RA* def)
 {
     if (arc.BeginObject(keyname))
@@ -46,8 +56,7 @@ FSerializer& Serialize(FSerializer& arc, const char* keyname, RA& w, RA* def)
             ("sprite", w.pActor)
             ("target", w.pTarget)
             ("run", w.nRun)
-            ("ata", w.field_A)
-            ("atc", w.field_C)
+            ("atc", w.nState)
             ("player", w.nPlayer)
             .EndObject();
     }
@@ -63,36 +72,35 @@ void SerializeRa(FSerializer& arc)
 void FreeRa(int nPlayer)
 {
     int nRun = Ra[nPlayer].nRun;
-    auto pActor = Ra[nPlayer].pActor;
-	auto pSprite = &pActor->s();
+    DExhumedActor* pActor = Ra[nPlayer].pActor;
+    if (!pActor) return;
 
     runlist_SubRunRec(nRun);
-    runlist_DoSubRunRec(pSprite->owner);
-    runlist_FreeRun(pSprite->lotag - 1);
+    runlist_DoSubRunRec(pActor->spr.intowner);
+    runlist_FreeRun(pActor->spr.lotag - 1);
 
     DeleteActor(pActor);
+    Ra[nPlayer] = {};
 }
 
 void BuildRa(int nPlayer)
 {
-    auto pPlayerActor = PlayerList[nPlayer].Actor();
-    auto pPlayerSprite = &pPlayerActor->s();
+    auto pPlayerActor = PlayerList[nPlayer].pActor;
 
-    auto pActor = insertActor(pPlayerSprite->sectnum, 203);
-	auto pSprite = &pActor->s();
+    auto pActor = insertActor(pPlayerActor->sector(), 203);
 
-    pSprite->cstat = 0x8000;
-    pSprite->xvel = 0;
-    pSprite->yvel = 0;
-    pSprite->zvel = 0;
-    pSprite->extra = -1;
-    pSprite->lotag = runlist_HeadRun() + 1;
-    pSprite->hitag = 0;
-    pSprite->owner = runlist_AddRunRec(pSprite->lotag - 1, nPlayer, 0x210000);
-    pSprite->pal = 1;
-    pSprite->xrepeat = 64;
-    pSprite->yrepeat = 64;
-    pSprite->pos = pPlayerSprite->pos;
+    pActor->spr.cstat = CSTAT_SPRITE_INVISIBLE;
+    pActor->spr.xvel = 0;
+    pActor->spr.yvel = 0;
+    pActor->spr.zvel = 0;
+    pActor->spr.extra = -1;
+    pActor->spr.lotag = runlist_HeadRun() + 1;
+    pActor->spr.hitag = 0;
+    pActor->spr.intowner = runlist_AddRunRec(pActor->spr.lotag - 1, nPlayer, 0x210000);
+    pActor->spr.pal = 1;
+    pActor->spr.xrepeat = 64;
+    pActor->spr.yrepeat = 64;
+    pActor->spr.pos = pPlayerActor->spr.pos;
 
 //	GrabTimeSlot(3);
 
@@ -102,7 +110,7 @@ void BuildRa(int nPlayer)
     Ra[nPlayer].pTarget = nullptr;
     Ra[nPlayer].nFrame  = 0;
     Ra[nPlayer].nAction = 0;
-    Ra[nPlayer].field_C = 0;
+    Ra[nPlayer].nState = 0;
     Ra[nPlayer].nPlayer = nPlayer;
 }
 
@@ -113,15 +121,14 @@ void InitRa()
 
 void MoveRaToEnemy(int nPlayer)
 {
-    auto pTarget = Ra[nPlayer].pTarget;
-    auto pActor = Ra[nPlayer].pActor;
-    short nAction = Ra[nPlayer].nAction;
-	auto pSprite = &pActor->s();
+    DExhumedActor* pTarget = Ra[nPlayer].pTarget;
+    DExhumedActor* pActor = Ra[nPlayer].pActor;
+    if (!pActor) return;
+    int nAction = Ra[nPlayer].nAction;
 
     if (pTarget)
     {
-		auto pTargSprite = &pTarget->s();
-        if (!(pTargSprite->cstat & 0x101) || pTargSprite->statnum == MAXSTATUS)
+        if (!(pTarget->spr.cstat & CSTAT_SPRITE_BLOCK_ALL) || pTarget->spr.statnum == MAXSTATUS)
         {
             Ra[nPlayer].pTarget = nullptr;
             if (nAction == 0 || nAction == 3) {
@@ -134,8 +141,8 @@ void MoveRaToEnemy(int nPlayer)
         }
         else
         {
-            if (pSprite->sectnum != pTargSprite->sectnum) {
-                ChangeActorSect(pActor, pTargSprite->sectnum);
+            if (pActor->sector() != pTarget->sector()) {
+                ChangeActorSect(pActor, pTarget->sector());
             }
         }
     }
@@ -152,33 +159,32 @@ void MoveRaToEnemy(int nPlayer)
             return;
         }
 
-        pSprite->cstat = 0x8000;
-        pTarget = PlayerList[nPlayer].Actor();
+        pActor->spr.cstat = CSTAT_SPRITE_INVISIBLE;
+        pTarget = PlayerList[nPlayer].pActor;
     }
-	auto pTargSprite = &pTarget->s();
 
-    pSprite->x = pTargSprite->x;
-    pSprite->y = pTargSprite->y;
-    pSprite->z = pTargSprite->z - GetActorHeight(pTarget);
+    pActor->spr.pos.X = pTarget->spr.pos.X;
+    pActor->spr.pos.Y = pTarget->spr.pos.Y;
+    pActor->spr.pos.Z = pTarget->spr.pos.Z - GetActorHeight(pTarget);
 
-    if (pSprite->sectnum != pTargSprite->sectnum) {
-        ChangeActorSect(pActor, pTargSprite->sectnum);
+    if (pActor->sector() != pTarget->sector()) {
+        ChangeActorSect(pActor, pTarget->sector());
     }
 }
 
 void AIRa::Tick(RunListEvent* ev)
 {
     int nPlayer = RunData[ev->nRun].nObjIndex;
-    short nCurrentWeapon = PlayerList[nPlayer].nCurrentWeapon;
+    int nCurrentWeapon = PlayerList[nPlayer].nCurrentWeapon;
 
-    short nSeq = SeqOffsets[kSeqEyeHit] + RaSeq[Ra[nPlayer].nAction].a;
-    auto pActor = Ra[nPlayer].pActor;
-    auto pSprite = &pActor->s();
+    int nSeq = SeqOffsets[kSeqEyeHit] + RaSeq[Ra[nPlayer].nAction].a;
+    DExhumedActor* pActor = Ra[nPlayer].pActor;
+    if (!pActor) return;
 
     bool bVal = false;
 
     Ra[nPlayer].pTarget = sPlayerInput[nPlayer].pTarget;
-    pSprite->picnum = seq_GetSeqPicnum2(nSeq, Ra[nPlayer].nFrame);
+    pActor->spr.picnum = seq_GetSeqPicnum2(nSeq, Ra[nPlayer].nFrame);
 
     if (Ra[nPlayer].nAction)
     {
@@ -198,13 +204,13 @@ void AIRa::Tick(RunListEvent* ev)
     {
         MoveRaToEnemy(nPlayer);
 
-        if (!Ra[nPlayer].field_C || Ra[nPlayer].pTarget == nullptr)
+        if (!Ra[nPlayer].nState || Ra[nPlayer].pTarget == nullptr)
         {
-            pSprite->cstat = 0x8000;
+            pActor->spr.cstat = CSTAT_SPRITE_INVISIBLE;
         }
         else
         {
-            pSprite->cstat &= 0x7FFF;
+            pActor->spr.cstat &= ~CSTAT_SPRITE_INVISIBLE;
             Ra[nPlayer].nAction = 1;
             Ra[nPlayer].nFrame = 0;
         }
@@ -214,7 +220,7 @@ void AIRa::Tick(RunListEvent* ev)
 
     case 1:
     {
-        if (!Ra[nPlayer].field_C)
+        if (!Ra[nPlayer].nState)
         {
             Ra[nPlayer].nAction = 3;
             Ra[nPlayer].nFrame = 0;
@@ -255,7 +261,7 @@ void AIRa::Tick(RunListEvent* ev)
             {
                 if (PlayerList[nPlayer].nAmmo[kWeaponRing] > 0)
                 {
-                    runlist_DamageEnemy(Ra[nPlayer].pTarget, PlayerList[Ra[nPlayer].nPlayer].Actor(), BulletInfo[kWeaponRing].nDamage);
+                    runlist_DamageEnemy(Ra[nPlayer].pTarget, PlayerList[Ra[nPlayer].nPlayer].pActor, BulletInfo[kWeaponRing].nDamage);
                     AddAmmo(nPlayer, kWeaponRing, -WeaponInfo[kWeaponRing].d);
                     SetQuake(pActor, 100);
                 }
@@ -275,10 +281,10 @@ void AIRa::Tick(RunListEvent* ev)
     {
         if (bVal)
         {
-            pSprite->cstat |= 0x8000;
+            pActor->spr.cstat |= CSTAT_SPRITE_INVISIBLE;
             Ra[nPlayer].nAction = 0;
             Ra[nPlayer].nFrame = 0;
-            Ra[nPlayer].field_C = 0;
+            Ra[nPlayer].nState = 0;
         }
 
         return;
@@ -292,10 +298,10 @@ void AIRa::Tick(RunListEvent* ev)
 void AIRa::Draw(RunListEvent* ev)
 {
     int nPlayer = RunData[ev->nRun].nObjIndex;
-    short nSeq = SeqOffsets[kSeqEyeHit] + RaSeq[Ra[nPlayer].nAction].a;
+    int nSeq = SeqOffsets[kSeqEyeHit] + RaSeq[Ra[nPlayer].nAction].a;
 
     seq_PlotSequence(ev->nParam, nSeq, Ra[nPlayer].nFrame, 1);
-    ev->pTSprite->owner = -1;
+    ev->pTSprite->ownerActor = nullptr;
 }
 
 

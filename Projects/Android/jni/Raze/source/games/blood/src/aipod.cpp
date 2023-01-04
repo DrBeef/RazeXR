@@ -23,7 +23,6 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 
 #include "ns.h"	// Must come before everything else!
 
-#include "compat.h"
 #include "build.h"
 
 #include "blood.h"
@@ -63,21 +62,19 @@ void sub_6FF54(int, DBloodActor* actor)
 
 void podAttack(int, DBloodActor* actor)
 {
-	spritetype* pSprite = &actor->s();
-
 	if (!actor->ValidateTarget(__FUNCTION__)) return;
-	spritetype* pTarget = &actor->GetTarget()->s();
+	auto target = actor->GetTarget();
 
-	DUDEINFO* pDudeInfo = getDudeInfo(pSprite->type);
-	int x = pTarget->x - pSprite->x;
-	int y = pTarget->y - pSprite->y;
-	int dz = pTarget->z - pSprite->z;
+	DUDEINFO* pDudeInfo = getDudeInfo(actor->spr.type);
+	int x = target->spr.pos.X - actor->spr.pos.X;
+	int y = target->spr.pos.Y - actor->spr.pos.Y;
+	int dz = target->spr.pos.Z - actor->spr.pos.Z;
 	x += Random2(1000);
 	y += Random2(1000);
 	int nDist = approxDist(x, y);
 	int nDist2 = nDist / 540;
 	DBloodActor* pMissile = nullptr;
-	switch (pSprite->type)
+	switch (actor->spr.type)
 	{
 	case kDudePodGreen:
 		dz += 8000;
@@ -104,16 +101,15 @@ void podAttack(int, DBloodActor* actor)
 		break;
 	}
 	for (int i = 0; i < 4; i++)
-        fxSpawnPodStuff(actor, 240);
+		fxSpawnPodStuff(actor, 240);
 }
 
 void sub_70284(int, DBloodActor* actor)
 {
-	auto pSprite = &actor->s();
 	sfxPlay3DSound(actor, 2502, -1, 0);
 	int nDist, nBurn;
 	DAMAGE_TYPE dmgType;
-	switch (pSprite->type) {
+	switch (actor->spr.type) {
 	case kDudeTentacleGreen:
 	default: // ???
 		nBurn = 0;
@@ -126,34 +122,30 @@ void sub_70284(int, DBloodActor* actor)
 		nDist = 75;
 		break;
 	}
-	actRadiusDamage(actor, pSprite->x, pSprite->y, pSprite->z, pSprite->sectnum, nDist, 1, 5 * (1 + gGameOptions.nDifficulty), dmgType, 2, nBurn);
+	actRadiusDamage(actor, actor->spr.pos.X, actor->spr.pos.Y, actor->spr.pos.Z, actor->sector(), nDist, 1, 5 * (1 + gGameOptions.nDifficulty), dmgType, 2, nBurn);
 }
 
 static void aiPodSearch(DBloodActor* actor)
 {
-	auto pXSprite = &actor->x();
-	aiChooseDirection(actor, pXSprite->goalAng);
+	aiChooseDirection(actor, actor->xspr.goalAng);
 	aiThinkTarget(actor);
 }
 
 static void aiPodMove(DBloodActor* actor)
 {
-	auto pXSprite = &actor->x();
-	auto pSprite = &actor->s();
-	///assert(pSprite->type >= kDudeBase && pSprite->type < kDudeMax);
-	if (!(pSprite->type >= kDudeBase && pSprite->type < kDudeMax)) {
-		Printf(PRINT_HIGH, "pSprite->type >= kDudeBase && pSprite->type < kDudeMax");
+	if (!(actor->spr.type >= kDudeBase && actor->spr.type < kDudeMax)) {
+		Printf(PRINT_HIGH, "actor->spr.type >= kDudeBase && actor->spr.type < kDudeMax");
 		return;
 	}
 
-	DUDEINFO* pDudeInfo = getDudeInfo(pSprite->type);
-	int dx = pXSprite->targetX - pSprite->x;
-	int dy = pXSprite->targetY - pSprite->y;
+	DUDEINFO* pDudeInfo = getDudeInfo(actor->spr.type);
+	int dx = actor->xspr.TargetPos.X - actor->spr.pos.X;
+	int dy = actor->xspr.TargetPos.Y - actor->spr.pos.Y;
 	int nAngle = getangle(dx, dy);
 	int nDist = approxDist(dx, dy);
 	aiChooseDirection(actor, nAngle);
-	if (nDist < 512 && abs(pSprite->ang - nAngle) < pDudeInfo->periphery) {
-		switch (pSprite->type) {
+	if (nDist < 512 && abs(actor->spr.ang - nAngle) < pDudeInfo->periphery) {
+		switch (actor->spr.type) {
 		case kDudePodGreen:
 		case kDudePodFire:
 			aiNewState(actor, &podSearch);
@@ -169,9 +161,8 @@ static void aiPodMove(DBloodActor* actor)
 
 static void aiPodChase(DBloodActor* actor)
 {
-	auto pSprite = &actor->s();
 	if (actor->GetTarget() == nullptr) {
-		switch (pSprite->type) {
+		switch (actor->spr.type) {
 		case kDudePodGreen:
 		case kDudePodFire:
 			aiNewState(actor, &podMove);
@@ -183,20 +174,19 @@ static void aiPodChase(DBloodActor* actor)
 		}
 		return;
 	}
-	///assert(pSprite->type >= kDudeBase && pSprite->type < kDudeMax);
-	if (!(pSprite->type >= kDudeBase && pSprite->type < kDudeMax)) {
-		Printf(PRINT_HIGH, "pSprite->type >= kDudeBase && pSprite->type < kDudeMax");
+	if (!(actor->spr.type >= kDudeBase && actor->spr.type < kDudeMax)) {
+		Printf(PRINT_HIGH, "actor->spr.type >= kDudeBase && actor->spr.type < kDudeMax");
 		return;
 	}
-	DUDEINFO* pDudeInfo = getDudeInfo(pSprite->type);
-	spritetype* pTarget = &actor->GetTarget()->s();
-	XSPRITE* pXTarget = &actor->GetTarget()->x();
-	int dx = pTarget->x - pSprite->x;
-	int dy = pTarget->y - pSprite->y;
-	aiChooseDirection(actor, getangle(dx, dy));
-	if (pXTarget->health == 0) {
+	DUDEINFO* pDudeInfo = getDudeInfo(actor->spr.type);
+	auto target = actor->GetTarget();
 
-		switch (pSprite->type) {
+	int dx = target->spr.pos.X - actor->spr.pos.X;
+	int dy = target->spr.pos.Y - actor->spr.pos.Y;
+	aiChooseDirection(actor, getangle(dx, dy));
+	if (target->xspr.health == 0) {
+
+		switch (actor->spr.type) {
 		case kDudePodGreen:
 		case kDudePodFire:
 			aiNewState(actor, &podSearch);
@@ -211,15 +201,15 @@ static void aiPodChase(DBloodActor* actor)
 	int nDist = approxDist(dx, dy);
 	if (nDist <= pDudeInfo->seeDist)
 	{
-		int nDeltaAngle = ((getangle(dx, dy) + 1024 - pSprite->ang) & 2047) - 1024;
-		int height = (pDudeInfo->eyeHeight * pSprite->yrepeat) << 2;
-		if (cansee(pTarget->x, pTarget->y, pTarget->z, pTarget->sectnum, pSprite->x, pSprite->y, pSprite->z - height, pSprite->sectnum))
+		int nDeltaAngle = ((getangle(dx, dy) + 1024 - actor->spr.ang) & 2047) - 1024;
+		int height = (pDudeInfo->eyeHeight * actor->spr.yrepeat) << 2;
+		if (cansee(target->spr.pos.X, target->spr.pos.Y, target->spr.pos.Z, target->sector(), actor->spr.pos.X, actor->spr.pos.Y, actor->spr.pos.Z - height, actor->sector()))
 		{
 			if (nDist < pDudeInfo->seeDist && abs(nDeltaAngle) <= pDudeInfo->periphery)
 			{
 				aiSetTarget(actor, actor->GetTarget());
-				if (abs(nDeltaAngle) < 85 && pTarget->type != kDudePodGreen && pTarget->type != kDudePodFire) {
-					switch (pSprite->type) {
+				if (abs(nDeltaAngle) < 85 && target->spr.type != kDudePodGreen && target->spr.type != kDudePodFire) {
+					switch (actor->spr.type) {
 					case kDudePodGreen:
 					case kDudePodFire:
 						aiNewState(actor, &podStartChase);
@@ -235,7 +225,7 @@ static void aiPodChase(DBloodActor* actor)
 		}
 	}
 
-	switch (pSprite->type) {
+	switch (actor->spr.type) {
 	case kDudePodGreen:
 	case kDudePodFire:
 		aiNewState(actor, &podMove);

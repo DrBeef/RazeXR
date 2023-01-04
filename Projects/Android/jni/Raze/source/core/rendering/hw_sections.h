@@ -2,32 +2,61 @@
 
 #include "build.h"
 
+enum ESectionFlag
+{
+	Unclosed = 1,	// at least one unclosed loop
+	Dumped = 2,		// builder was unable to properly construct, so content may not be usable for triangulator.
+	BadWinding = 4,
+};
+
+
 struct SectionLine
 {
-	int16_t section;
-	int16_t partnersection;
-	int16_t startpoint;
-	int16_t endpoint;
-	int16_t wall;
-	int16_t partner;
-	int16_t point2index;
+	int section;
+	int partnersection;
+	int startpoint;
+	int endpoint;
+	int wall;
+	int partner;
+
+	vec2_t v1() const { return ::wall[startpoint].wall_int_pos(); }
+	vec2_t v2() const { return ::wall[endpoint].wall_int_pos(); }
+	walltype* wallp() const { return &::wall[wall]; }
+	SectionLine* partnerLine() const;
+
+};
+extern TArray<SectionLine> sectionLines;
+
+inline SectionLine* SectionLine::partnerLine() const
+{
+	return partner == -1 ? nullptr : &sectionLines[partner];
+}
+
+struct Section2Loop
+{
+	TArrayView<int> walls;
 };
 
 struct Section
 {
+	uint8_t flags;
+	uint8_t dirty;
+	uint8_t geomflags;
+	unsigned index;
 	int sector;
-	// this is the whole point of sections - instead of just having a start index and count, we have an explicit list of lines that's a lot easier to change when needed.
-	TArray<int16_t> lines;	
+	// this uses a memory arena for storage, so use TArrayView instead of TArray
+	TArrayView<int> lines;
+	TArrayView<Section2Loop> loops;
 };
 
-// giving 25% more may be a bit high as normally this should be small numbers only.
-extern SectionLine sectionLines[MAXWALLS + (MAXWALLS >> 2)];
-extern Section sections[MAXSECTORS + (MAXSECTORS >> 2)];
-extern TArray<int> sectionspersector[MAXSECTORS];	// reverse map, mainly for the automap
-extern int numsections;
-extern int numsectionlines;
+extern TArray<Section> sections;
+extern TArrayView<TArrayView<int>> sectionsPerSector;
 
+void hw_CreateSections();
+using Outline = TArray<TArray<vec2_t>>;
+using Point = std::pair<float, float>;
+using FOutline = std::vector<std::vector<Point>>; // Data type was chosen so it can be passed directly into Earcut.
+Outline BuildOutline(Section* section);
 
-void hw_BuildSections();
 void hw_SetSplitSector(int sector, int startpos, int endpos);
 void hw_ClearSplitSector();

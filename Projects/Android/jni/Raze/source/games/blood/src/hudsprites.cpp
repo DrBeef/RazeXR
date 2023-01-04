@@ -25,7 +25,6 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 #include <stdlib.h>
 #include <string.h>
 
-#include "compat.h"
 #include "build.h"
 #include "v_font.h"
 
@@ -60,6 +59,12 @@ static struct {
 };
 
 
+//---------------------------------------------------------------------------
+//
+//
+//
+//---------------------------------------------------------------------------
+
 static void drawElement(int x, int y, int tile, double scale = 1, int flipx = 0, int flipy = 0, int pin = 0, int basepal = 0, double alpha = 1)
 {
 	int flags = RS_TOPLEFT;
@@ -67,9 +72,15 @@ static void drawElement(int x, int y, int tile, double scale = 1, int flipx = 0,
 	if (flipy) flags |= RS_YFLIPHUD;
 	if (pin == -1) flags |= RS_ALIGN_L;
 	else if (pin == 1) flags |= RS_ALIGN_R;
-	hud_drawsprite(x, y, int(scale*65536), 0, tile, 0, basepal, flags, alpha);
+	hud_drawsprite(x, y, int(scale * 65536), 0, tile, 0, basepal, flags, alpha);
 }
 
+
+//---------------------------------------------------------------------------
+//
+//
+//
+//---------------------------------------------------------------------------
 
 static void viewBurnTime(int gScale)
 {
@@ -81,18 +92,21 @@ static void viewBurnTime(int gScale)
 		int nScale = burnTable[i].nScale;
 		if (gScale < 600)
 		{
-			nScale = scale(nScale, gScale, 600);
+			nScale = Scale(nScale, gScale, 600);
 		}
-		drawElement(burnTable[i].nX, burnTable[i].nY, nTile, nScale / 65536.);
+		hud_drawsprite(burnTable[i].nX, burnTable[i].nY, nScale, 0, nTile, 0, 0, RS_STRETCH, 1);
 	}
 }
 
+//---------------------------------------------------------------------------
+//
+//
+//
+//---------------------------------------------------------------------------
 
-void hudDraw(PLAYER *gView, int nSectnum, double bobx, double boby, double zDelta, int basepal, double smoothratio)
+void hudDraw(PLAYER* gView, sectortype* pSector, double bobx, double boby, double zDelta, int basepal, double smoothratio)
 {
 	double look_anghalf = gView->angle.look_anghalf(smoothratio);
-
-	DrawCrosshair(kCrosshairTile, gView->pXSprite->health >> 4, -look_anghalf, 0, 2);
 
 	if (gViewPos == 0)
 	{
@@ -117,18 +131,18 @@ void hudDraw(PLAYER *gView, int nSectnum, double bobx, double boby, double zDelt
 		{
 			cY += (-2048. / 128.);
 		}
-		int nShade = sector[nSectnum].floorshade; 
+		int nShade = pSector->floorshade;
 		int nPalette = 0;
-		if (sector[gView->pSprite->sectnum].extra > 0) {
-			sectortype* pSector = &sector[gView->pSprite->sectnum];
-			XSECTOR* pXSector = &xsector[pSector->extra];
+		if (gView->actor->sector()->hasX()) {
+			sectortype* pViewSect = gView->actor->sector();
+			XSECTOR* pXSector = &pViewSect->xs();
 			if (pXSector->color)
-				nPalette = pSector->floorpal;
+				nPalette = pViewSect->floorpal;
 		}
 
 		#ifdef NOONE_EXTENSIONS
 		if (gView->sceneQav < 0) WeaponDraw(gView, nShade, cX, cY, nPalette);
-			else if (gView->pXSprite->health > 0) playerQavSceneDraw(gView, nShade, cX, cY, nPalette);
+			else if (gView->actor->xspr.health > 0) playerQavSceneDraw(gView, nShade, cX, cY, nPalette);
 		else {
 			gView->sceneQav = gView->weaponQav = kQAVNone;
 			gView->qavTimer = gView->weaponTimer = gView->curWeapon = 0;
@@ -137,9 +151,9 @@ void hudDraw(PLAYER *gView, int nSectnum, double bobx, double boby, double zDelt
 			WeaponDraw(gView, nShade, cX, cY, nPalette);
 		#endif
 	}
-	if (gViewPos == 0 && gView->pXSprite->burnTime > 60)
+	if (gViewPos == 0 && gView->actor->xspr.burnTime > 60)
 	{
-		viewBurnTime(gView->pXSprite->burnTime);
+		viewBurnTime(gView->actor->xspr.burnTime);
 	}
 	if (packItemActive(gView, 1))
 	{
@@ -159,15 +173,12 @@ void hudDraw(PLAYER *gView, int nSectnum, double bobx, double boby, double zDelt
 		drawElement(320, 237, 2358, 1, 1, 1, 1);
 	}
 
-#if 0 // This currently does not work. May have to be redone as a hardware effect.
-	if (v4 && gNetPlayers > 1)
+	int zn = ((gView->zWeapon - gView->zView - (12 << 8)) >> 7) + 220;
+	PLAYER* pPSprite = &gPlayer[gMe->actor->spr.type - kDudePlayer1];
+	if (gMe->actor->IsPlayerActor() && pPSprite->hand == 1)
 	{
-		DoLensEffect();
-		viewingRange = viewingrange;
-		r otatesprite(IntToFixed(280), IntToFixed(35), 53248, 512, 4077, v10, v14, 512 + 6, gViewX0, gViewY0, gViewX1, gViewY1);
-		r otatesprite(IntToFixed(280), IntToFixed(35), 53248, 0, 1683, v10, 0, 512 + 35, gViewX0, gViewY0, gViewX1, gViewY1);
+		gChoke.animateChoke(160, zn, (int)gInterpolate);
 	}
-#endif
 }
 
 END_BLD_NS

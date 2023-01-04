@@ -5,6 +5,7 @@
 #include "image.h"
 #include "i_time.h"
 #include "intvec.h"
+#include "name.h"
 
 // picanm[].sf:
 // |bit(1<<7)
@@ -204,7 +205,7 @@ public:
 	FRestorableTile(FImageSource* base)
 	{
 		Base = base;
-		
+
 		CopySize(*base);
 		ResizeImage(Width, Height);
 		Reload();
@@ -294,6 +295,21 @@ struct BuildTiles
 	TArray<FString> addedArt;
 	TArray<FString> maptilesadded;
 	TMap<int, FGameTexture*> cameratextures;
+	TMap<FName, int> nametoindex;
+
+	void addName(const char* name, int index)
+	{
+		nametoindex.Insert(name, index);
+	}
+
+	int tileForName(const char* name)
+	{
+		FName nm(name, true);
+		if (nm == NAME_None) return -1;
+		auto nmm = nametoindex.CheckKey(nm);
+		if (!nmm) return -1;
+		return *nmm;
+	}
 
 	void Init(); // This cannot be a constructor because it needs the texture manager running.
 	~BuildTiles()
@@ -492,4 +508,13 @@ struct SetAnim
 void processSetAnim(const char* cmd, FScriptPosition& pos, SetAnim& imp);
 class FGameTexture;
 bool PickTexture(FGameTexture* tex, int paletteid, TexturePick& pick, bool wantindexed = false);
+
+inline FixedBitArray<MAXTILES> gotpic;
+
+inline bool testgotpic(int32_t tilenume, bool reset = false)
+{
+	bool res = gotpic[tilenume];
+	if (reset) gotpic.Clear(tilenume);
+	return res;
+}
 

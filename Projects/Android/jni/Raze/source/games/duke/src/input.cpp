@@ -39,6 +39,9 @@ source as it is released.
 #include "v_video.h"
 #include "dukeactor.h"
 
+EXTERN_CVAR(Float, m_sensitivity_x)
+EXTERN_CVAR(Float, m_yaw)
+
 BEGIN_DUKE_NS
 
 // State timer counters. 
@@ -74,18 +77,18 @@ void hud_input(int plnum)
 	{
 		if (PlayerInput(plnum, SB_QUICK_KICK) && p->last_pissed_time == 0)
 		{
-			if (!isRRRA() || p->GetActor()->s->extra > 0)
+			if (!isRRRA() || p->GetActor()->spr.extra > 0)
 			{
 				p->last_pissed_time = 4000;
 				S_PlayActorSound(437, pact);
-				if (p->GetActor()->s->extra <= gs.max_player_health - gs.max_player_health / 10)
+				if (p->GetActor()->spr.extra <= gs.max_player_health - gs.max_player_health / 10)
 				{
-					p->GetActor()->s->extra += 2;
-					p->last_extra = p->GetActor()->s->extra;
+					p->GetActor()->spr.extra += 2;
+					p->last_extra = p->GetActor()->spr.extra;
 					p->resurrected = true;
 				}
-				else if (p->GetActor()->s->extra < gs.max_player_health)
-					p->GetActor()->s->extra = gs.max_player_health;
+				else if (p->GetActor()->spr.extra < gs.max_player_health)
+					p->GetActor()->spr.extra = gs.max_player_health;
 			}
 		}
 	}
@@ -95,7 +98,7 @@ void hud_input(int plnum)
 		{
 			SetGameVarID(g_iReturnVarID, 0, nullptr, plnum);
 			OnEvent(EVENT_QUICKKICK, plnum, nullptr, -1);
-			if (GetGameVarID(g_iReturnVarID, nullptr, plnum) == 0)
+			if (GetGameVarID(g_iReturnVarID, nullptr, plnum).value() == 0)
 			{
 				p->quick_kick = 14;
 				if (!p->quick_kick_msg && plnum == screenpeek) FTA(QUOTE_MIGHTY_FOOT, p);
@@ -113,14 +116,14 @@ void hud_input(int plnum)
 
 		// Don't go on if paused or dead.
 		if (paused) return;
-		if (p->GetActor()->s->extra <= 0) return;
+		if (p->GetActor()->spr.extra <= 0) return;
 
 		// Activate an inventory item. This just forwards to the other inventory bits. If the inventory selector was taken out of the playsim this could be removed.
 		if (PlayerInput(plnum, SB_INVUSE) && p->newOwner == nullptr)
 		{
 			SetGameVarID(g_iReturnVarID, 0, nullptr, plnum);
 			OnEvent(EVENT_INVENTORY, plnum, nullptr, -1);
-			if (GetGameVarID(g_iReturnVarID, nullptr, plnum) == 0)
+			if (GetGameVarID(g_iReturnVarID, nullptr, plnum).value() == 0)
 			{
 				if (p->inven_icon > ICON_NONE && p->inven_icon <= ICON_HEATS) PlayerSetItemUsed(plnum, p->inven_icon);
 			}
@@ -130,7 +133,7 @@ void hud_input(int plnum)
 		{
 			SetGameVarID(g_iReturnVarID, 0, nullptr, plnum);
 			OnEvent(EVENT_USENIGHTVISION, plnum, nullptr, -1);
-			if (GetGameVarID(g_iReturnVarID, nullptr, plnum) == 0 && p->heat_amount > 0)
+			if (GetGameVarID(g_iReturnVarID, nullptr, plnum).value() == 0 && p->heat_amount > 0)
 			{
 				p->heat_on = !p->heat_on;
 				p->inven_icon = 5;
@@ -143,7 +146,7 @@ void hud_input(int plnum)
 		{
 			SetGameVarID(g_iReturnVarID, 0, nullptr, plnum);
 			OnEvent(EVENT_USESTEROIDS, plnum, nullptr, -1);
-			if (GetGameVarID(g_iReturnVarID, nullptr, plnum) == 0)
+			if (GetGameVarID(g_iReturnVarID, nullptr, plnum).value() == 0)
 			{
 				if (p->steroids_amount == 400)
 				{
@@ -226,13 +229,13 @@ void hud_input(int plnum)
 			{
 				SetGameVarID(g_iReturnVarID, dainv, nullptr, plnum);
 				OnEvent(EVENT_INVENTORYLEFT, plnum, nullptr, -1);
-				dainv = GetGameVarID(g_iReturnVarID, nullptr, plnum);
+				dainv = GetGameVarID(g_iReturnVarID, nullptr, plnum).safeValue();
 			}
 			if (PlayerInput(plnum, SB_INVNEXT))
 			{
 				SetGameVarID(g_iReturnVarID, dainv, nullptr, plnum);
 				OnEvent(EVENT_INVENTORYRIGHT, plnum, nullptr, -1);
-				dainv = GetGameVarID(g_iReturnVarID, nullptr, plnum);
+				dainv = GetGameVarID(g_iReturnVarID, nullptr, plnum).safeValue();
 			}
 			p->inven_icon = dainv;
 			// Someone must have really hated constant data, doing this with a switch/case (and of course also with literal numbers...)
@@ -270,7 +273,7 @@ void hud_input(int plnum)
 		{
 			SetGameVarID(g_iReturnVarID, 0, nullptr, plnum);
 			OnEvent(EVENT_HOLODUKEON, plnum, nullptr, -1);
-			if (GetGameVarID(g_iReturnVarID, nullptr, plnum) == 0)
+			if (GetGameVarID(g_iReturnVarID, nullptr, plnum).value() == 0)
 			{
 				if (!isRR())
 				{
@@ -281,14 +284,14 @@ void hud_input(int plnum)
 							p->inven_icon = 3;
 
 							auto pactor =
-								EGS(p->cursector(),
-									p->pos.x,
-									p->pos.y,
-									p->pos.z + (30 << 8), TILE_APLAYER, -64, 0, 0, p->angle.ang.asbuild(), 0, 0, nullptr, 10);
+								EGS(p->cursector,
+									p->pos.X,
+									p->pos.Y,
+									p->pos.Z + (30 << 8), TILE_APLAYER, -64, 0, 0, p->angle.ang.asbuild(), 0, 0, nullptr, 10);
 							pactor->temp_data[3] = pactor->temp_data[4] = 0;
 							p->holoduke_on = pactor;
-							pactor->s->yvel = plnum;
-							pactor->s->extra = 0;
+							pactor->spr.yvel = plnum;
+							pactor->spr.extra = 0;
 							FTA(QUOTE_HOLODUKE_ON, p);
 							S_PlayActorSound(TELEPORTER, p->holoduke_on);
 						}
@@ -304,12 +307,12 @@ void hud_input(int plnum)
 				}
 				else // In RR this means drinking whiskey.
 				{
-					if (p->holoduke_amount > 0 && p->GetActor()->s->extra < gs.max_player_health)
+					if (p->holoduke_amount > 0 && p->GetActor()->spr.extra < gs.max_player_health)
 					{
 						p->holoduke_amount -= 400;
-						p->GetActor()->s->extra += 5;
-						if (p->GetActor()->s->extra > gs.max_player_health)
-							p->GetActor()->s->extra = gs.max_player_health;
+						p->GetActor()->spr.extra += 5;
+						if (p->GetActor()->spr.extra > gs.max_player_health)
+							p->GetActor()->spr.extra = gs.max_player_health;
 
 						p->drink_amt += 5;
 						p->inven_icon = 3;
@@ -327,7 +330,7 @@ void hud_input(int plnum)
 		{
 			SetGameVarID(g_iReturnVarID, 0, nullptr, plnum);
 			OnEvent(EVENT_USENIGHTVISION, plnum, nullptr, -1);
-			if (GetGameVarID(g_iReturnVarID, nullptr, plnum) == 0)
+			if (GetGameVarID(g_iReturnVarID, nullptr, plnum).value() == 0)
 			{
 				if (p->yehaa_timer == 0)
 				{
@@ -335,20 +338,20 @@ void hud_input(int plnum)
 					S_PlayActorSound(390, pact);
 					p->noise_radius = 16384;
 					madenoise(plnum);
-					if (p->cursector()->lotag == 857)
+					if (p->cursector->lotag == 857)
 					{
-						if (p->GetActor()->s->extra <= gs.max_player_health)
+						if (p->GetActor()->spr.extra <= gs.max_player_health)
 						{
-							p->GetActor()->s->extra += 10;
-							if (p->GetActor()->s->extra >= gs.max_player_health)
-								p->GetActor()->s->extra = gs.max_player_health;
+							p->GetActor()->spr.extra += 10;
+							if (p->GetActor()->spr.extra >= gs.max_player_health)
+								p->GetActor()->spr.extra = gs.max_player_health;
 						}
 					}
 					else
 					{
-						if (p->GetActor()->s->extra + 1 <= gs.max_player_health)
+						if (p->GetActor()->spr.extra + 1 <= gs.max_player_health)
 						{
-							p->GetActor()->s->extra++;
+							p->GetActor()->spr.extra++;
 						}
 					}
 				}
@@ -359,23 +362,23 @@ void hud_input(int plnum)
 		{
 			SetGameVarID(g_iReturnVarID, 0, nullptr, plnum);
 			OnEvent(EVENT_USEMEDKIT, plnum, nullptr, -1);
-			if (GetGameVarID(g_iReturnVarID, nullptr, plnum) == 0)
+			if (GetGameVarID(g_iReturnVarID, nullptr, plnum).value() == 0)
 			{
-				if (p->firstaid_amount > 0 && p->GetActor()->s->extra < gs.max_player_health)
+				if (p->firstaid_amount > 0 && p->GetActor()->spr.extra < gs.max_player_health)
 				{
 					if (!isRR())
 					{
-						int j = gs.max_player_health - p->GetActor()->s->extra;
+						int j = gs.max_player_health - p->GetActor()->spr.extra;
 
 						if (p->firstaid_amount > j)
 						{
 							p->firstaid_amount -= j;
-							p->GetActor()->s->extra = gs.max_player_health;
+							p->GetActor()->spr.extra = gs.max_player_health;
 							p->inven_icon = 1;
 						}
 						else
 						{
-							p->GetActor()->s->extra += p->firstaid_amount;
+							p->GetActor()->spr.extra += p->firstaid_amount;
 							p->firstaid_amount = 0;
 							checkavailinven(p);
 						}
@@ -387,19 +390,19 @@ void hud_input(int plnum)
 						if (p->firstaid_amount > j)
 						{
 							p->firstaid_amount -= j;
-							p->GetActor()->s->extra += j;
-							if (p->GetActor()->s->extra > gs.max_player_health)
-								p->GetActor()->s->extra = gs.max_player_health;
+							p->GetActor()->spr.extra += j;
+							if (p->GetActor()->spr.extra > gs.max_player_health)
+								p->GetActor()->spr.extra = gs.max_player_health;
 							p->inven_icon = 1;
 						}
 						else
 						{
-							p->GetActor()->s->extra += p->firstaid_amount;
+							p->GetActor()->spr.extra += p->firstaid_amount;
 							p->firstaid_amount = 0;
 							checkavailinven(p);
 						}
-						if (p->GetActor()->s->extra > gs.max_player_health)
-							p->GetActor()->s->extra = gs.max_player_health;
+						if (p->GetActor()->spr.extra > gs.max_player_health)
+							p->GetActor()->spr.extra = gs.max_player_health;
 						p->drink_amt += 10;
 						if (p->drink_amt <= 100 && !S_CheckActorSoundPlaying(pact, DUKE_USEMEDKIT))
 							S_PlayActorSound(DUKE_USEMEDKIT, pact);
@@ -412,7 +415,7 @@ void hud_input(int plnum)
 		{
 			SetGameVarID(g_iReturnVarID, 0, nullptr, plnum);
 			OnEvent(EVENT_USEJETPACK, plnum, nullptr, -1);
-			if (GetGameVarID(g_iReturnVarID, nullptr, plnum) == 0)
+			if (GetGameVarID(g_iReturnVarID, nullptr, plnum).value() == 0)
 			{
 				if (!isRR())
 				{
@@ -430,7 +433,7 @@ void hud_input(int plnum)
 						else
 						{
 							p->hard_landing = 0;
-							p->poszv = 0;
+							p->vel.Z = 0;
 							S_PlayActorSound(DUKE_JETPACK_OFF, pact);
 							S_StopSound(DUKE_JETPACK_IDLE, pact);
 							S_StopSound(DUKE_JETPACK_ON, pact);
@@ -442,7 +445,7 @@ void hud_input(int plnum)
 				else
 				{
 					// eat cow pie
-					if (p->jetpack_amount > 0 && p->GetActor()->s->extra < gs.max_player_health)
+					if (p->jetpack_amount > 0 && p->GetActor()->spr.extra < gs.max_player_health)
 					{
 						if (!S_CheckActorSoundPlaying(pact, 429))
 							S_PlayActorSound(429, pact);
@@ -462,12 +465,12 @@ void hud_input(int plnum)
 								p->eat = 100;
 						}
 
-						p->GetActor()->s->extra += 5;
+						p->GetActor()->spr.extra += 5;
 
 						p->inven_icon = 4;
 
-						if (p->GetActor()->s->extra > gs.max_player_health)
-							p->GetActor()->s->extra = gs.max_player_health;
+						if (p->GetActor()->spr.extra > gs.max_player_health)
+							p->GetActor()->spr.extra = gs.max_player_health;
 
 						if (p->jetpack_amount <= 0)
 							checkavailinven(p);
@@ -480,7 +483,7 @@ void hud_input(int plnum)
 		{
 			SetGameVarID(g_iReturnVarID, 0, nullptr, plnum);
 			OnEvent(EVENT_TURNAROUND, plnum, nullptr, -1);
-			if (GetGameVarID(g_iReturnVarID, nullptr, plnum) != 0)
+			if (GetGameVarID(g_iReturnVarID, nullptr, plnum).value() != 0)
 			{
 				p->sync.actions &= ~SB_TURNAROUND;
 			}
@@ -526,7 +529,7 @@ enum
 static void processInputBits(player_struct *p, ControlInfo* const hidInput)
 {
 	// Set-up crouch bools.
-	int const sectorLotag = p->cursectnum != -1 ? p->cursector()->lotag : 0;
+	int const sectorLotag = p->insector() ? p->cursector->lotag : 0;
 	bool const crouchable = sectorLotag != ST_2_UNDERWATER && (sectorLotag != ST_1_ABOVE_WATER || p->spritebridge);
 	bool const disableToggle = p->jetpack_on || (!crouchable && p->on_ground) || (isRRRA() && (p->OnMotorcycle || p->OnBoat));
 
@@ -733,6 +736,10 @@ static void processVehicleInput(player_struct *p, ControlInfo* const hidInput, I
 {
 	bool const kbdLeft = buttonMap.ButtonDown(gamefunc_Turn_Left) || buttonMap.ButtonDown(gamefunc_Strafe_Left);
 	bool const kbdRight = buttonMap.ButtonDown(gamefunc_Turn_Right) || buttonMap.ButtonDown(gamefunc_Strafe_Right);
+
+	// Cancel out micro-movement
+	if (fabs(hidInput->mouseturnx) < (m_sensitivity_x * m_yaw * backendinputscale() * 2.f)) hidInput->mouseturnx = 0;
+
 	p->vehTurnLeft = kbdLeft || hidInput->mouseturnx < 0 || hidInput->dyaw < 0;
 	p->vehTurnRight = kbdRight || hidInput->mouseturnx > 0 || hidInput->dyaw > 0;
 
@@ -753,7 +760,7 @@ static void processVehicleInput(player_struct *p, ControlInfo* const hidInput, I
 		input.avel = (float)boatApplyTurn(p, hidInput, kbdLeft, kbdRight, scaleAdjust);
 	}
 
-	loc.fvel = (int16_t)clamp<int>(xs_CRoundToInt(p->MotoSpeed), -(MAXVELMOTO >> 3), MAXVELMOTO);
+	loc.fvel = clamp<int16_t>(xs_CRoundToInt(p->MotoSpeed), -(MAXVELMOTO >> 3), MAXVELMOTO);
 	input.avel *= BAngToDegree;
 	loc.avel += input.avel;
 }
@@ -766,7 +773,7 @@ static void processVehicleInput(player_struct *p, ControlInfo* const hidInput, I
 
 static void FinalizeInput(player_struct *p, InputPacket& input)
 {
-	if (gamestate != GS_LEVEL || movementBlocked(p) || p->GetActor()->s->extra <= 0 || (p->dead_flag && !ud.god && !p->resurrected))
+	if (gamestate != GS_LEVEL || movementBlocked(p) || p->GetActor()->spr.extra <= 0 || (p->dead_flag && !ud.god && !p->resurrected))
 	{
 		// neutralize all movement when not in a game, blocked or in automap follow mode
 		loc.fvel = loc.svel = 0;
@@ -826,7 +833,7 @@ void GameInterface::GetInput(ControlInfo* const hidInput, double const scaleAdju
 
 	if (!SyncInput())
 	{
-		if (p->GetActor()->s->extra > 0)
+		if (p->GetActor()->spr.extra > 0)
 		{
 			// Do these in the same order as the old code.
 			doslopetilting(p, scaleAdjust);
@@ -837,14 +844,14 @@ void GameInterface::GetInput(ControlInfo* const hidInput, double const scaleAdju
 
 		p->angle.processhelpers(scaleAdjust);
 		p->horizon.processhelpers(scaleAdjust);
-		p->GetActor()->s->ang = p->angle.ang.asbuild();
+		p->GetActor()->spr.ang = p->angle.ang.asbuild();
 	}
 
 	if (packet)
 	{
 		*packet = loc;
-		packet->fvel = MulScale(loc.fvel, p->angle.ang.bcos(), 9) + MulScale(loc.svel, p->angle.ang.bsin(), 9) + p->fric.x;
-		packet->svel = MulScale(loc.fvel, p->angle.ang.bsin(), 9) - MulScale(loc.svel, p->angle.ang.bcos(), 9) + p->fric.y;
+		packet->fvel = MulScale(loc.fvel, p->angle.ang.bcos(), 9) + MulScale(loc.svel, p->angle.ang.bsin(), 9) + p->fric.X;
+		packet->svel = MulScale(loc.fvel, p->angle.ang.bsin(), 9) - MulScale(loc.svel, p->angle.ang.bcos(), 9) + p->fric.Y;
 		loc = {};
 	}
 }

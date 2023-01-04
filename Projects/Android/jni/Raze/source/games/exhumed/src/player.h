@@ -18,21 +18,17 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 
 #pragma once 
 
-#include "compat.h"
 #include "gamecontrol.h"
 #include "gameinput.h"
 
 BEGIN_PS_NS
 
-void RestoreSavePoint(int nPlayer, int *x, int *y, int *z, short *nSector, short *nAngle);
-void SetSavePoint(int nPlayer, int x, int y, int z, int nSector, int nAngle);
+void SetSavePoint(int nPlayer, int x, int y, int z, sectortype* pSector, int nAngle);
 void InitPlayer();
 void InitPlayerKeys(int nPlayer);
 int GrabPlayer();
 void InitPlayerInventory(int nPlayer);
 void RestartPlayer(int nPlayer);
-
-void FuncPlayer(int, int nSector, int nSprite, int nRun);
 
 enum
 {
@@ -49,23 +45,22 @@ extern int lPlayerYVel;
 
 struct PlayerSave
 {
+    sectortype* pSector;
     int x;
     int y;
     int z;
-    int nSector;
     int16_t nAngle;
 };
 
 struct Player
 {
-	DExhumedActor* Actor() { return pActor; }
     DExhumedActor* pActor;
     int16_t nHealth;
     int16_t nLives;
     int16_t nDouble;
     int16_t nInvisible;
     int16_t nTorch;
-    int16_t field_2;
+    int16_t nSeqSize;
     int16_t nAction;
     int16_t bIsMummified;
     int16_t invincibility;
@@ -78,57 +73,54 @@ struct Player
     uint8_t items[8];
     int16_t nAmmo[7]; // TODO - kMaxWeapons?
 
-    short nCurrentWeapon;
-    short field_3FOUR;
-    short bIsFiring;
-    short field_38;
-    short field_3A;
-    short field_3C;
-    short nRun;
+    int16_t nCurrentWeapon;
+    int16_t nSeqSize2;
+    int16_t bIsFiring;
+    int16_t nNextWeapon;
+    int16_t nState;
+    int16_t nLastWeapon;
+    int16_t nRun;
     bool bPlayerPan, bLockPan;
     fixedhoriz nDestVertPan;
 
     PlayerHorizon horizon;
     PlayerAngle angle;
+    sectortype* pPlayerPushSect;
+    sectortype* pPlayerViewSect;
 
     int16_t nBreathTimer;
     int16_t nPlayerSwear;
-    int nPlayerPushSect;
     int16_t nDeathType;
     int16_t nPlayerScore;
     int16_t nPlayerColor;
     int16_t nPistolClip;
-    int nPlayerDY;
-    int nPlayerDX;
-    int nXDamage;
-    int nYDamage;
+    vec2_t nPlayerD, nDamage;
     int16_t nPlayerOldWeapon;
     int16_t nPlayerClip;
     int16_t nPlayerPushSound;
     int16_t nTauntTimer;
     uint16_t nPlayerWeapons; // each set bit represents a weapon the player has
-    short nPlayerViewSect;
     PlayerSave sPlayerSave;
     int ototalvel;
     int totalvel;
     int16_t eyelevel, oeyelevel;
-    DExhumedActor* pPlayerGrenade;
-    DExhumedActor* pPlayerFloorSprite;
-    DExhumedActor* pDoppleSprite;
+    TObjPtr<DExhumedActor*> pPlayerGrenade;
+    TObjPtr<DExhumedActor*> pPlayerFloorSprite;
+    TObjPtr<DExhumedActor*> pDoppleSprite;
 
 };
 
-extern short PlayerCount;
+extern int PlayerCount;
 
 extern Player PlayerList[kMaxPlayers];
 
-extern short obobangle, bobangle;
+extern int obobangle, bobangle;
 
-extern DExhumedActor* nNetStartSprite[kMaxPlayers];
-extern short nNetStartSprites;
-extern short nCurStartSprite;
+extern TObjPtr<DExhumedActor*> nNetStartSprite[kMaxPlayers];
+extern int nNetStartSprites;
+extern int nCurStartSprite;
 
-short GetPlayerFromActor(DExhumedActor* actor);
+int GetPlayerFromActor(DExhumedActor* actor);
 void SetPlayerMummified(int nPlayer, int bIsMummified);
 int AddAmmo(int nPlayer, int nWeapon, int nAmmoAmount);
 void ShootStaff(int nPlayer);

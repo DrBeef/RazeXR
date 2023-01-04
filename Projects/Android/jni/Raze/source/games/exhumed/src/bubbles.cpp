@@ -27,49 +27,46 @@ BEGIN_PS_NS
 
 void DestroyBubble(DExhumedActor* pActor)
 {
-	auto pSprite = &pActor->s();
-
-    runlist_DoSubRunRec(pSprite->lotag - 1); 
-    runlist_DoSubRunRec(pSprite->owner);
+    runlist_DoSubRunRec(pActor->spr.lotag - 1); 
+    runlist_DoSubRunRec(pActor->spr.intowner);
     runlist_SubRunRec(pActor->nRun);
     DeleteActor(pActor);
 }
 
-DExhumedActor* BuildBubble(vec3_t pos, int nSector)
+DExhumedActor* BuildBubble(vec3_t pos, sectortype* pSector)
 {
     int nSize = RandomSize(3);
     if (nSize > 4) {
         nSize -= 4;
     }
 
-    auto pActor = insertActor(nSector, 402);
-	auto pSprite = &pActor->s();
+    auto pActor = insertActor(pSector, 402);
 
-    pSprite->pos = pos;
-    pSprite->cstat = 0;
-    pSprite->shade = -32;
-    pSprite->pal = 0;
-    pSprite->clipdist = 5;
-    pSprite->xrepeat = 40;
-    pSprite->yrepeat = 40;
-    pSprite->xoffset = 0;
-    pSprite->yoffset = 0;
-    pSprite->picnum = 1;
-    pSprite->ang = inita;
-    pSprite->xvel = 0;
-    pSprite->yvel = 0;
-    pSprite->zvel = -1200;
-    pSprite->hitag = -1;
-    pSprite->extra = -1;
-    pSprite->lotag = runlist_HeadRun() + 1;
-    pSprite->backuppos();
+    pActor->spr.pos = pos;
+    pActor->spr.cstat = 0;
+    pActor->spr.shade = -32;
+    pActor->spr.pal = 0;
+    pActor->spr.clipdist = 5;
+    pActor->spr.xrepeat = 40;
+    pActor->spr.yrepeat = 40;
+    pActor->spr.xoffset = 0;
+    pActor->spr.yoffset = 0;
+    pActor->spr.picnum = 1;
+    pActor->spr.ang = inita;
+    pActor->spr.xvel = 0;
+    pActor->spr.yvel = 0;
+    pActor->spr.zvel = -1200;
+    pActor->spr.hitag = -1;
+    pActor->spr.extra = -1;
+    pActor->spr.lotag = runlist_HeadRun() + 1;
+    pActor->backuppos();
 
 //	GrabTimeSlot(3);
 
     pActor->nFrame = 0;
     pActor->nIndex = SeqOffsets[kSeqBubble] + nSize;
 
-    pSprite->owner = runlist_AddRunRec(pSprite->lotag - 1, pActor, 0x140000);
+    pActor->spr.intowner = runlist_AddRunRec(pActor->spr.lotag - 1, pActor, 0x140000);
 
     pActor->nRun = runlist_AddRunRec(NewRun, pActor, 0x140000);
     return pActor;
@@ -80,8 +77,7 @@ void AIBubble::Tick(RunListEvent* ev)
     auto pActor = ev->pObjActor;
     if (!pActor) return;
 
-    short nSeq = pActor->nIndex;
-    auto pSprite = &pActor->s();
+    int nSeq = pActor->nIndex;
 
     seq_MoveSequence(pActor, nSeq, pActor->nFrame);
 
@@ -91,16 +87,16 @@ void AIBubble::Tick(RunListEvent* ev)
         pActor->nFrame = 0;
     }
 
-    pSprite->z += pSprite->zvel;
+    pActor->spr.pos.Z += pActor->spr.zvel;
 
-    int nSector = pSprite->sectnum;
+    auto pSector = pActor->sector();
 
-    if (pSprite->z <= sector[nSector].ceilingz)
+    if (pActor->spr.pos.Z <= pSector->ceilingz)
     {
-        int nSectAbove = SectAbove[nSector];
+        auto pSectAbove = pSector->pAbove;
 
-        if (pSprite->hitag > -1 && nSectAbove != -1) {
-            BuildAnim(nullptr, 70, 0, pSprite->x, pSprite->y, sector[nSectAbove].floorz, nSectAbove, 64, 0);
+        if (pActor->spr.hitag > -1 && pSectAbove != nullptr) {
+            BuildAnim(nullptr, 70, 0, pActor->spr.pos.X, pActor->spr.pos.Y, pSectAbove->floorz, pSectAbove, 64, 0);
         }
 
         DestroyBubble(pActor);
@@ -113,7 +109,7 @@ void AIBubble::Draw(RunListEvent* ev)
     if (!pActor) return;
 
     seq_PlotSequence(ev->nParam, pActor->nIndex, pActor->nFrame, 1);
-    ev->pTSprite->owner = -1;
+    ev->pTSprite->ownerActor = nullptr;
 }
 
 
@@ -128,8 +124,7 @@ void DoBubbleMachines()
         {
             pActor->nCount = (RandomWord() % pActor->nFrame) + 30;
 
-			auto pSprite = &pActor->s();
-            BuildBubble(pSprite->pos, pSprite->sectnum);
+            BuildBubble(pActor->spr.pos, pActor->sector());
         }
     }
 }
@@ -139,19 +134,18 @@ void BuildBubbleMachine(DExhumedActor* pActor)
     pActor->nFrame = 75;
     pActor->nCount = pActor->nFrame;
 
-	auto pSprite = &pActor->s();
-    pSprite->cstat = 0x8000;
+    pActor->spr.cstat = CSTAT_SPRITE_INVISIBLE;
     ChangeActorStat(pActor, kStatBubbleMachine);
 }
 
 void DoBubbles(int nPlayer)
 {
     vec3_t pos;
-    int nSector;
+    sectortype* pSector;
 
-    WheresMyMouth(nPlayer, &pos, &nSector);
+    WheresMyMouth(nPlayer, &pos, &pSector);
 
-    auto pActor = BuildBubble(pos, nSector);
-    pActor->s().hitag = nPlayer;
+    auto pActor = BuildBubble(pos, pSector);
+    pActor->spr.hitag = nPlayer;
 }
 END_PS_NS

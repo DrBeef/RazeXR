@@ -36,34 +36,30 @@ Prepared for public release: 03/28/2005 - Charlie Wiederhold, 3D Realms
 
 BEGIN_SW_NS
 
-SECTOR_OBJECTp DetectSectorObjectByWall(WALLp);
+SECTOR_OBJECT* DetectSectorObjectByWall(walltype*);
 
-void SOwallmove(SECTOR_OBJECTp sop, DSWActor* actor, WALLp find_wallp, int dist, int *nx, int *ny)
+void SOwallmove(SECTOR_OBJECT* sop, DSWActor* actor, walltype* find_wallp, int dist, int *nx, int *ny)
 {
     int j,k,wallcount;
-    WALLp wp;
+    walltype* wp;
     short startwall,endwall;
-    SECTORp *sectp;
+    sectortype* *sectp;
 
-    if (!actor->hasU() || TEST(sop->flags, SOBJ_SPRITE_OBJ))
+    if (!actor->hasU() || (sop->flags & SOBJ_SPRITE_OBJ))
         return;
 
-    auto u = actor->u();
     wallcount = 0;
     for (sectp = sop->sectp, j = 0; *sectp; sectp++, j++)
     {
-        startwall = (*sectp)->wallptr;
-        endwall = startwall + (*sectp)->wallnum - 1;
 
         // move all walls in sectors back to the original position
-        for (wp = &wall[startwall], k = startwall; k <= endwall; wp++, k++)
+        for (auto& wal : wallsofsector(*sectp))
         {
             // find the one wall we want to adjust
-            if (wp == find_wallp)
+            if (&wal == find_wallp)
             {
-                short ang;
                 // move orig x and y in saved angle
-                ang = u->sang;
+                int ang = actor->user.sang;
 
                 *nx = MulScale(dist, bcos(ang), 14);
                 *ny = MulScale(dist, bsin(ang), 14);
@@ -71,7 +67,7 @@ void SOwallmove(SECTOR_OBJECTp sop, DSWActor* actor, WALLp find_wallp, int dist,
                 sop->xorig[wallcount] -= *nx;
                 sop->yorig[wallcount] -= *ny;
 
-                SET(sop->flags, SOBJ_UPDATE_ONCE);
+                sop->flags |= (SOBJ_UPDATE_ONCE);
                 return;
             }
 
@@ -84,21 +80,17 @@ int DoWallMove(DSWActor* actor)
 {
     int dist,nx,ny;
     short shade1,shade2,ang,picnum1,picnum2;
-    WALLp wallp;
-    short prev_wall;
     bool found = false;
     short dang;
     bool SOsprite = false;
 
-    auto sp = &actor->s();
-
-    dist = SP_TAG13(sp);
-    ang = SP_TAG4(sp);
-    picnum1 = SP_TAG5(sp);
-    picnum2 = SP_TAG6(sp);
-    shade1 = SP_TAG7(sp);
-    shade2 = SP_TAG8(sp);
-    dang = ((int)SP_TAG10(sp)) << 3;
+    dist = SP_TAG13(actor);
+    ang = SP_TAG4(actor);
+    picnum1 = SP_TAG5(actor);
+    picnum2 = SP_TAG6(actor);
+    shade1 = SP_TAG7(actor);
+    shade2 = SP_TAG8(actor);
+    dang = ((int)SP_TAG10(actor)) << 3;
 
     if (dang)
         ang = NORM_ANGLE(ang + (RandomRange(dang) - dang/2));
@@ -106,44 +98,42 @@ int DoWallMove(DSWActor* actor)
     nx = MulScale(dist, bcos(ang), 14);
     ny = MulScale(dist, bsin(ang), 14);
 
-    for (wallp = &wall[0]; wallp < &wall[numwalls]; wallp++)
+    for(auto& wal : wall)
     {
-        if (wallp->x == sp->x && wallp->y == sp->y)
+        if (wal.wall_int_pos().X == actor->spr.pos.X && wal.wall_int_pos().Y == actor->spr.pos.Y)
         {
             found = true;
 
-            if (TEST(wallp->extra, WALLFX_SECTOR_OBJECT))
+            if ((wal.extra & WALLFX_SECTOR_OBJECT))
             {
-                SECTOR_OBJECTp sop;
-                sop = DetectSectorObjectByWall(wallp);
+                SECTOR_OBJECT* sop;
+                sop = DetectSectorObjectByWall(&wal);
                 ASSERT(sop);
-                SOwallmove(sop, actor, wallp, dist, &nx, &ny);
+                SOwallmove(sop, actor, &wal, dist, &nx, &ny);
 
                 SOsprite = true;
             }
             else
             {
-                wallp->x = sp->x + nx;
-                wallp->y = sp->y + ny;
-                sector[wallp->sector].dirty = 255;
+                wal.movexy(actor->spr.pos.X + nx, actor->spr.pos.Y + ny);
             }
 
             if (shade1)
-                wallp->shade = int8_t(shade1);
+                wal.shade = int8_t(shade1);
             if (picnum1)
-                wallp->picnum = picnum1;
+                wal.picnum = picnum1;
 
             // find the previous wall
-            prev_wall = PrevWall(wallnum(wallp));
+            auto prev_wall = PrevWall(&wal);
             if (shade2)
-                wall[prev_wall].shade = int8_t(shade2);
+                prev_wall->shade = int8_t(shade2);
             if (picnum2)
-                wall[prev_wall].picnum = picnum2;
+                prev_wall->picnum = picnum2;
         }
     }
 
-    SP_TAG9(sp)--;
-    if ((int8_t)SP_TAG9(sp) <= 0)
+    SP_TAG9(actor)--;
+    if ((int8_t)SP_TAG9(actor) <= 0)
     {
         KillActor(actor);
     }
@@ -152,35 +142,32 @@ int DoWallMove(DSWActor* actor)
         if (SOsprite)
         {
             // move the sprite offset from center
-            actor->u()->sx -= nx;
-            actor->u()->sy -= ny;
+            actor->user.pos.X -= nx;
+            actor->user.pos.Y -= ny;
         }
         else
         {
-            sp->x += nx;
-            sp->y += ny;
+            actor->spr.pos.X += nx;
+            actor->spr.pos.Y += ny;
         }
     }
 
     return found;
 }
 
-bool CanSeeWallMove(SPRITEp wp, short match)
+bool CanSeeWallMove(DSWActor* caller, int match)
 {
     int i;
     bool found = false;
-    SPRITEp sp;
 
     SWStatIterator it(STAT_WALL_MOVE_CANSEE);
     while (auto actor = it.Next())
     {
-        sp = &actor->s();
-
-        if (SP_TAG2(sp) == match)
+        if (SP_TAG2(actor) == match)
         {
             found = true;
 
-            if (cansee(wp->x, wp->y, wp->z, wp->sectnum, sp->x, sp->y, sp->z, sp->sectnum))
+            if (cansee(caller->spr.pos.X, caller->spr.pos.Y, caller->spr.pos.Z, caller->sector(), actor->spr.pos.X, actor->spr.pos.Y, actor->spr.pos.Z, actor->sector()))
             {
                 return true;
             }
@@ -198,7 +185,7 @@ int DoWallMoveMatch(short match)
     SWStatIterator it(STAT_WALL_MOVE);
     while (auto actor = it.Next())
     {
-        if (SP_TAG2(&actor->s()) == match)
+        if (SP_TAG2(actor) == match)
         {
             found = true;
             DoWallMove(actor);

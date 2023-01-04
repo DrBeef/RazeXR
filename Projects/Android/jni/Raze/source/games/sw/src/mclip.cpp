@@ -27,7 +27,6 @@ Prepared for public release: 03/28/2005 - Charlie Wiederhold, 3D Realms
 
 #include "build.h"
 
-#include "mytypes.h"
 #include "names2.h"
 #include "panel.h"
 #include "game.h"
@@ -38,19 +37,18 @@ Prepared for public release: 03/28/2005 - Charlie Wiederhold, 3D Realms
 BEGIN_SW_NS
 
 
-int MultiClipMove(PLAYERp pp, int z, int floor_dist)
+Collision MultiClipMove(PLAYER* pp, int z, int floor_dist)
 {
     int i;
     vec3_t opos[MAX_CLIPBOX], pos[MAX_CLIPBOX];
-    SECTOR_OBJECTp sop = pp->sop;
+    SECTOR_OBJECT* sop = pp->sop;
     short ang;
     short min_ndx = 0;
     int min_dist = 999999;
     int dist;
 
-    int ret_start;
     int ret;
-    int min_ret=0;
+    Collision min_ret{};
 
     int xvect,yvect;
 
@@ -60,93 +58,91 @@ int MultiClipMove(PLAYERp pp, int z, int floor_dist)
         // allowing you to move through wall
         ang = NORM_ANGLE(pp->angle.ang.asbuild() + sop->clipbox_ang[i]);
 
-        vec3_t spos = { pp->posx, pp->posy, z };
+        vec3_t spos = { pp->pos.X, pp->pos.Y, z };
 
         xvect = sop->clipbox_vdist[i] * bcos(ang);
         yvect = sop->clipbox_vdist[i] * bsin(ang);
-        ret_start = clipmove(&spos, &pp->cursectnum, xvect, yvect, (int)sop->clipbox_dist[i], Z(4), floor_dist, CLIPMASK_PLAYER, 1);
+        Collision coll;
+        clipmove(spos, &pp->cursector, xvect, yvect, (int)sop->clipbox_dist[i], Z(4), floor_dist, CLIPMASK_PLAYER, coll, 1);
 
-        if (ret_start)
+        if (coll.type != kHitNone)
         {
             // hit something moving into start position
             min_dist = 0;
             min_ndx = i;
             // ox is where it should be
-            opos[i].x = pos[i].x = pp->posx + MulScale(sop->clipbox_vdist[i], bcos(ang), 14);
-            opos[i].y = pos[i].y = pp->posy + MulScale(sop->clipbox_vdist[i], bsin(ang), 14);
+            opos[i].X = pos[i].X = pp->pos.X + MulScale(sop->clipbox_vdist[i], bcos(ang), 14);
+            opos[i].Y = pos[i].Y = pp->pos.Y + MulScale(sop->clipbox_vdist[i], bsin(ang), 14);
 
             // spos.x is where it hit
-            pos[i].x = spos.x;
-            pos[i].y = spos.y;
+            pos[i].X = spos.X;
+            pos[i].Y = spos.Y;
 
             // see the dist moved
-            dist = ksqrt(SQ(pos[i].x - opos[i].x) + SQ(pos[i].y - opos[i].y));
+            dist = ksqrt(SQ(pos[i].X - opos[i].X) + SQ(pos[i].Y - opos[i].Y));
 
             // save it off
             if (dist < min_dist)
             {
                 min_dist = dist;
                 min_ndx = i;
-                min_ret = ret_start;
+                min_ret = coll;
             }
         }
         else
         {
             // save off the start position
             opos[i] = pos[i] = spos;
-            pos[i].z = z;
+            pos[i].Z = z;
 
             // move the box
-            ret = clipmove(&pos[i], &pp->cursectnum, pp->xvect, pp->yvect, (int)sop->clipbox_dist[i], Z(4), floor_dist, CLIPMASK_PLAYER);
+            clipmove(pos[i], &pp->cursector, pp->vect.X, pp->vect.Y, (int)sop->clipbox_dist[i], Z(4), floor_dist, CLIPMASK_PLAYER, coll);
 
             // save the dist moved
-            dist = ksqrt(SQ(pos[i].x - opos[i].x) + SQ(pos[i].y - opos[i].y));
-
-            if (ret)
-            {
-            }
+            dist = ksqrt(SQ(pos[i].X - opos[i].X) + SQ(pos[i].Y - opos[i].Y));
 
             if (dist < min_dist)
             {
                 min_dist = dist;
                 min_ndx = i;
-                min_ret = ret;
+                min_ret = coll;
             }
         }
     }
 
     // put posx and y off from offset
-    pp->posx += pos[min_ndx].x - opos[min_ndx].x;
-    pp->posy += pos[min_ndx].y - opos[min_ndx].y;
+    pp->pos.X += pos[min_ndx].X - opos[min_ndx].X;
+    pp->pos.Y += pos[min_ndx].Y - opos[min_ndx].Y;
 
     return min_ret;
 }
 
-short MultiClipTurn(PLAYERp pp, short new_ang, int z, int floor_dist)
+short MultiClipTurn(PLAYER* pp, short new_ang, int z, int floor_dist)
 {
     int i;
-    SECTOR_OBJECTp sop = pp->sop;
+    SECTOR_OBJECT* sop = pp->sop;
     int ret;
     int x,y;
     short ang;
     int xvect, yvect;
-    int cursectnum = pp->cursectnum;
+    auto cursect = pp->cursector;
 
     for (i = 0; i < sop->clipbox_num; i++)
     {
         ang = NORM_ANGLE(new_ang + sop->clipbox_ang[i]);
 
-        vec3_t pos = { pp->posx, pp->posy, z };
+        vec3_t pos = { pp->pos.X, pp->pos.Y, z };
 
         xvect = sop->clipbox_vdist[i] * bcos(ang);
         yvect = sop->clipbox_vdist[i] * bsin(ang);
 
         // move the box
-        ret = clipmove(&pos, &cursectnum, xvect, yvect, (int)sop->clipbox_dist[i], Z(4), floor_dist, CLIPMASK_PLAYER);
+        Collision coll;
+        clipmove(pos, &cursect, xvect, yvect, (int)sop->clipbox_dist[i], Z(4), floor_dist, CLIPMASK_PLAYER, coll);
 
-        ASSERT(cursectnum >= 0);
+        ASSERT(cursect);
 
-        if (ret)
+        if (coll.type != kHitNone)
         {
             // attempt to move a bit when turning against a wall
             //ang = NORM_ANGLE(ang + 1024);
@@ -159,7 +155,7 @@ short MultiClipTurn(PLAYERp pp, short new_ang, int z, int floor_dist)
     return true;
 }
 
-int testquadinsect(int *point_num, vec2_t const * q, short sectnum)
+int testquadinsect(int *point_num, vec2_t const * q, sectortype* sect)
 {
     int i,next_i;
 
@@ -167,7 +163,7 @@ int testquadinsect(int *point_num, vec2_t const * q, short sectnum)
 
     for (i=0; i < 4; i++)
     {
-        if (!inside(q[i].x, q[i].y, sectnum))
+        if (!inside(q[i].X, q[i].Y, sect))
         {
             *point_num = i;
 
@@ -178,8 +174,8 @@ int testquadinsect(int *point_num, vec2_t const * q, short sectnum)
     for (i=0; i<4; i++)
     {
         next_i = (i+1) & 3;
-        if (!cansee(q[i].x, q[i].y,0x3fffffff, sectnum,
-                    q[next_i].x, q[next_i].y,0x3fffffff, sectnum))
+        if (!cansee(q[i].X, q[i].Y,0x3fffffff, sect,
+                    q[next_i].X, q[next_i].Y,0x3fffffff, sect))
         {
             return false;
         }
@@ -190,7 +186,7 @@ int testquadinsect(int *point_num, vec2_t const * q, short sectnum)
 
 
 //Ken gives the tank clippin' a try...
-int RectClipMove(PLAYERp pp, int *qx, int *qy)
+int RectClipMove(PLAYER* pp, int *qx, int *qy)
 {
     int i;
     vec2_t xy[4];
@@ -198,15 +194,15 @@ int RectClipMove(PLAYERp pp, int *qx, int *qy)
 
     for (i = 0; i < 4; i++)
     {
-        xy[i].x = qx[i] + (pp->xvect>>14);
-        xy[i].y = qy[i] + (pp->yvect>>14);
+        xy[i].X = qx[i] + (pp->vect.X>>14);
+        xy[i].Y = qy[i] + (pp->vect.Y>>14);
     }
 
     //Given the 4 points: x[4], y[4]
-    if (testquadinsect(&point_num, xy, pp->cursectnum))
+    if (testquadinsect(&point_num, xy, pp->cursector))
     {
-        pp->posx += (pp->xvect>>14);
-        pp->posy += (pp->yvect>>14);
+        pp->pos.X += (pp->vect.X>>14);
+        pp->pos.Y += (pp->vect.Y>>14);
         return true;
     }
 
@@ -217,13 +213,13 @@ int RectClipMove(PLAYERp pp, int *qx, int *qy)
     {
         for (i = 0; i < 4; i++)
         {
-            xy[i].x = qx[i] - (pp->yvect>>15);
-            xy[i].y = qy[i] + (pp->xvect>>15);
+            xy[i].X = qx[i] - (pp->vect.Y>>15);
+            xy[i].Y = qy[i] + (pp->vect.X>>15);
         }
-        if (testquadinsect(&point_num, xy, pp->cursectnum))
+        if (testquadinsect(&point_num, xy, pp->cursector))
         {
-            pp->posx -= (pp->yvect>>15);
-            pp->posy += (pp->xvect>>15);
+            pp->pos.X -= (pp->vect.Y>>15);
+            pp->pos.Y += (pp->vect.X>>15);
         }
 
         return false;
@@ -233,13 +229,13 @@ int RectClipMove(PLAYERp pp, int *qx, int *qy)
     {
         for (i = 0; i < 4; i++)
         {
-            xy[i].x = qx[i] + (pp->yvect>>15);
-            xy[i].y = qy[i] - (pp->xvect>>15);
+            xy[i].X = qx[i] + (pp->vect.Y>>15);
+            xy[i].Y = qy[i] - (pp->vect.X>>15);
         }
-        if (testquadinsect(&point_num, xy, pp->cursectnum))
+        if (testquadinsect(&point_num, xy, pp->cursector))
         {
-            pp->posx += (pp->yvect>>15);
-            pp->posy -= (pp->xvect>>15);
+            pp->pos.X += (pp->vect.Y>>15);
+            pp->pos.Y -= (pp->vect.X>>15);
         }
 
         return false;
@@ -269,11 +265,11 @@ int testpointinquad(int x, int y, int *qx, int *qy)
     return cnt>>31;
 }
 
-short RectClipTurn(PLAYERp pp, short new_ang, int *qx, int *qy, int *ox, int *oy)
+short RectClipTurn(PLAYER* pp, short new_ang, int *qx, int *qy, int *ox, int *oy)
 {
     int i;
     vec2_t xy[4];
-    SECTOR_OBJECTp sop = pp->sop;
+    SECTOR_OBJECT* sop = pp->sop;
     short rot_ang;
     int point_num;
 
@@ -287,13 +283,13 @@ short RectClipTurn(PLAYERp pp, short new_ang, int *qx, int *qy, int *ox, int *oy
     }
 
     //Given the 4 points: x[4], y[4]
-    if (testquadinsect(&point_num, xy, pp->cursectnum))
+    if (testquadinsect(&point_num, xy, pp->cursector))
     {
         // move to new pos
         for (i = 0; i < 4; i++)
         {
-            qx[i] = xy[i].x;
-            qy[i] = xy[i].y;
+            qx[i] = xy[i].X;
+            qy[i] = xy[i].Y;
         }
         return true;
     }

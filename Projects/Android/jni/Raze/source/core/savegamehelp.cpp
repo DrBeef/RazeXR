@@ -60,11 +60,11 @@
 #include "hw_sections.h"
 #include "sectorgeometry.h"
 #include "d_net.h"
+#include "ns.h"
+#include "serialize_obj.h"
+#include "games/blood/src/mapstructs.h"
 #include <zlib.h>
 
-
-sectortype sectorbackup[MAXSECTORS];
-walltype wallbackup[MAXWALLS];
 
 void WriteSavePic(FileWriter* file, int width, int height);
 bool WriteZip(const char* filename, TArray<FString>& filenames, TArray<FCompressedBuffer>& content);
@@ -73,9 +73,13 @@ extern FString BackupSaveGame;
 int SaveVersion;
 
 void SerializeMap(FSerializer &arc);
-FixedBitArray<MAXSPRITES> activeSprites;
 
-CVAR(String, cl_savedir, "", CVAR_ARCHIVE|CVAR_GLOBALCONFIG)
+CVAR(String, cl_savedir, "", CVAR_ARCHIVE | CVAR_GLOBALCONFIG)
+
+BEGIN_BLD_NS
+FSerializer& Serialize(FSerializer& arc, const char* keyname, XWALL& w, XWALL* def);
+FSerializer& Serialize(FSerializer& arc, const char* keyname, XSECTOR& w, XSECTOR* def);
+END_BLD_NS
 
 //=============================================================================
 //
@@ -100,6 +104,7 @@ static void SerializeGlobals(FSerializer& arc)
 
 static void SerializeSession(FSerializer& arc)
 {
+	arc.ReadObjects(false);
 	SerializeMap(arc);
 	SerializeStatistics(arc);
 	SECRET_Serialize(arc);
@@ -365,7 +370,7 @@ int G_ValidateSavegame(FileReader &fr, FString *savetitle, bool formenu)
 	}
 	if (!curLevel) return 0;
 	if (!formenu) currentLevel = curLevel;
-		
+
 
 	if (savever < savesig.minsavever)
 	{
@@ -441,9 +446,9 @@ FSerializer &Serialize(FSerializer &arc, const char *key, spritetype &c, spritet
 	def = &zsp; // always delta against 0
 	if (arc.BeginObject(key))
 	{
-		arc("x", c.x, def->x)
-			("y", c.y, def->y)
-			("z", c.z, def->z)
+		arc("x", c.pos.X, def->pos.X)
+			("y", c.pos.Y, def->pos.Y)
+			("z", c.pos.Z, def->pos.Z)
 			("cstat", c.cstat, def->cstat)
 			("picnum", c.picnum, def->picnum)
 			("shade", c.shade, def->shade)
@@ -455,9 +460,9 @@ FSerializer &Serialize(FSerializer &arc, const char *key, spritetype &c, spritet
 			("xoffset", c.xoffset, def->xoffset)
 			("yoffset", c.yoffset, def->yoffset)
 			("statnum", c.statnum)
-			("sectnum", c.sectnum)
+			("sectnum", c.sectp)
 			("ang", c.ang, def->ang)
-			("owner", c.owner, def->owner)
+			("owner", c.intowner, def->intowner)
 			("xvel", c.xvel, def->xvel)
 			("yvel", c.yvel, def->yvel)
 			("zvel", c.zvel, def->zvel)
@@ -465,7 +470,6 @@ FSerializer &Serialize(FSerializer &arc, const char *key, spritetype &c, spritet
 			("hitag", c.hitag, def->hitag)
 			("extra", c.extra, def->extra)
 			("detail", c.detail, def->detail)
-			("time", c.time, def->time)
 			("cstat2", c.cstat2, def->cstat2)
 			.EndObject();
 	}
@@ -490,7 +494,7 @@ FSerializer& Serialize(FSerializer& arc, const char* key, spriteext_t& c, sprite
 			("roll", c.roll, def->roll)
 			("pivot_offset", c.pivot_offset, def->pivot_offset)
 			("position_offset", c.position_offset, def->position_offset)
-			("flags", c.flags, def->flags)
+			("flags", c.renderflags, def->renderflags)
 			("alpha", c.alpha, def->alpha)
 			.EndObject();
 	}
@@ -503,10 +507,14 @@ FSerializer &Serialize(FSerializer &arc, const char *key, sectortype &c, sectort
 {
 	if (arc.BeginObject(key))
 	{
-		arc("wallptr", c.wallptr, def->wallptr)
+		arc("firstentry", c.firstEntry)
+			("lastentry", c.lastEntry)
+			("wallptr", c.wallptr, def->wallptr)
 			("wallnum", c.wallnum, def->wallnum)
+#ifndef SECTOR_HACKJOB // can't save these in test mode...
 			("ceilingz", c.ceilingz, def->ceilingz)
 			("floorz", c.floorz, def->floorz)
+#endif
 			("ceilingstat", c.ceilingstat, def->ceilingstat)
 			("floorstat", c.floorstat, def->floorstat)
 			("ceilingpicnum", c.ceilingpicnum, def->ceilingpicnum)
@@ -528,7 +536,69 @@ FSerializer &Serialize(FSerializer &arc, const char *key, sectortype &c, sectort
 			("extra", c.extra, def->extra)
 			("portalflags", c.portalflags, def->portalflags)
 			("portalnum", c.portalnum, def->portalnum)
-			.EndObject();
+			("exflags", c.exflags, def->exflags);
+
+		// Save the extensions only when playing their respective games.
+		if (isDukeLike())
+		{
+			arc("keyinfo", c.keyinfo, def->keyinfo)
+				("shadedsector", c.shadedsector, def->shadedsector)
+				("hitagactor", c.hitagactor, def->hitagactor);
+
+		}
+		else if (isBlood())
+		{
+			arc("upperlink", c.upperLink, def->upperLink)
+				("lowerlink", c.lowerLink, def->lowerLink)
+				("basefloor", c.baseFloor, def->baseFloor)
+				("baseCeil", c.baseCeil, def->baseCeil)
+				("velfloor", c.velFloor, def->velFloor)
+				("velCeil", c.velCeil, def->velCeil)
+				("slopwwallofs", c.slopewallofs, def->slopewallofs);
+
+			if (arc.isWriting())
+			{
+				if (c.hasX())
+				{
+					BLD_NS::Serialize(arc, "xsector", *c._xs, nullptr);
+				}
+			}
+			else
+			{
+				if (arc.HasObject("xsector"))
+				{
+					c.allocX();
+					BLD_NS::Serialize(arc, "xsector", *c._xs, nullptr);
+				}
+			}
+		}
+		else if (isExhumed())
+		{
+			arc("SoundSect", c.pSoundSect, def->pSoundSect)
+				("Depth", c.Depth, def->Depth)
+				("Above", c.pAbove, def->pAbove)
+				("Below", c.pBelow, def->pBelow)
+				("Sound", c.Sound, def->Sound)
+				("Flag", c.Flag, def->Flag)
+				("Damage", c.Damage, def->Damage)
+				("Speed", c.Speed, def->Speed);
+
+		}
+		else if (isSWALL())
+		{
+			arc("flags", c.flags, def->flags)
+				("depth_fixed", c.depth_fixed, def->depth_fixed)
+				("stag", c.stag, def->stag)
+				("ang", c.ang, def->ang)
+				("height", c.height, def->height)
+				("speed", c.speed, def->speed)
+				("damage", c.damage, def->damage)
+				("number", c.number, def->number)
+				("u_defined", c.u_defined, def->u_defined)
+				("flags2", c.flags2, def->flags2);
+		}
+
+		arc.EndObject();
 	}
 	return arc;
 }
@@ -537,8 +607,8 @@ FSerializer &Serialize(FSerializer &arc, const char *key, walltype &c, walltype 
 {
 	if (arc.BeginObject(key))
 	{
-		arc("x", c.x, def->x)
-			("y", c.y, def->y)
+		arc("x", c.pos.X, def->pos.X)
+			("y", c.pos.Y, def->pos.Y)
 			("point2", c.point2, def->point2)
 			("nextwall", c.nextwall, def->nextwall)
 			("nextsector", c.nextsector, def->nextsector)
@@ -555,58 +625,70 @@ FSerializer &Serialize(FSerializer &arc, const char *key, walltype &c, walltype 
 			("hitag", c.hitag, def->hitag)
 			("extra", c.extra, def->extra)
 			("portalflags", c.portalflags, def->portalflags)
-			("portalnum", c.portalnum, def->portalnum)
+			("portalnum", c.portalnum, def->portalnum);
+
+		// Save the blood-specific extensions only when playing Blood
+		if (isBlood())
+		{
+			arc("wallbase", c.baseWall, def->baseWall);
+			if (arc.isWriting())
+			{
+				if (c.hasX())
+				{
+					BLD_NS::Serialize(arc, "xwall", *c._xw, nullptr);
+				}
+			}
+			else
+			{
+				if (arc.HasObject("xwall"))
+				{
+					c.allocX();
+					BLD_NS::Serialize(arc, "xwall", *c._xw, nullptr);
+				}
+			}
+		}
+
+		arc.EndObject();
+	}
+	return arc;
+}
+
+FSerializer& Serialize(FSerializer& arc, const char* key, ActorStatList& c, ActorStatList* def)
+{
+	if (arc.BeginObject(key))
+	{
+		arc("firstentry", c.firstEntry)
+			("lastentry", c.lastEntry)
 			.EndObject();
 	}
 	return arc;
 }
 
+void DCoreActor::Serialize(FSerializer& arc)
+{
+	Super::Serialize(arc);
+	arc("link_stat", link_stat)
+		("link_sector", link_sector)
+		("prevstat", prevStat)
+		("nextstat", nextStat)
+		("prevsect", prevSect)
+		("nextsect", nextSect)
+		("sprite", spr)
+		("time", time)
+		("spritesetindex", spritesetindex)
+		("spriteext", sprext);
+
+	if (arc.isReading()) spsmooth = {};
+}
+
 
 void SerializeMap(FSerializer& arc)
 {
-	// create a map of all used sprites so that we can use that elsewhere to only save what's needed.
-	activeSprites.Zero();
-	if (arc.isWriting())
-	{
-		for (int i=0; i<MAXSPRITES;i++)
-		{
-			if (sprite[i].statnum != MAXSTATUS)
-			{
-				activeSprites.Set(i);
-			}
-		}
-		// simplify the data a bit for better compression. 
-		for (int i = 0; i < MAXSPRITES; i++)
-		{
-			if (nextspritestat[i] == i + 1) nextspritestat[i] = -2;
-			if (nextspritesect[i] == i + 1) nextspritesect[i] = -2;
-			if (prevspritestat[i] == i - 1) prevspritestat[i] = -2;
-			if (prevspritesect[i] == i - 1) prevspritesect[i] = -2;
-		}
-
-	}
-	else
-	{
-		memset(sprite, 0, sizeof(sprite[0]) * MAXSPRITES);
-		initspritelists();
-		zsp = sprite[0];
-	}
-
 	if (arc.BeginObject("engine"))
 	{
-		arc.SerializeMemory("activesprites", activeSprites.Storage(), activeSprites.StorageSize())
-			.SparseArray("sprites", sprite, MAXSPRITES, activeSprites)
-			.SparseArray("spriteext", spriteext, MAXSPRITES, activeSprites)
-			("numsectors", numsectors)
-			.Array("sectors", sector, sectorbackup, numsectors)
-			("numwalls", numwalls)
-			.Array("walls", wall, wallbackup, numwalls)
-			.Array("headspritestat", headspritestat, MAXSTATUS + 1)
-			.Array("nextspritestat", nextspritestat, MAXSPRITES)
-			.Array("prevspritestat", prevspritestat, MAXSPRITES)
-			.Array("headspritesect", headspritesect, MAXSECTORS + 1)
-			.Array("nextspritesect", nextspritesect, MAXSPRITES)
-			.Array("prevspritesect", prevspritesect, MAXSPRITES)
+		arc.Array("statlist", statList, MAXSTATUS)
+			("sectors", sector, sectorbackup)
+			("walls", wall, wallbackup)
 
 			("tailspritefree", tailspritefree)
 			("myconnectindex", myconnectindex)
@@ -615,10 +697,7 @@ void SerializeMap(FSerializer& arc)
 			("randomseed", randomseed)
 			("numshades", numshades)	// is this really needed?
 			("visibility", g_visibility)
-			("parallaxtype", parallaxtype)
-			("parallaxyo", parallaxyoffs_override)
-			("parallaxys", parallaxyscale_override)
-			("pskybits", pskybits_override)
+			("relvisibility", g_relvisibility)
 			("numsprites", Numsprites)
 			("gamesetinput", gamesetinput)
 			("allportals", allPortals);
@@ -638,20 +717,11 @@ void SerializeMap(FSerializer& arc)
 		arc.EndObject();
 	}
 
-
-	// Undo the simplification.
-	for (int i = 0; i < MAXSPRITES; i++)
-	{
-		if (nextspritestat[i] == -2) nextspritestat[i] = i + 1;
-		if (nextspritesect[i] == -2) nextspritesect[i] = i + 1;
-		if (prevspritestat[i] == -2) prevspritestat[i] = i - 1;
-		if (prevspritesect[i] == -2) prevspritesect[i] = i - 1;
-	}
 	if (arc.isReading())
 	{
 		setWallSectors();
-		hw_BuildSections();
-		sectorGeometry.SetSize(numsections);
+		hw_CreateSections();
+		sectionGeometry.SetSize(sections.Size());
 	}
 }
 
@@ -682,12 +752,13 @@ static int nextquicksave = -1;
 
  void DoLoadGame(const char* name)
  {
+	 gi->FreeLevelData();
 	 if (ReadSavegame(name))
 	 {
-			 gameaction = ga_level;
-		 }
-		 else
-		 {
+		 gameaction = ga_level;
+	 }
+	 else
+	 {
 		 I_Error("%s: Failed to open savegame", name);
 	 }
  }
@@ -711,7 +782,6 @@ static int nextquicksave = -1;
 	 }
 
 	 inputState.ClearAllInput();
-	 gi->FreeLevelData();
 	 DoLoadGame(savename);
 	 BackupSaveGame = savename;
  }
@@ -782,7 +852,7 @@ static int nextquicksave = -1;
 		 BackupSaveGame = fn;
 	 }
  }
- 
+
  //---------------------------------------------------------------------------
  //
  //

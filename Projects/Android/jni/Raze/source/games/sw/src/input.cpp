@@ -34,21 +34,19 @@ Prepared for public release: 03/28/2005 - Charlie Wiederhold, 3D Realms
 
 BEGIN_SW_NS
 
-void DoPlayerHorizon(PLAYERp pp, float const horz, double const scaleAdjust);
-void DoPlayerTurn(PLAYERp pp, float const avel, double const scaleAdjust);
-void DoPlayerTurnVehicle(PLAYERp pp, float avel, int z, int floor_dist);
-void DoPlayerTurnTurret(PLAYERp pp, float avel);
+void DoPlayerHorizon(PLAYER* pp, float const horz, double const scaleAdjust);
+void DoPlayerTurn(PLAYER* pp, float const avel, double const scaleAdjust);
+void DoPlayerTurnVehicle(PLAYER* pp, float avel, int z, int floor_dist);
+void DoPlayerTurnTurret(PLAYER* pp, float avel);
 
 static InputPacket loc;
 
-void
-InitNetVars(void)
+void InitNetVars(void)
 {
     loc = {};
 }
 
-void
-InitTimingVars(void)
+void InitTimingVars(void)
 {
     PlayClock = 0;
     randomseed = 17L;
@@ -78,23 +76,23 @@ enum
 //
 //---------------------------------------------------------------------------
 
-static void processWeapon(PLAYERp const pp)
+static void processWeapon(PLAYER* const pp)
 {
-    if (pp->Actor() == nullptr) return;
-    USERp u = pp->Actor()->u();
+    DSWActor* plActor = pp->actor;
+    if (plActor == nullptr) return;
     int i;
 
     if (loc.getNewWeapon() == WeaponSel_Next)
     {
-        short next_weapon = u->WeaponNum + 1;
-        short start_weapon;
+        int next_weapon = plActor->user.WeaponNum + 1;
+        int start_weapon;
 
-        start_weapon = u->WeaponNum + 1;
+        start_weapon = plActor->user.WeaponNum + 1;
 
-        if (u->WeaponNum == WPN_SWORD)
+        if (plActor->user.WeaponNum == WPN_SWORD)
             start_weapon = WPN_STAR;
 
-        if (u->WeaponNum == WPN_FIST)
+        if (plActor->user.WeaponNum == WPN_FIST)
         {
             next_weapon = 14;
         }
@@ -109,7 +107,7 @@ static void processWeapon(PLAYERp const pp)
                     break;
                 }
 
-                if (TEST(pp->WpnFlags, BIT(i)) && pp->WpnAmmo[i])
+                if (pp->WpnFlags & (BIT(i)) && pp->WpnAmmo[i])
                 {
                     next_weapon = i;
                     break;
@@ -121,16 +119,16 @@ static void processWeapon(PLAYERp const pp)
     }
     else if (loc.getNewWeapon() == WeaponSel_Prev)
     {
-        short prev_weapon = u->WeaponNum - 1;
-        short start_weapon;
+        int prev_weapon = plActor->user.WeaponNum - 1;
+        int start_weapon;
 
-        start_weapon = u->WeaponNum - 1;
+        start_weapon = plActor->user.WeaponNum - 1;
 
-        if (u->WeaponNum == WPN_SWORD)
+        if (plActor->user.WeaponNum == WPN_SWORD)
         {
             prev_weapon = 13;
         }
-        else if (u->WeaponNum == WPN_STAR)
+        else if (plActor->user.WeaponNum == WPN_STAR)
         {
             prev_weapon = 14;
         }
@@ -142,7 +140,7 @@ static void processWeapon(PLAYERp const pp)
                 if (i <= -1)
                     i = WPN_HEART;
 
-                if (TEST(pp->WpnFlags, BIT(i)) && pp->WpnAmmo[i])
+                if (pp->WpnFlags & (BIT(i)) && pp->WpnAmmo[i])
                 {
                     prev_weapon = i;
                     break;
@@ -153,16 +151,16 @@ static void processWeapon(PLAYERp const pp)
     }
     else if (loc.getNewWeapon() == WeaponSel_Alt)
     {
-        short const which_weapon = u->WeaponNum + 1;
+        int which_weapon = plActor->user.WeaponNum + 1;
         loc.setNewWeapon(which_weapon);
     }
 }
 
 void GameInterface::GetInput(ControlInfo* const hidInput, double const scaleAdjust, InputPacket *packet)
 {
-    PLAYERp pp = &Player[myconnectindex];
+    PLAYER* pp = &Player[myconnectindex];
 
-    if (paused || M_Active() || pp->Actor() == nullptr)
+    if (paused || M_Active() || pp->actor == nullptr)
     {
         loc = {};
         return;
@@ -176,22 +174,22 @@ void GameInterface::GetInput(ControlInfo* const hidInput, double const scaleAdju
 
     if (!SyncInput())
     {
-        if (TEST(pp->Flags2, PF2_INPUT_CAN_AIM))
+        if ((pp->Flags2 & PF2_INPUT_CAN_AIM))
         {
             DoPlayerHorizon(pp, input.horz, scaleAdjust);
         }
 
-        if (TEST(pp->Flags2, PF2_INPUT_CAN_TURN_GENERAL))
+        if ((pp->Flags2 & PF2_INPUT_CAN_TURN_GENERAL))
         {
             DoPlayerTurn(pp, input.avel, scaleAdjust);
         }
 
-        if (TEST(pp->Flags2, PF2_INPUT_CAN_TURN_VEHICLE))
+        if ((pp->Flags2 & PF2_INPUT_CAN_TURN_VEHICLE))
         {
-            DoPlayerTurnVehicle(pp, input.avel, pp->posz + Z(10), labs(pp->posz + Z(10) - pp->sop->floor_loz));
+            DoPlayerTurnVehicle(pp, input.avel, pp->pos.Z + Z(10), labs(pp->pos.Z + Z(10) - pp->sop->floor_loz));
         }
 
-        if (TEST(pp->Flags2, PF2_INPUT_CAN_TURN_TURRET))
+        if ((pp->Flags2 & PF2_INPUT_CAN_TURN_TURRET))
         {
             DoPlayerTurnTurret(pp, input.avel);
         }

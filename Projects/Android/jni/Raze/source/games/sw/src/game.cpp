@@ -32,6 +32,7 @@ Prepared for public release: 03/28/2005 - Charlie Wiederhold, 3D Realms
 #include "names2.h"
 #include "panel.h"
 #include "game.h"
+#include "swactor.h"
 #include "interpso.h"
 #include "tags.h"
 #include "sector.h"
@@ -46,9 +47,10 @@ Prepared for public release: 03/28/2005 - Charlie Wiederhold, 3D Realms
 #include "texturemanager.h"
 #include "st_start.h"
 #include "i_interface.h"
+#include "psky.h"
+#include "startscreen.h"
 
 
-#include "mytypes.h"
 
 #include "menus.h"
 
@@ -90,7 +92,61 @@ CVAR(Bool, sw_bunnyrockets, false, CVAR_SERVERINFO | CVAR_CHEAT);   // This is a
 
 BEGIN_SW_NS
 
-void pClearSpriteList(PLAYERp pp);
+IMPLEMENT_CLASS(DSWActor, false, true)
+IMPLEMENT_POINTERS_START(DSWActor)
+IMPLEMENT_POINTER(ownerActor)
+IMPLEMENT_POINTER(user.lowActor)
+IMPLEMENT_POINTER(user.lowActor)
+IMPLEMENT_POINTER(user.highActor)
+IMPLEMENT_POINTER(user.targetActor)
+IMPLEMENT_POINTER(user.flameActor)
+IMPLEMENT_POINTER(user.attachActor)
+IMPLEMENT_POINTER(user.WpnGoalActor)
+IMPLEMENT_POINTERS_END
+
+void MarkSOInterp();
+
+void markgcroots()
+{
+    MarkSOInterp();
+    GC::MarkArray(StarQueue, MAX_STAR_QUEUE);
+    GC::MarkArray(HoleQueue, MAX_HOLE_QUEUE);
+    GC::MarkArray(WallBloodQueue, MAX_WALLBLOOD_QUEUE);
+    GC::MarkArray(FloorBloodQueue, MAX_FLOORBLOOD_QUEUE);
+    GC::MarkArray(GenericQueue, MAX_GENERIC_QUEUE);
+    GC::MarkArray(LoWangsQueue, MAX_LOWANGS_QUEUE);
+    GC::MarkArray(BossSpriteNum, 3);
+    for (auto& pl : Player)
+    {
+        GC::Mark(pl.actor);
+        GC::Mark(pl.lowActor);
+        GC::Mark(pl.highActor);
+        GC::Mark(pl.remoteActor);
+        GC::Mark(pl.PlayerUnderActor);
+        GC::Mark(pl.KillerActor);
+        GC::Mark(pl.HitBy);
+        GC::Mark(pl.last_camera_act);
+    }
+    for (auto& so : SectorObject)
+    {
+       GC::Mark(so.controller);
+       GC::Mark(so.sp_child);
+       GC::MarkArray(so.so_actors, MAX_SO_SPRITE);
+       GC::Mark(so.match_event_actor);
+    }
+    for (int i = 0; i < AnimCnt; i++)
+    {
+        GC::Mark(Anim[i].animactor);
+    }
+    for (auto& mir : mirror)
+    {
+        GC::Mark(mir.cameraActor);
+        GC::Mark(mir.camspriteActor);
+    }
+}
+
+
+void pClearSpriteList(PLAYER* pp);
 
 extern int sw_snd_scratch;
 
@@ -106,7 +162,7 @@ short screenpeek = 0;
 
 int GodMode = false;
 short Skill = 2;
-short TotalKillable;
+int TotalKillable;
 
 const GAME_SET gs_defaults =
 {
@@ -160,6 +216,7 @@ static void SetTileNames()
     auto registerName = [](const char* name, int index)
     {
         TexMan.AddAlias(name, tileGetTexture(index));
+        TileFiles.addName(name, index);
     };
 #include "namelist.h"
 }
@@ -178,6 +235,8 @@ void GameInterface::LoadGameTextures()
 
 void GameInterface::app_init()
 {
+    GC::AddMarkerFunc(markgcroots);
+
     GameTicRate = TICS_PER_SEC / synctics;
     InitCheats();
     automapping = 1;
@@ -211,8 +270,7 @@ void GameInterface::app_init()
 
     //Connect();
     SortBreakInfo();
-    parallaxtype = 1;
-    SW_InitMultiPsky();
+    defineSky(DEFAULTPSKY, 1, nullptr);
 
     memset(Track, 0, sizeof(Track));
     memset(Player, 0, sizeof(Player));
@@ -222,7 +280,7 @@ void GameInterface::app_init()
     LoadCustomInfoFromScript("engine/swcustom.txt");	// load the internal definitions. These also apply to the shareware version.
     if (!SW_SHAREWARE)
         LoadCustomInfoFromScript("swcustom.txt");   // Load user customisation information
- 
+
     SetTileNames();
     userConfig.AddDefs.reset();
     InitFX();
@@ -288,6 +346,27 @@ void InitLevelGlobals2(void)
 //
 //---------------------------------------------------------------------------
 
+void spawnactors(SpawnSpriteDef& sprites)
+{
+    InitSpriteLists();
+    for (unsigned i = 0; i < sprites.sprites.Size(); i++)
+    {
+        if (sprites.sprites[i].statnum == MAXSTATUS)
+        {
+            continue;
+        }
+        auto sprt = &sprites.sprites[i];
+        auto actor = insertActor(sprt->sectp, sprt->statnum);
+        actor->spr = sprites.sprites[i];
+        actor->time = i;
+        if (sprites.sprext.Size()) actor->sprext = sprites.sprext[i];
+        else actor->sprext = {};
+        actor->spsmooth = {};
+    }
+    leveltimer = sprites.sprites.Size();
+}
+
+
 void InitLevel(MapRecord *maprec)
 {
     Terminate3DSounds();
@@ -322,16 +401,22 @@ void InitLevel(MapRecord *maprec)
 
     int16_t ang;
     currentLevel = maprec;
-    engineLoadBoard(maprec->fileName, SW_SHAREWARE ? 1 : 0, &Player[0].pos, &ang, &Player[0].cursectnum);
+    int cursect;
+    SpawnSpriteDef sprites;
+    loadMap(maprec->fileName, SW_SHAREWARE ? 1 : 0, &Player[0].pos, &ang, &cursect, sprites);
+    spawnactors(sprites);
+    Player[0].cursector = &sector[cursect];
 
     SECRET_SetMapName(currentLevel->DisplayName(), currentLevel->name);
     STAT_NewLevel(currentLevel->fileName);
+    TITLE_InformName(currentLevel->name);
     Player[0].angle.ang = buildang(ang);
 
-    if (sector[0].extra != -1)
+    auto vissect = &sector[0]; // hack alert!
+    if (vissect->extra != -1)
     {
-        NormalVisibility = g_visibility = sector[0].extra;
-        sector[0].extra = 0;
+        NormalVisibility = g_visibility = vissect->extra;
+        vissect->extra = 0;
     }
     else
         NormalVisibility = g_visibility;
@@ -419,7 +504,6 @@ void TerminateLevel(void)
     if (!currentLevel) return;
 
     int i, stat, pnum, ndx;
-    SECT_USERp* sectu;
 
     // Free any track points
     for (ndx = 0; ndx < MAX_TRACKS; ndx++)
@@ -427,8 +511,11 @@ void TerminateLevel(void)
         Track[ndx].FreeTrackPoints();
     }
 
-    // Clear the tracks
+    // Clear the tracks and other arrays holding pointers into the level data.
     memset(Track, 0, sizeof(Track));
+    memset(SineWaveFloor, 0, sizeof(SineWaveFloor));
+    memset(SineWall, 0, sizeof(SineWall));
+    memset(SpringBoard, 0, sizeof(SpringBoard));
 
     StopFX();
 
@@ -444,28 +531,41 @@ void TerminateLevel(void)
         SWStatIterator it(stat);
         if (auto actor = it.Next())
         {
-            if (actor->hasU()) puser[pnum].CopyFromUser(actor->u());
+            if (actor->hasU()) puser[pnum].CopyFromUser(actor);
         }
     }
 
-    // Kill User memory and delete sprites
+    // clear some pointers KillActor may operate upon.
     SWSpriteIterator it;
+    while (auto actor = it.Next())
+    {
+        actor->user.targetActor = nullptr;
+        actor->user.flameActor = nullptr;
+    }
+    // Kill User memory and delete sprites
+    it.Reset();
     while (auto actor = it.Next())
     {
         KillActor(actor);
     }
 
-    // Free SectUser memory
-    for (auto& su : SectUser) su.Clear();
-
     TRAVERSE_CONNECT(pnum)
     {
-        PLAYERp pp = Player + pnum;
+        PLAYER* pp = &Player[pnum];
 
         // Free panel sprites for players
         pClearSpriteList(pp);
 
+        // clear *all* pointers in Player!
+        pp->remote = {};
+        pp->sop = pp->sop_remote = nullptr;
+        pp->LadderSector = nullptr;
         pp->cookieTime = 0;
+        pp->hi_sectp = pp->lo_sectp = nullptr;
+        pp->cursector = pp->lastcursector = pp->lv_sector = nullptr;
+        pp->sop_control = pp->sop_riding = nullptr;
+        pp->PanelSpriteList = {};
+
         memset(pp->cookieQuote, 0, sizeof(pp->cookieQuote));
         pp->DoPlayerAction = nullptr;
 
@@ -496,7 +596,7 @@ static void PlayOrderSound()
     if (!DidOrderSound)
     {
         DidOrderSound = true;
-        int choose_snd = STD_RANDOM_RANGE(1000);
+        int choose_snd = StdRandomRange(1000);
         if (choose_snd > 500)
             PlaySound(DIGI_WANGORDER1, v3df_dontpan, CHAN_BODY, CHANF_UI);
         else
@@ -618,7 +718,7 @@ void GameInterface::Render()
 
     drawtime.Reset();
     drawtime.Clock();
-    drawscreen(Player + screenpeek, smoothratio);
+    drawscreen(Player + screenpeek, smoothratio, false);
     drawtime.Unclock();
 }
 
@@ -684,7 +784,7 @@ int StdRandomRange(int range)
     if (range <= 0)
         return 0;
 
-    rand_num = STD_RANDOM();
+    rand_num = rand();
 
     if (rand_num == RAND_MAX)
         rand_num--;
@@ -720,7 +820,7 @@ ReservedSpace GameInterface::GetReservedScreenSpace(int viewsize)
 
 GameStats GameInterface::getStats()
 {
-	PLAYERp pp = Player + myconnectindex;
+	PLAYER* pp = Player + myconnectindex;
 	return { pp->Kills, TotalKillable, pp->SecretsFound, LevelSecrets, PlayClock / 120, 0 };
 }
 

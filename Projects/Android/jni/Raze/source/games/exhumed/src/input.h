@@ -18,7 +18,6 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 
 #pragma once 
 
-#include "compat.h"
 #include "packet.h"
 
 BEGIN_PS_NS
@@ -33,7 +32,7 @@ enum {
 // 32 bytes
 struct PlayerInput
 {
-    DExhumedActor* pTarget;
+    TObjPtr<DExhumedActor*> pTarget;
     int xVel;
     int yVel;
     uint16_t buttons;

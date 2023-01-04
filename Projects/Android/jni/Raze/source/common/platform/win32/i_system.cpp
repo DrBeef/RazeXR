@@ -81,6 +81,7 @@
 #include "bitmap.h"
 #include "cmdlib.h"
 #include "i_interface.h"
+#include "i_mainwindow.h"
 
 // MACROS ------------------------------------------------------------------
 
@@ -91,10 +92,6 @@
 #endif
 
 // TYPES -------------------------------------------------------------------
-
-// EXTERNAL FUNCTION PROTOTYPES --------------------------------------------
-
-extern void LayoutMainWindow(HWND hWnd, HWND pane);
 
 // PUBLIC FUNCTION PROTOTYPES ----------------------------------------------
 
@@ -116,13 +113,11 @@ EXTERN_CVAR (Bool, autoloadbrightmaps)
 EXTERN_CVAR (Bool, autoloadwidescreen)
 EXTERN_CVAR (Int, vid_preferbackend)
 
-extern HWND Window, ConWindow, GameTitleWindow;
 extern HANDLE StdOut;
 extern bool FancyStdOut;
 extern HINSTANCE g_hInst;
 extern FILE *Logfile;
 extern bool NativeMouse;
-extern bool ConWindowHidden;
 
 // PUBLIC DATA DEFINITIONS -------------------------------------------------
 
@@ -281,175 +276,46 @@ void CalculateCPUSpeed()
 //
 //==========================================================================
 
-static void DoPrintStr(const char *cpt, HWND edit, HANDLE StdOut)
+static void PrintToStdOut(const char *cpt, HANDLE StdOut)
 {
-	if (edit == nullptr && StdOut == nullptr && !con_debugoutput)
-		return;
+	const char* srcp = cpt;
+	FString printData = "";
+	bool terminal = FancyStdOut;
 
-	wchar_t wbuf[256];
-	int bpos = 0;
-	CHARRANGE selection = {};
-	CHARRANGE endselection = {};
-	LONG lines_before = 0, lines_after;
-	CHARFORMAT format;
-
-	if (edit != NULL)
+	while (*srcp != 0)
 	{
-		// Store the current selection and set it to the end so we can append text.
-		SendMessage(edit, EM_EXGETSEL, 0, (LPARAM)&selection);
-		endselection.cpMax = endselection.cpMin = GetWindowTextLength(edit);
-		SendMessage(edit, EM_EXSETSEL, 0, (LPARAM)&endselection);
-
-		// GetWindowTextLength and EM_EXSETSEL can disagree on where the end of
-		// the text is. Find out what EM_EXSETSEL thought it was and use that later.
-		SendMessage(edit, EM_EXGETSEL, 0, (LPARAM)&endselection);
-
-		// Remember how many lines there were before we added text.
-		lines_before = (LONG)SendMessage(edit, EM_GETLINECOUNT, 0, 0);
-	}
-
-	const uint8_t *cptr = (const uint8_t*)cpt;
-
-	auto outputIt = [&]()
-	{
-		wbuf[bpos] = 0;
-		if (edit != nullptr)
+		if (*srcp == 0x1c && terminal)
 		{
-			SendMessageW(edit, EM_REPLACESEL, FALSE, (LPARAM)wbuf);
-		}
-		if (con_debugoutput)
-		{
-			OutputDebugStringW(wbuf);
-		}
-		if (StdOut != nullptr)
-		{
-			// Convert back to UTF-8.
-			DWORD bytes_written;
-			if (!FancyStdOut)
+			srcp += 1;
+			const uint8_t* scratch = (const uint8_t*)srcp; // GCC does not like direct casting of the parameter.
+			EColorRange range = V_ParseFontColor(scratch, CR_UNTRANSLATED, CR_YELLOW);
+			srcp = (char*)scratch;
+			if (range != CR_UNDEFINED)
 			{
-				FString conout(wbuf);
-				WriteFile(StdOut, conout.GetChars(), (DWORD)conout.Len(), &bytes_written, NULL);
-			}
-			else
-			{
-				WriteConsoleW(StdOut, wbuf, bpos, &bytes_written, nullptr);
+				PalEntry color = V_LogColorFromColorRange(range);
+				printData.AppendFormat("\033[38;2;%u;%u;%um", color.r, color.g, color.b);
 			}
 		}
-		bpos = 0;
-	};
-
-	while (int chr = GetCharFromString(cptr))
-	{
-		if ((chr == TEXTCOLOR_ESCAPE && bpos != 0) || bpos == 255)
+		else if (*srcp != 0x1c && *srcp != 0x1d && *srcp != 0x1e && *srcp != 0x1f)
 		{
-			outputIt();
-		}
-		if (chr != TEXTCOLOR_ESCAPE)
-		{
-			if (chr >= 0x1D && chr <= 0x1F)
-			{ // The bar characters, most commonly used to indicate map changes
-				chr = 0x2550;	// Box Drawings Double Horizontal
-			}
-			wbuf[bpos++] = chr;
+			printData += *srcp++;
 		}
 		else
 		{
-			EColorRange range = V_ParseFontColor(cptr, CR_UNTRANSLATED, CR_YELLOW);
-
-			if (range != CR_UNDEFINED)
-			{
-				// Change the color of future text added to the control.
-				PalEntry color = V_LogColorFromColorRange(range);
-				if (StdOut != NULL && FancyStdOut)
-				{
-					// Unfortunately, we are pretty limited here: There are only
-					// eight basic colors, and each comes in a dark and a bright
-					// variety.
-					float h, s, v, r, g, b;
-					int attrib = 0;
-
-					RGBtoHSV(color.r / 255.f, color.g / 255.f, color.b / 255.f, &h, &s, &v);
-					if (s != 0)
-					{ // color
-						HSVtoRGB(&r, &g, &b, h, 1, 1);
-						if (r == 1)  attrib  = FOREGROUND_RED;
-						if (g == 1)  attrib |= FOREGROUND_GREEN;
-						if (b == 1)  attrib |= FOREGROUND_BLUE;
-						if (v > 0.6) attrib |= FOREGROUND_INTENSITY;
-					}
-					else
-					{ // gray
-						     if (v < 0.33) attrib = FOREGROUND_INTENSITY;
-						else if (v < 0.90) attrib = FOREGROUND_RED | FOREGROUND_GREEN | FOREGROUND_BLUE;
-						else			   attrib = FOREGROUND_RED | FOREGROUND_GREEN | FOREGROUND_BLUE | FOREGROUND_INTENSITY;
-					}
-					SetConsoleTextAttribute(StdOut, (WORD)attrib);
-				}
-				if (edit != NULL)
-				{
-					// GDI uses BGR colors, but color is RGB, so swap the R and the B.
-					std::swap(color.r, color.b);
-					// Change the color.
-					format.cbSize = sizeof(format);
-					format.dwMask = CFM_COLOR;
-					format.dwEffects = 0;
-					format.crTextColor = color;
-					SendMessage(edit, EM_SETCHARFORMAT, SCF_SELECTION, (LPARAM)&format);
-				}
-			}
+			if (srcp[1] != 0) srcp += 2;
+			else break;
 		}
 	}
-	if (bpos != 0)
-	{
-		outputIt();
-	}
-
-	if (edit != NULL)
-	{
-		// If the old selection was at the end of the text, keep it at the end and
-		// scroll. Don't scroll if the selection is anywhere else.
-		if (selection.cpMin == endselection.cpMin && selection.cpMax == endselection.cpMax)
-		{
-			selection.cpMax = selection.cpMin = GetWindowTextLength (edit);
-			lines_after = (LONG)SendMessage(edit, EM_GETLINECOUNT, 0, 0);
-			if (lines_after > lines_before)
-			{
-				SendMessage(edit, EM_LINESCROLL, 0, lines_after - lines_before);
-			}
-		}
-		// Restore the previous selection.
-		SendMessage(edit, EM_EXSETSEL, 0, (LPARAM)&selection);
-		// Give the edit control a chance to redraw itself.
-		I_GetEvent();
-	}
-	if (StdOut != NULL && FancyStdOut)
-	{ // Set text back to gray, in case it was changed.
-		SetConsoleTextAttribute(StdOut, FOREGROUND_RED | FOREGROUND_GREEN | FOREGROUND_BLUE);
-	}
+	DWORD bytes_written;
+	WriteFile(StdOut, printData.GetChars(), (DWORD)printData.Len(), &bytes_written, NULL);
+	if (terminal) 
+		WriteFile(StdOut, "\033[0m", 4, &bytes_written, NULL);
 }
-
-static TArray<FString> bufferedConsoleStuff;
 
 void I_PrintStr(const char *cp)
 {
-	if (ConWindowHidden)
-	{
-		bufferedConsoleStuff.Push(cp);
-		DoPrintStr(cp, NULL, StdOut);
-	}
-	else
-	{
-		DoPrintStr(cp, ConWindow, StdOut);
-	}
-}
-
-void I_FlushBufferedConsoleStuff()
-{
-	for (unsigned i = 0; i < bufferedConsoleStuff.Size(); i++)
-	{
-		DoPrintStr(bufferedConsoleStuff[i], ConWindow, NULL);
-	}
-	bufferedConsoleStuff.Clear();
+	mainwindow.PrintStr(cp);
+	PrintToStdOut(cp, StdOut);
 }
 
 //==========================================================================
@@ -635,7 +501,7 @@ int I_PickIWad(WadStuff *wads, int numwads, bool showwin, int defaultiwad)
 		DefaultWad = defaultiwad;
 
 		return (int)DialogBox(g_hInst, MAKEINTRESOURCE(IDD_IWADDIALOG),
-			(HWND)Window, (DLGPROC)IWADBoxCallback);
+			(HWND)mainwindow.GetHandle(), (DLGPROC)IWADBoxCallback);
 	}
 	return defaultiwad;
 }
@@ -682,16 +548,16 @@ bool I_SetCursor(FGameTexture *cursorpic)
 		DestroyCustomCursor();
 		cursor = LoadCursor(NULL, IDC_ARROW);
 	}
-	SetClassLongPtr(Window, GCLP_HCURSOR, (LONG_PTR)cursor);
+	SetClassLongPtr(mainwindow.GetHandle(), GCLP_HCURSOR, (LONG_PTR)cursor);
 	if (NativeMouse)
 	{
 		POINT pt;
 		RECT client;
 
 		// If the mouse pointer is within the window's client rect, set it now.
-		if (GetCursorPos(&pt) && GetClientRect(Window, &client) &&
-			ClientToScreen(Window, (LPPOINT)&client.left) &&
-			ClientToScreen(Window, (LPPOINT)&client.right))
+		if (GetCursorPos(&pt) && GetClientRect(mainwindow.GetHandle(), &client) &&
+			ClientToScreen(mainwindow.GetHandle(), (LPPOINT)&client.left) &&
+			ClientToScreen(mainwindow.GetHandle(), (LPPOINT)&client.right))
 		{
 			if (pt.x >= client.left && pt.x < client.right &&
 				pt.y >= client.top && pt.y < client.bottom)
@@ -868,7 +734,7 @@ static HCURSOR CreateBitmapCursor(int xhot, int yhot, HBITMAP and_mask, HBITMAP 
 	// Delete the bitmaps.
 	DeleteObject(and_mask);
 	DeleteObject(color_mask);
-	
+
 	return cursor;
 }
 
@@ -912,7 +778,7 @@ bool I_WriteIniFailed()
 	);
 	errortext.Format ("The config file %s could not be written:\n%s", GameConfig->GetPathName(), lpMsgBuf);
 	LocalFree (lpMsgBuf);
-	return MessageBoxA(Window, errortext.GetChars(), GAMENAME " configuration not saved", MB_ICONEXCLAMATION | MB_RETRYCANCEL) == IDRETRY;
+	return MessageBoxA(mainwindow.GetHandle(), errortext.GetChars(), GAMENAME " configuration not saved", MB_ICONEXCLAMATION | MB_RETRYCANCEL) == IDRETRY;
 }
 
 

@@ -1,7 +1,6 @@
 #pragma once
 
 #include <stdint.h>
-#include "compat.h"
 #include "printf.h"
 #include "c_dispatch.h" 
 #include "tarray.h"
@@ -12,6 +11,7 @@
 #include "m_joy.h"
 #include "gamecvars.h"
 #include "packet.h"
+#include "vectors.h"
 
 
 struct ControlInfo
@@ -33,7 +33,7 @@ class InputState
 {
 	uint8_t KeyStatus[NUM_KEYS];
 	bool AnyKeyStatus;
-	vec2f_t  g_mousePos;
+	FVector2  g_mousePos;
 
 public:
 
@@ -46,8 +46,8 @@ public:
 
 	void MouseAddToPos(float x, float y)
 	{
-		g_mousePos.x += x;
-		g_mousePos.y += y;
+		g_mousePos.X += x;
+		g_mousePos.Y += y;
 	}
 
 	void GetMouseDelta(ControlInfo* hidInput);
@@ -108,7 +108,12 @@ extern bool gamesetinput;
 
 inline bool SyncInput()
 {
-	return gamesetinput || cl_syncinput;
+	return gamesetinput || cl_syncinput || cl_capfps;
+}
+
+inline float backendinputscale()
+{
+	return (1.f / 16.f);
 }
 
 //---------------------------------------------------------------------------

@@ -17,8 +17,8 @@ BEGIN_DUKE_NS
 void lava_cleararrays();
 void addjaildoor(int p1, int p2, int iht, int jlt, int p3, sectortype* h);
 void addminecart(int p1, int p2, sectortype* i, int iht, int p3, sectortype* childsectnum);
-void addtorch(spritetype* i);
-void addlightning(spritetype* i);
+void addtorch(DDukeActor* i);
+void addlightning(DDukeActor* i);
 
 void movecyclers(void);
 void movedummyplayers(void);
@@ -27,14 +27,16 @@ void moveplayers();
 void doanimations();
 void movefx();
 void moveclouds(double smoothratio);
+void movefta();
 
+void clearcameras(int i, player_struct* p);
 void RANDOMSCRAP(DDukeActor* i);
 void ms(DDukeActor* i);
 void movecrane(DDukeActor* i, int crane);
 void movefountain(DDukeActor* i, int fountain);
-void moveflammable(DDukeActor* i, int tire, int box, int pool);
+void moveflammable(DDukeActor* i, int pool);
 void detonate(DDukeActor* i, int explosion);
-void movemasterswitch(DDukeActor* i, int spectype1, int spectype2);
+void movemasterswitch(DDukeActor* i);
 void movetrash(DDukeActor* i);
 void movewaterdrip(DDukeActor* i, int drip);
 void movedoorshock(DDukeActor* i);
@@ -58,12 +60,12 @@ void watersplash2(DDukeActor* i);
 void frameeffect1(DDukeActor* i);
 bool money(DDukeActor* i, int BLOODPOOL);
 bool jibs(DDukeActor* i, int JIBS6, bool timeout, bool callsetsprite, bool floorcheck, bool zcheck1, bool zcheck2);
-bool bloodpool(DDukeActor* i, bool puke, int TIRE);
+bool bloodpool(DDukeActor* i, bool puke);
 void shell(DDukeActor* i, bool morecheck);
 void glasspieces(DDukeActor* i);
 void scrap(DDukeActor* i, int SCRAP1, int SCRAP6);
 
-void handle_se00(DDukeActor* i, int LASERLINE);
+void handle_se00(DDukeActor* i);
 void handle_se01(DDukeActor* i);
 void handle_se14(DDukeActor* i, bool checkstat, int RPG, int JIBS6);
 void handle_se30(DDukeActor* i, int JIBS6);
@@ -84,7 +86,7 @@ void handle_se19(DDukeActor* i, int BIGFORCE);
 void handle_se20(DDukeActor* i);
 void handle_se21(DDukeActor* i);
 void handle_se22(DDukeActor* i);
-void handle_se24(DDukeActor* actor, const int16_t* list1, const int16_t* list2, bool scroll, int TRIPBOMB, int LASERLINE, int CRANE, int shift);
+void handle_se24(DDukeActor* actor, bool scroll, int shift);
 void handle_se25(DDukeActor* a, int t_index, int snd1, int snd2);
 void handle_se26(DDukeActor* i);
 void handle_se27(DDukeActor* i);
@@ -95,7 +97,6 @@ void handle_se128(DDukeActor* i);
 void handle_se130(DDukeActor* i, int countmax, int EXPLOSION2);
 
 void respawn_rrra(DDukeActor* oldact, DDukeActor* newact);
-// This is only called from game specific code so it does not need an indirection.
 void check_fta_sounds_d(DDukeActor* i);
 void check_fta_sounds_r(DDukeActor* i);
 
@@ -137,7 +138,7 @@ int haskey(sectortype* sect, int snum);
 void shootbloodsplat(DDukeActor* i, int p, int sx, int sy, int sz, int sa, int atwith, int BIGFORCE, int OOZFILTER, int NEWBEAST);
 
 void breakwall(int newpn, DDukeActor* spr, walltype* dawallnum);
-int callsound(int sectnum,DDukeActor* snum);
+int callsound(sectortype* sectnum,DDukeActor* snum, bool endstate = false);
 int hitasprite(DDukeActor* snum,DDukeActor **hitSprite);
 int findplayer(const DDukeActor* s, int* dist);
 void operatejaildoors(int hitag);
@@ -160,7 +161,7 @@ void dotorch();
 int hitawall(struct player_struct* pl, walltype** hitWall);
 int hits(DDukeActor* snum);
 
-DDukeActor* LocateTheLocator(int n, int sectnum);
+DDukeActor* LocateTheLocator(int n, sectortype* sectnum);
 void clearcamera(player_struct* ps);
 
 void LoadActor(DDukeActor* i, int p, int x);
@@ -180,14 +181,14 @@ void checkplayerhurt_d(struct player_struct* p, const Collision& coll);
 void checkplayerhurt_r(struct player_struct* p, const Collision& coll);
 DDukeActor* dospawnsprite(DDukeActor* actj, int pn);
 
-void spriteinit_d(int);
-void spriteinit_r(int);
-DDukeActor* spawninit_d(DDukeActor* actj, DDukeActor* act);
-DDukeActor* spawninit_r(DDukeActor* actj, DDukeActor* act);
+void spriteinit_d(DDukeActor*);
+void spriteinit_r(DDukeActor*);
+DDukeActor* spawninit_d(DDukeActor* actj, DDukeActor* act, TArray<DDukeActor*>* actors);
+DDukeActor* spawninit_r(DDukeActor* actj, DDukeActor* act, TArray<DDukeActor*>* actors);
 
 void addspritetodelete(int spnum=0);
 void checkavailinven(struct player_struct* p);
-int initspriteforspawn(int spn, const std::initializer_list<int> &excludes);
+bool initspriteforspawn(DDukeActor* spn);
 void spawninitdefault(DDukeActor* actj, DDukeActor* act);
 void spawntransporter(DDukeActor* actj, DDukeActor* acti, bool beam);
 int spawnbloodpoolpart1(DDukeActor* acti);
@@ -196,7 +197,7 @@ void initshell(DDukeActor* actj, DDukeActor* acti, bool isshell);
 void initcrane(DDukeActor* actj, DDukeActor* acti, int CRANEPOLE);
 void initwaterdrip(DDukeActor* actj, DDukeActor* acti);
 int initreactor(DDukeActor* actj, DDukeActor* acti, bool isrecon);
-void spawneffector(DDukeActor* actor);
+void spawneffector(DDukeActor* actor, TArray<DDukeActor*>* actors);
 int startrts(int lumpNum, int localPlayer);
 
 void pickrandomspot(int pn);
@@ -217,15 +218,16 @@ void OffBoat(player_struct *pl);
 void cameratext(DDukeActor* i);
 void dobonus(int bonusonly, const CompletionFunc& completion);
 
+void drawweapon(double smoothratio);
 void drawoverlays(double smoothratio);
 void drawbackground(void);
-void displayrooms(int32_t playerNum, double smoothratio);
+void displayrooms(int32_t playerNum, double smoothratio, bool sceneonly);
 void setgamepalette(int palid);
 void resetmys();
 void resettimevars();
 bool setnextmap(bool checksecretexit);
-void prelevel_d(int g);
-void prelevel_r(int g);
+void prelevel_d(int g, TArray<DDukeActor*>&);
+void prelevel_r(int g, TArray<DDukeActor*>&);
 void e4intro(const CompletionFunc& completion);
 void exitlevel(MapRecord *next);
 void enterlevel(MapRecord* mi, int gm);
@@ -236,7 +238,5 @@ bool movementBlocked(player_struct *p);
 void loadcons();
 void recordoldspritepos();
 void DrawStatusBar();
-
-int* animateptr(int i);
 
 END_DUKE_NS

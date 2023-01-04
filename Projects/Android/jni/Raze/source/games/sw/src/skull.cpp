@@ -72,7 +72,7 @@ STATE s_SkullWait[5][1] =
 };
 
 
-STATEp sg_SkullWait[] =
+STATE* sg_SkullWait[] =
 {
     &s_SkullWait[0][0],
     &s_SkullWait[1][0],
@@ -120,7 +120,7 @@ STATE s_SkullRing[5][1] =
 };
 
 
-STATEp sg_SkullRing[] =
+STATE* sg_SkullRing[] =
 {
     &s_SkullRing[0][0],
     &s_SkullRing[1][0],
@@ -159,7 +159,7 @@ STATE s_SkullJump[5][1] =
 };
 
 
-STATEp sg_SkullJump[] =
+STATE* sg_SkullJump[] =
 {
     &s_SkullJump[0][0],
     &s_SkullJump[1][0],
@@ -201,7 +201,7 @@ STATE s_SkullExplode[] =
     {SKULL_EXPLODE +13, SKULL_EXPLODE_RATE, DoSuicide,    &s_SkullExplode[17]}
 };
 
-STATEp sg_SkullExplode[] =
+STATE* sg_SkullExplode[] =
 {
     s_SkullExplode,
 };
@@ -209,48 +209,41 @@ STATEp sg_SkullExplode[] =
 
 int SetupSkull(DSWActor* actor)
 {
-    SPRITEp sp = &actor->s();
-    USERp u;
     ANIMATOR DoActorDecide;
 
-    if (TEST(sp->cstat, CSTAT_SPRITE_RESTORE))
+    if (!(actor->spr.cstat & CSTAT_SPRITE_RESTORE))
     {
-        u = actor->u();
-        ASSERT(u);
-    }
-    else
-    {
-        u = SpawnUser(actor,SKULL_R0,s_SkullWait[0]);
-        u->Health = HEALTH_SKULL;
+        SpawnUser(actor,SKULL_R0,s_SkullWait[0]);
+        actor->user.Health = HEALTH_SKULL;
     }
 
     ChangeState(actor, s_SkullWait[0]);
-    u->Attrib = &SkullAttrib;
+    actor->user.Attrib = &SkullAttrib;
     DoActorSetSpeed(actor, NORM_SPEED);
-    u->StateEnd = s_SkullExplode;
-    u->Rot = sg_SkullWait;
+    actor->user.StateEnd = s_SkullExplode;
+    actor->user.Rot = sg_SkullWait;
 
-    u->ID = SKULL_R0;
+    actor->user.ID = SKULL_R0;
 
     EnemyDefaults(actor, nullptr, nullptr);
-    sp->clipdist = (128+64) >> 2;
-    SET(u->Flags, SPR_XFLIP_TOGGLE);
-    SET(sp->cstat, CSTAT_SPRITE_YCENTER);
+    actor->spr.clipdist = (128+64) >> 2;
+    actor->user.Flags |= (SPR_XFLIP_TOGGLE);
+    actor->spr.cstat |= (CSTAT_SPRITE_YCENTER);
 
-    u->Radius = 400;
+    actor->user.Radius = 400;
 
-    if (SPRITEp_BOS(sp) > u->loz - Z(16))
+    if (ActorZOfBottom(actor) > actor->user.loz - Z(16))
     {
-        sp->z = u->loz + Z(tileTopOffset(sp->picnum));
+        actor->spr.pos.Z = actor->user.loz + Z(tileTopOffset(actor->spr.picnum));
 
-        u->loz = sp->z;
+        actor->user.loz = actor->spr.pos.Z;
         // leave 8 pixels above the ground
-        sp->z += SPRITEp_SIZE_TOS(sp) - Z(3);;
+        actor->spr.pos.Z += ActorSizeToTop(actor) - Z(3);;
     }
     else
     {
-        u->Counter = RANDOM_P2(2048);
-        u->sz = sp->z;
+        actor->user.Counter = RANDOM_P2(2048);
+        actor->user.pos.Z = actor->spr.pos.Z;
     }
 
 
@@ -259,15 +252,13 @@ int SetupSkull(DSWActor* actor)
 
 int DoSkullMove(DSWActor* actor)
 {
-    USER* u = actor->u();
-    SPRITEp sp = &actor->s();
     int32_t dax, day, daz;
 
-    dax = MOVEx(sp->xvel, sp->ang);
-    day = MOVEy(sp->xvel, sp->ang);
-    daz = sp->zvel;
+    dax = MOVEx(actor->spr.xvel, actor->spr.ang);
+    day = MOVEy(actor->spr.xvel, actor->spr.ang);
+    daz = actor->spr.zvel;
 
-    u->coll = move_missile(actor, dax, day, daz, Z(16), Z(16), CLIPMASK_MISSILE, ACTORMOVETICS);
+    actor->user.coll = move_missile(actor, dax, day, daz, Z(16), Z(16), CLIPMASK_MISSILE, ACTORMOVETICS);
 
     DoFindGroundPoint(actor);
     return 0;
@@ -275,39 +266,37 @@ int DoSkullMove(DSWActor* actor)
 
 int DoSkullBeginDeath(DSWActor* actor)
 {
-    USER* u = actor->u();
-    SPRITEp sp = &actor->s();
     int16_t i,num_ord=0;
 
     // Decrease for Serp God
     auto own = GetOwner(actor);
     if (own != nullptr && own->hasU())
-        own->u()->Counter--;
+        own->user.Counter--;
 
     // starts the explosion that does the actual damage
 
-    switch (sp->hitag)
+    switch (actor->spr.hitag)
     {
     case 1:
-        if (sp->lotag) num_ord = sp->lotag;
+        if (actor->spr.lotag) num_ord = actor->spr.lotag;
         else
             num_ord = 2;
         if (num_ord > 3) num_ord = 3;
         for (i=0; i<num_ord; i++)
         {
-            sp->ang = NORM_ANGLE(sp->ang+(i*1024));
+            actor->spr.ang = NORM_ANGLE(actor->spr.ang+(i*1024));
             InitSpriteChemBomb(actor);
         }
         break;
 
     case 2:
-        if (sp->lotag) num_ord = sp->lotag;
+        if (actor->spr.lotag) num_ord = actor->spr.lotag;
         else
             num_ord = 5;
         if (num_ord > 10) num_ord = 10;
         for (i=0; i<num_ord; i++)
         {
-            sp->ang = NORM_ANGLE(RandomRange(2048));
+            actor->spr.ang = NORM_ANGLE(RandomRange(2048));
             InitCaltrops(actor);
         }
         break;
@@ -318,13 +307,13 @@ int DoSkullBeginDeath(DSWActor* actor)
         break;
 
     case 4:
-        if (sp->lotag) num_ord = sp->lotag;
+        if (actor->spr.lotag) num_ord = actor->spr.lotag;
         else
             num_ord = 5;
         if (num_ord > 10) num_ord = 10;
         for (i=0; i<num_ord; i++)
         {
-            sp->ang = NORM_ANGLE(sp->ang+(i*(2048/num_ord)));
+            actor->spr.ang = NORM_ANGLE(actor->spr.ang+(i*(2048/num_ord)));
             InitSpriteGrenade(actor);
         }
         break;
@@ -332,20 +321,20 @@ int DoSkullBeginDeath(DSWActor* actor)
         SpawnMineExp(actor);
         for (i=0; i<3; i++)
         {
-            sp->ang = NORM_ANGLE(RandomRange(2048));
+            actor->spr.ang = NORM_ANGLE(RandomRange(2048));
             InitPhosphorus(actor);
         }
         break;
     }
 
-    RESET(sp->cstat, CSTAT_SPRITE_BLOCK|CSTAT_SPRITE_BLOCK_HITSCAN);
-    u->RotNum = 0;
-    u->Tics = 0;
-    u->ID = SKULL_R0;
-    u->Radius = DamageData[DMG_SKULL_EXP].radius; //*DamageRadiusSkull;
-    u->OverlapZ = Z(64);
+    actor->spr.cstat &= ~(CSTAT_SPRITE_BLOCK|CSTAT_SPRITE_BLOCK_HITSCAN);
+    actor->user.RotNum = 0;
+    actor->user.Tics = 0;
+    actor->user.ID = SKULL_R0;
+    actor->user.Radius = DamageData[DMG_SKULL_EXP].radius; //*DamageRadiusSkull;
+    actor->user.OverlapZ = Z(64);
     change_actor_stat(actor, STAT_DEAD_ACTOR);
-    sp->shade = -40;
+    actor->spr.shade = -40;
 
     SpawnLittleExp(actor);
     SetSuicide(actor);
@@ -355,41 +344,38 @@ int DoSkullBeginDeath(DSWActor* actor)
 
 int DoSkullJump(DSWActor* actor)
 {
-    USER* u = actor->u();
-    SPRITEp sp = &actor->s();
-
-    if (sp->xvel)
+    if (actor->spr.xvel)
         DoSkullMove(actor);
     else
-        sp->ang = NORM_ANGLE(sp->ang + (64 * ACTORMOVETICS));
+        actor->spr.ang = NORM_ANGLE(actor->spr.ang + (64 * ACTORMOVETICS));
 
-    if (TEST(u->Flags,SPR_JUMPING))
+    if (actor->user.Flags & (SPR_JUMPING))
     {
         DoJump(actor);
     }
-    else if (TEST(u->Flags,SPR_FALLING))
+    else if (actor->user.Flags & (SPR_FALLING))
     {
         DoFall(actor);
 
         // jump/fall type
-        if (sp->xvel)
+        if (actor->spr.xvel)
         {
 
             int dist,a,b,c;
 
-            DISTANCE(sp->x, sp->y, u->targetActor->s().x, u->targetActor->s().y, dist, a, b, c);
+            DISTANCE(actor->spr.pos.X, actor->spr.pos.Y, actor->user.targetActor->spr.pos.X, actor->user.targetActor->spr.pos.Y, dist, a, b, c);
 
             if (dist < 1000 &&
-                SpriteOverlapZ(actor, u->targetActor, Z(32)))
+                SpriteOverlapZ(actor, actor->user.targetActor, Z(32)))
             {
                 UpdateSinglePlayKills(actor);
                 DoSkullBeginDeath(actor);
                 return 0;
             }
 
-            if ((sp->z > u->loz - Z(36)))
+            if ((actor->spr.pos.Z > actor->user.loz - Z(36)))
             {
-                sp->z = u->loz - Z(36);
+                actor->spr.pos.Z = actor->user.loz - Z(36);
                 UpdateSinglePlayKills(actor);
                 DoSkullBeginDeath(actor);
                 return 0;
@@ -398,7 +384,7 @@ int DoSkullJump(DSWActor* actor)
         // non jumping type
         else
         {
-            if (u->jump_speed > 200)
+            if (actor->user.jump_speed > 200)
             {
                 UpdateSinglePlayKills(actor);
                 DoSkullBeginDeath(actor);
@@ -417,15 +403,12 @@ int DoSkullJump(DSWActor* actor)
 
 int DoSkullBob(DSWActor* actor)
 {
-    USER* u = actor->u();
-    SPRITEp sp = &actor->s();
-
-    // actor does a sine wave about u->sz - this is the z mid point
+    // actor does a sine wave about actor->user.sz - this is the z mid point
     const int SKULL_BOB_AMT = (Z(16));
 
-    u->Counter = (u->Counter + (ACTORMOVETICS << 3) + (ACTORMOVETICS << 1)) & 2047;
-    sp->z = u->sz + MulScale(SKULL_BOB_AMT, bsin(u->Counter), 14) +
-            MulScale(DIV2(SKULL_BOB_AMT), bsin(u->Counter), 14);
+    actor->user.Counter = (actor->user.Counter + (ACTORMOVETICS << 3) + (ACTORMOVETICS << 1)) & 2047;
+    actor->spr.pos.Z = actor->user.pos.Z + MulScale(SKULL_BOB_AMT, bsin(actor->user.Counter), 14) +
+            MulScale((SKULL_BOB_AMT / 2), bsin(actor->user.Counter), 14);
 
     return 0;
 }
@@ -440,31 +423,29 @@ int DoSkullSpawnShrap(DSWActor* actor)
 
 int DoSkullWait(DSWActor* actor)
 {
-    USER* u = actor->u();
-    SPRITEp sp = &actor->s();
     int a,b,c,dist;
 
-    DISTANCE(sp->x, sp->y, u->targetActor->s().x, u->targetActor->s().y, dist, a, b, c);
+    DISTANCE(actor->spr.pos.X, actor->spr.pos.Y, actor->user.targetActor->spr.pos.X, actor->user.targetActor->spr.pos.Y, dist, a, b, c);
 
     DoActorPickClosePlayer(actor);
 
-    //if (dist < u->active_range)
+    //if (dist < actor->user.active_range)
     //    return(0);
 
-    if ((u->WaitTics -= ACTORMOVETICS) <= 0)
+    if ((actor->user.WaitTics -= ACTORMOVETICS) <= 0)
     {
         PlaySound(DIGI_AHSCREAM, actor, v3df_none);
-        u->WaitTics = SEC(3) + RandomRange(360);
+        actor->user.WaitTics = SEC(3) + RandomRange(360);
     }
 
     // below the floor type
-    if (sp->z > u->loz)
+    if (actor->spr.pos.Z > actor->user.loz)
     {
         // look for closest player every once in a while
         if (dist < 3500)
         {
-            sp->xvel = 0;
-            u->jump_speed = -600;
+            actor->spr.xvel = 0;
+            actor->user.jump_speed = -600;
             NewStateGroup(actor, sg_SkullJump);
             DoBeginJump(actor);
         }
@@ -472,15 +453,15 @@ int DoSkullWait(DSWActor* actor)
     else
     // above the floor type
     {
-        sp->ang = NORM_ANGLE(sp->ang + (48 * ACTORMOVETICS));
+        actor->spr.ang = NORM_ANGLE(actor->spr.ang + (48 * ACTORMOVETICS));
 
         DoSkullBob(actor);
 
         if (dist < 8000)
         {
-            sp->ang = getangle(u->targetActor->s().x - sp->x, u->targetActor->s().y - sp->y);
-            sp->xvel = 128 + (RANDOM_P2(256<<8)>>8);
-            u->jump_speed = -700;
+            actor->spr.ang = getangle(actor->user.targetActor->spr.pos.X - actor->spr.pos.X, actor->user.targetActor->spr.pos.Y - actor->spr.pos.Y);
+            actor->spr.xvel = 128 + (RANDOM_P2(256<<8)>>8);
+            actor->user.jump_speed = -700;
             NewStateGroup(actor, sg_SkullJump);
             DoBeginJump(actor);
         }
@@ -533,7 +514,7 @@ STATE s_BettyWait[5][3] =
 };
 
 
-STATEp sg_BettyWait[] =
+STATE* sg_BettyWait[] =
 {
     &s_BettyWait[0][0],
     &s_BettyWait[1][0],
@@ -578,7 +559,7 @@ STATE s_BettyJump[5][1] =
 };
 
 
-STATEp sg_BettyJump[] =
+STATE* sg_BettyJump[] =
 {
     &s_BettyJump[0][0],
     &s_BettyJump[1][0],
@@ -605,7 +586,7 @@ STATE s_BettyExplode[] =
     {BETTY_EXPLODE + 0, BETTY_EXPLODE_RATE, DoSuicide, &s_BettyExplode[0]}
 };
 
-STATEp sg_BettyExplode[] =
+STATE* sg_BettyExplode[] =
 {
     s_BettyExplode,
 };
@@ -613,48 +594,41 @@ STATEp sg_BettyExplode[] =
 
 int SetupBetty(DSWActor* actor)
 {
-    SPRITEp sp = &actor->s();
-    USERp u;
     ANIMATOR DoActorDecide;
 
-    if (TEST(sp->cstat, CSTAT_SPRITE_RESTORE))
+    if (!(actor->spr.cstat & CSTAT_SPRITE_RESTORE))
     {
-        u = actor->u();
-        ASSERT(u);
-    }
-    else
-    {
-        u = SpawnUser(actor,BETTY_R0,s_BettyWait[0]);
-        u->Health = HEALTH_SKULL;
+        SpawnUser(actor,BETTY_R0,s_BettyWait[0]);
+        actor->user.Health = HEALTH_SKULL;
     }
 
     ChangeState(actor, s_BettyWait[0]);
-    u->Attrib = &BettyAttrib;
+    actor->user.Attrib = &BettyAttrib;
     DoActorSetSpeed(actor, NORM_SPEED);
-    u->StateEnd = s_BettyExplode;
-    u->Rot = sg_BettyWait;
+    actor->user.StateEnd = s_BettyExplode;
+    actor->user.Rot = sg_BettyWait;
 
-    u->ID = BETTY_R0;
+    actor->user.ID = BETTY_R0;
 
     EnemyDefaults(actor, nullptr, nullptr);
-    sp->clipdist = (128+64) >> 2;
-    SET(u->Flags, SPR_XFLIP_TOGGLE);
-    SET(sp->cstat, CSTAT_SPRITE_YCENTER);
+    actor->spr.clipdist = (128+64) >> 2;
+    actor->user.Flags |= (SPR_XFLIP_TOGGLE);
+    actor->spr.cstat |= (CSTAT_SPRITE_YCENTER);
 
-    u->Radius = 400;
+    actor->user.Radius = 400;
 
-    if (SPRITEp_BOS(sp) > u->loz - Z(16))
+    if (ActorZOfBottom(actor) > actor->user.loz - Z(16))
     {
-        sp->z = u->loz + Z(tileTopOffset(sp->picnum));
+        actor->spr.pos.Z = actor->user.loz + Z(tileTopOffset(actor->spr.picnum));
 
-        u->loz = sp->z;
+        actor->user.loz = actor->spr.pos.Z;
         // leave 8 pixels above the ground
-        sp->z += SPRITEp_SIZE_TOS(sp) - Z(3);;
+        actor->spr.pos.Z += ActorSizeToTop(actor) - Z(3);;
     }
     else
     {
-        u->Counter = RANDOM_P2(2048);
-        u->sz = sp->z;
+        actor->user.Counter = RANDOM_P2(2048);
+        actor->user.pos.Z = actor->spr.pos.Z;
     }
 
 
@@ -663,15 +637,13 @@ int SetupBetty(DSWActor* actor)
 
 int DoBettyMove(DSWActor* actor)
 {
-    USER* u = actor->u();
-    SPRITEp sp = &actor->s();
     int32_t dax, day, daz;
 
-    dax = MOVEx(sp->xvel, sp->ang);
-    day = MOVEy(sp->xvel, sp->ang);
-    daz = sp->zvel;
+    dax = MOVEx(actor->spr.xvel, actor->spr.ang);
+    day = MOVEy(actor->spr.xvel, actor->spr.ang);
+    daz = actor->spr.zvel;
 
-    u->coll = move_missile(actor, dax, day, daz, Z(16), Z(16), CLIPMASK_MISSILE, ACTORMOVETICS);
+    actor->user.coll = move_missile(actor, dax, day, daz, Z(16), Z(16), CLIPMASK_MISSILE, ACTORMOVETICS);
 
     DoFindGroundPoint(actor);
     return 0;
@@ -679,34 +651,32 @@ int DoBettyMove(DSWActor* actor)
 
 int DoBettyBeginDeath(DSWActor* actor)
 {
-    USER* u = actor->u();
-    SPRITEp sp = &actor->s();
     int16_t i,num_ord=0;
 
     // starts the explosion that does the actual damage
 
-    switch (sp->hitag)
+    switch (actor->spr.hitag)
     {
     case 1:
-        if (sp->lotag) num_ord = sp->lotag;
+        if (actor->spr.lotag) num_ord = actor->spr.lotag;
         else
             num_ord = 2;
         if (num_ord > 3) num_ord = 3;
         for (i=0; i<num_ord; i++)
         {
-            sp->ang = NORM_ANGLE(sp->ang+(i*1024));
+            actor->spr.ang = NORM_ANGLE(actor->spr.ang+(i*1024));
             InitSpriteChemBomb(actor);
         }
         break;
 
     case 2:
-        if (sp->lotag) num_ord = sp->lotag;
+        if (actor->spr.lotag) num_ord = actor->spr.lotag;
         else
             num_ord = 5;
         if (num_ord > 10) num_ord = 10;
         for (i=0; i<num_ord; i++)
         {
-            sp->ang = NORM_ANGLE(RandomRange(2048));
+            actor->spr.ang = NORM_ANGLE(RandomRange(2048));
             InitCaltrops(actor);
         }
         break;
@@ -716,34 +686,34 @@ int DoBettyBeginDeath(DSWActor* actor)
         break;
 
     case 4:
-        if (sp->lotag) num_ord = sp->lotag;
+        if (actor->spr.lotag) num_ord = actor->spr.lotag;
         else
             num_ord = 5;
         if (num_ord > 10) num_ord = 10;
         for (i=0; i<num_ord; i++)
         {
-            sp->ang = NORM_ANGLE(sp->ang + (i*(2048/num_ord)));
+            actor->spr.ang = NORM_ANGLE(actor->spr.ang + (i*(2048/num_ord)));
             InitSpriteGrenade(actor);
         }
         break;
     default:
         for (i=0; i<5; i++)
         {
-            sp->ang = NORM_ANGLE(RandomRange(2048));
+            actor->spr.ang = NORM_ANGLE(RandomRange(2048));
             InitPhosphorus(actor);
             SpawnMineExp(actor);
         }
         break;
     }
 
-    RESET(sp->cstat, CSTAT_SPRITE_BLOCK|CSTAT_SPRITE_BLOCK_HITSCAN);
-    u->RotNum = 0;
-    u->Tics = 0;
-    u->ID = BETTY_R0;
-    u->Radius = DamageData[DMG_SKULL_EXP].radius; //*DamageRadiusBetty;
-    u->OverlapZ = Z(64);
+    actor->spr.cstat &= ~(CSTAT_SPRITE_BLOCK|CSTAT_SPRITE_BLOCK_HITSCAN);
+    actor->user.RotNum = 0;
+    actor->user.Tics = 0;
+    actor->user.ID = BETTY_R0;
+    actor->user.Radius = DamageData[DMG_SKULL_EXP].radius; //*DamageRadiusBetty;
+    actor->user.OverlapZ = Z(64);
     change_actor_stat(actor, STAT_DEAD_ACTOR);
-    sp->shade = -40;
+    actor->spr.shade = -40;
 
     SpawnLittleExp(actor);
     SetSuicide(actor);
@@ -753,40 +723,37 @@ int DoBettyBeginDeath(DSWActor* actor)
 
 int DoBettyJump(DSWActor* actor)
 {
-    USER* u = actor->u();
-    SPRITEp sp = &actor->s();
-
-    if (sp->xvel)
+    if (actor->spr.xvel)
         DoBettyMove(actor);
     else
-        sp->ang = NORM_ANGLE(sp->ang + (64 * ACTORMOVETICS));
+        actor->spr.ang = NORM_ANGLE(actor->spr.ang + (64 * ACTORMOVETICS));
 
-    if (TEST(u->Flags,SPR_JUMPING))
+    if (actor->user.Flags & (SPR_JUMPING))
     {
         DoJump(actor);
     }
-    else if (TEST(u->Flags,SPR_FALLING))
+    else if (actor->user.Flags & (SPR_FALLING))
     {
         DoFall(actor);
 
         // jump/fall type
-        if (sp->xvel)
+        if (actor->spr.xvel)
         {
             int dist,a,b,c;
 
-            DISTANCE(sp->x, sp->y, u->targetActor->s().x, u->targetActor->s().y, dist, a, b, c);
+            DISTANCE(actor->spr.pos.X, actor->spr.pos.Y, actor->user.targetActor->spr.pos.X, actor->user.targetActor->spr.pos.Y, dist, a, b, c);
 
             if (dist < 1000 &&
-                SpriteOverlapZ(actor, u->targetActor, Z(32)))
+                SpriteOverlapZ(actor, actor->user.targetActor, Z(32)))
             {
                 UpdateSinglePlayKills(actor);
                 DoBettyBeginDeath(actor);
                 return 0;
             }
 
-            if ((sp->z > u->loz - Z(36)))
+            if ((actor->spr.pos.Z > actor->user.loz - Z(36)))
             {
-                sp->z = u->loz - Z(36);
+                actor->spr.pos.Z = actor->user.loz - Z(36);
                 UpdateSinglePlayKills(actor);
                 DoBettyBeginDeath(actor);
                 return 0;
@@ -795,7 +762,7 @@ int DoBettyJump(DSWActor* actor)
         // non jumping type
         else
         {
-            if (u->jump_speed > 200)
+            if (actor->user.jump_speed > 200)
             {
                 UpdateSinglePlayKills(actor);
                 DoBettyBeginDeath(actor);
@@ -813,15 +780,12 @@ int DoBettyJump(DSWActor* actor)
 
 int DoBettyBob(DSWActor* actor)
 {
-    USER* u = actor->u();
-    SPRITEp sp = &actor->s();
-
-    // actor does a sine wave about u->sz - this is the z mid point
+    // actor does a sine wave about actor->user.sz - this is the z mid point
     const int  BETTY_BOB_AMT = (Z(16));
 
-    u->Counter = (u->Counter + (ACTORMOVETICS << 3) + (ACTORMOVETICS << 1)) & 2047;
-    sp->z = u->sz + MulScale(BETTY_BOB_AMT, bsin(u->Counter), 14) +
-            MulScale(DIV2(BETTY_BOB_AMT), bsin(u->Counter), 14);
+    actor->user.Counter = (actor->user.Counter + (ACTORMOVETICS << 3) + (ACTORMOVETICS << 1)) & 2047;
+    actor->spr.pos.Z = actor->user.pos.Z + MulScale(BETTY_BOB_AMT, bsin(actor->user.Counter), 14) +
+            MulScale((BETTY_BOB_AMT / 2), bsin(actor->user.Counter), 14);
 
     return 0;
 }
@@ -829,37 +793,31 @@ int DoBettyBob(DSWActor* actor)
 int DoBettySpawnShrap(DSWActor* actor)
 {
     SpawnShrap(actor, nullptr);
-    //PlaySpriteSound(actor,attr_extra1,v3df_none);
     return 0;
 }
 
 int DoBettyWait(DSWActor* actor)
 {
-    USER* u = actor->u();
-    SPRITEp sp = &actor->s();
     int a,b,c,dist;
 
-    DISTANCE(sp->x, sp->y, u->targetActor->s().x, u->targetActor->s().y, dist, a, b, c);
+    DISTANCE(actor->spr.pos.X, actor->spr.pos.Y, actor->user.targetActor->spr.pos.X, actor->user.targetActor->spr.pos.Y, dist, a, b, c);
 
     DoActorPickClosePlayer(actor);
 
-    //if (dist < u->active_range)
-    //    return(0);
-
-    if ((u->WaitTics -= ACTORMOVETICS) <= 0)
+    if ((actor->user.WaitTics -= ACTORMOVETICS) <= 0)
     {
         PlaySound(DIGI_MINEBEEP, actor, v3df_none);
-        u->WaitTics = SEC(3);
+        actor->user.WaitTics = SEC(3);
     }
 
     // below the floor type
-    if (sp->z > u->loz)
+    if (actor->spr.pos.Z > actor->user.loz)
     {
         // look for closest player every once in a while
         if (dist < 3500)
         {
-            sp->xvel = 0;
-            u->jump_speed = -600;
+            actor->spr.xvel = 0;
+            actor->user.jump_speed = -600;
             NewStateGroup(actor, sg_BettyJump);
             DoBeginJump(actor);
         }
@@ -867,15 +825,15 @@ int DoBettyWait(DSWActor* actor)
     else
     // above the floor type
     {
-        sp->ang = NORM_ANGLE(sp->ang + (48 * ACTORMOVETICS));
+        actor->spr.ang = NORM_ANGLE(actor->spr.ang + (48 * ACTORMOVETICS));
 
         DoBettyBob(actor);
 
         if (dist < 8000)
         {
-            sp->ang = getangle(u->targetActor->s().x - sp->x, u->targetActor->s().y - sp->y);
-            sp->xvel = 128 + (RANDOM_P2(256<<8)>>8);
-            u->jump_speed = -700;
+            actor->spr.ang = getangle(actor->user.targetActor->spr.pos.X - actor->spr.pos.X, actor->user.targetActor->spr.pos.Y - actor->spr.pos.Y);
+            actor->spr.xvel = 128 + (RANDOM_P2(256<<8)>>8);
+            actor->user.jump_speed = -700;
             NewStateGroup(actor, sg_BettyJump);
             DoBeginJump(actor);
         }

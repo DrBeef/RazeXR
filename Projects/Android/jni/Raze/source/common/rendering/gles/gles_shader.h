@@ -284,7 +284,7 @@ class FShader
 {
 	friend class FShaderCollection;
 	friend class FGLRenderState;
-	
+
 	FName mName;
 
 	FString mVertProg;
@@ -379,7 +379,7 @@ public:
 	FShader(const char *name)
 		: mName(name)
 	{
-		
+
 	}
 
 	~FShader();
@@ -394,9 +394,9 @@ public:
 	{
 		uint32_t tag = 0;
 		tag |= (flavour.textureMode & 0x7);
-		
+
 		tag |= (flavour.texFlags & 7) << 3;
-		
+
 		tag |= (flavour.blendFlags & 7) << 6;
 
 		tag |= (flavour.twoDFog & 1) << 7;
@@ -428,7 +428,7 @@ public:
 
 	bool Bind(ShaderFlavourData& flavour);
 
-	
+
 };
 
 //==========================================================================
@@ -462,7 +462,7 @@ class FShaderCollection
 
 	void Clean();
 	void CompileShaders(EPassType passType);
-	
+
 public:
 	FShaderCollection(EPassType passType);
 	~FShaderCollection();
@@ -481,7 +481,10 @@ public:
 		{
 			return mMaterialShaders[eff];
 		}
-		return NULL;
+		else // This can happen if we try and active a user shader which is not loaded, so return default shader so it does not crash
+		{
+			return mMaterialShaders[0];
+		}
 	}
 };
 

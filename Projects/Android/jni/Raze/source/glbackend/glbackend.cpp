@@ -65,7 +65,6 @@ EXTERN_CVAR(Bool, gl_texture)
 static int BufferLock = 0;
 
 TArray<VSMatrix> matrixArray;
-void Draw2D(F2DDrawer* drawer, FRenderState& state);
 
 GLInstance GLInterface;
 
@@ -343,7 +342,7 @@ void PM_WriteSavePic(FileWriter* file, int width, int height)
 
 	xdim = oldx;
 	ydim = oldy;
-	videoSetViewableArea(oldwindowxy1.x, oldwindowxy1.y, oldwindowxy2.x, oldwindowxy2.y);
+	videoSetViewableArea(oldwindowxy1.X, oldwindowxy1.Y, oldwindowxy2.X, oldwindowxy2.Y);
 
 	// The 2D drawers can contain some garbage from the dirty render setup. Get rid of that first.
 	twod->Clear();
@@ -418,34 +417,19 @@ int32_t r_scenebrightness = 0;
 
 
 
-void videoShowFrame(int32_t w)
+void videoShowFrame()
 {
-	if (gl_ssao)
-	{
-		screen->AmbientOccludeScene(GLInterface.GetProjectionM5());
-		// To do: the translucent part of the scene should be drawn here, but the render setup in the games is really too broken to do SSAO.
+	int oldssao = gl_ssao;
 
-		//glDrawBuffers(1, buffers);
-	}
-
+	// These two features do not really work with Polymost because the rendered scene does not provide it
+	gl_ssao = 0;
 	float Brightness = 8.f / (r_scenebrightness + 8.f);
 
 	screen->PostProcessScene(false, 0, Brightness, []() {
 		Draw2D(&twodpsp, *screen->RenderState()); // draws the weapon sprites
 		});
-	screen->Update();
 	screen->mVertexData->Reset();
 	screen->mViewpoints->Clear();
 
-	videoSetBrightness(0);	// immediately reset this after rendering so that the value doesn't stick around in the backend.
-
-							// After finishing the frame, reset everything for the next frame. This needs to be done better.
-	if (!w)
-	{
-		screen->BeginFrame();
-		bool useSSAO = (gl_ssao != 0);
-		screen->SetSceneRenderTarget(useSSAO);
-		twodpsp.Clear();
-		twod->Clear();
-	}
+	gl_ssao = oldssao;
 }

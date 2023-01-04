@@ -24,7 +24,6 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 #include "ns.h"	// Must come before everything else!
 
 #include "build.h"
-#include "compat.h"
 #include "g_input.h"
 #include "automap.h"
 
@@ -52,6 +51,57 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 
 BEGIN_BLD_NS
 
+
+IMPLEMENT_CLASS(DBloodActor, false, true)
+IMPLEMENT_POINTERS_START(DBloodActor)
+IMPLEMENT_POINTER(prevmarker)
+IMPLEMENT_POINTER(ownerActor)
+IMPLEMENT_POINTER(genDudeExtra.pLifeLeech)
+IMPLEMENT_POINTER(genDudeExtra.slave[0])
+IMPLEMENT_POINTER(genDudeExtra.slave[1])
+IMPLEMENT_POINTER(genDudeExtra.slave[2])
+IMPLEMENT_POINTER(genDudeExtra.slave[3])
+IMPLEMENT_POINTER(genDudeExtra.slave[4])
+IMPLEMENT_POINTER(genDudeExtra.slave[5])
+IMPLEMENT_POINTER(genDudeExtra.slave[6])
+IMPLEMENT_POINTER(xspr.burnSource)
+IMPLEMENT_POINTER(xspr.target)
+IMPLEMENT_POINTERS_END
+
+//---------------------------------------------------------------------------
+//
+//
+//
+//---------------------------------------------------------------------------
+
+size_t DBloodActor::PropagateMark()
+{
+	if (hit.hit.type == kHitSprite) GC::Mark(hit.hit.hitActor);
+	if (hit.ceilhit.type == kHitSprite) GC::Mark(hit.ceilhit.hitActor);
+	if (hit.florhit.type == kHitSprite) GC::Mark(hit.florhit.hitActor);
+	condition[0].Mark();
+	condition[1].Mark();
+	return Super::PropagateMark();
+}
+
+static void markgcroots()
+{
+	GC::MarkArray(gProxySpritesList, gProxySpritesCount);
+	GC::MarkArray(gSightSpritesList, gSightSpritesCount);
+	GC::MarkArray(gPhysSpritesList, gPhysSpritesCount);
+	GC::MarkArray(gImpactSpritesList, gImpactSpritesCount);
+	for (auto& pl : gPlayer)
+	{
+		GC::Mark(pl.actor);
+		GC::MarkArray(pl.ctfFlagState, 2);
+		GC::Mark(pl.aimTarget);
+		GC::MarkArray(pl.aimTargets, 16);
+		GC::Mark(pl.fragger);
+		GC::Mark(pl.voodooTarget);
+	}
+}
+
+
 void InitCheats();
 
 bool bNoDemo = false;
@@ -62,8 +112,14 @@ PLAYER gPlayerTemp[kMaxPlayers];
 int gHealthTemp[kMaxPlayers];
 vec3_t startpos;
 int16_t startang;
-int startsectnum;
+sectortype* startsector;
 
+
+//---------------------------------------------------------------------------
+//
+//
+//
+//---------------------------------------------------------------------------
 
 void QuitGame(void)
 {
@@ -80,12 +136,101 @@ void EndLevel(void)
 	seqKillAll();
 }
 
+//---------------------------------------------------------------------------
+//
+//
+//
+//---------------------------------------------------------------------------
+
+TArray<DBloodActor*> SpawnActors(BloodSpawnSpriteDef& sprites)
+{
+	TArray<DBloodActor*> spawns(sprites.sprites.Size(), true);
+	InitSpriteLists();
+	int j = 0;
+	for (unsigned i = 0; i < sprites.sprites.Size(); i++)
+	{
+		if (sprites.sprites[i].statnum == MAXSTATUS)
+		{
+			spawns.Pop();
+			continue;
+		}
+		auto sprt = &sprites.sprites[i];
+		auto actor = InsertSprite(sprt->sectp, sprt->statnum);
+		spawns[j++] = actor;
+		actor->time = i;
+		actor->spr = sprites.sprites[i];
+		if (sprites.sprext.Size()) actor->sprext = sprites.sprext[i];
+		else actor->sprext = {};
+		actor->spsmooth = {};
+
+		if (sprites.sprites[i].extra > 0)
+		{
+			actor->addX();
+			actor->xspr = sprites.xspr[i];
+		}
+	}
+	leveltimer = sprites.sprites.Size();
+	return spawns;
+}
+
+//---------------------------------------------------------------------------
+//
+//
+//
+//---------------------------------------------------------------------------
+
+void PropagateMarkerReferences(void)
+{
+	BloodStatIterator it(kStatMarker);
+	while (auto actor = it.Next())
+	{
+		switch (actor->spr.type)
+		{
+		case kMarkerOff:
+		case kMarkerAxis:
+		case kMarkerWarpDest:
+		{
+			int nOwner = actor->spr.intowner;
+			if (validSectorIndex(nOwner))
+			{
+				if (sector[nOwner].hasX())
+				{
+					sector[nOwner].xs().marker0 = actor;
+					continue;
+				}
+			}
+		}
+		break;
+		case kMarkerOn:
+		{
+			int nOwner = actor->spr.intowner;
+			if (validSectorIndex(nOwner))
+			{
+				if (sector[nOwner].hasX())
+				{
+					sector[nOwner].xs().marker1 = actor;
+					continue;
+				}
+			}
+		}
+		break;
+		}
+
+		DeleteSprite(actor);
+	}
+}
+
+//---------------------------------------------------------------------------
+//
+//
+//
+//---------------------------------------------------------------------------
+
 void StartLevel(MapRecord* level, bool newgame)
 {
 	if (!level) return;
 	gFrameCount = 0;
 	PlayClock = 0;
-	EndLevel();
 	inputState.ClearAllInput();
 	currentLevel = level;
 
@@ -103,36 +248,30 @@ void StartLevel(MapRecord* level, bool newgame)
 		gRedFlagDropped = false;
 	}
 #endif
-	if (!newgame)
-	{
-		for (int i = connecthead; i >= 0; i = connectpoint2[i])
-		{
-			memcpy(&gPlayerTemp[i], &gPlayer[i], sizeof(PLAYER));
-			gHealthTemp[i] = gPlayer[i].actor->x().health;
-		}
-	}
-	memset(xsprite, 0, sizeof(xsprite));
 	//drawLoadingScreen();
-	dbLoadMap(currentLevel->fileName, (int*)&startpos.x, (int*)&startpos.y, (int*)&startpos.z, &startang, &startsectnum, nullptr);
+	BloodSpawnSpriteDef sprites;
+	int startsectno;
+	dbLoadMap(currentLevel->fileName, (int*)&startpos.X, (int*)&startpos.Y, (int*)&startpos.Z, &startang, &startsectno, nullptr, sprites);
+	startsector = &sector[startsectno];
 	SECRET_SetMapName(currentLevel->DisplayName(), currentLevel->name);
 	STAT_NewLevel(currentLevel->fileName);
+	TITLE_InformName(currentLevel->name);
 	wsrand(dbReadMapCRC(currentLevel->LabelName()));
 	gKillMgr.Clear();
 	gSecretMgr.Clear();
 	automapping = 1;
 
+	// Here is where later the actors must be spawned.
+	auto actorlist = SpawnActors(sprites);
+	PropagateMarkerReferences();
 	int modernTypesErased = 0;
-	BloodLinearSpriteIterator it;
-	while (auto actor = it.Next())
+	for (auto actor : actorlist)
 	{
-		spritetype* pSprite = &actor->s();
-		if (pSprite->statnum < kMaxStatus && actor->hasX()) 
+		if (actor->exists() && actor->hasX()) 
 		{
-
-			XSPRITE* pXSprite = &actor->x();
-			if ((pXSprite->lSkill & (1 << gGameOptions.nDifficulty)) || (pXSprite->lS && gGameOptions.nGameType == 0)
-				|| (pXSprite->lB && gGameOptions.nGameType == 2) || (pXSprite->lT && gGameOptions.nGameType == 3)
-				|| (pXSprite->lC && gGameOptions.nGameType == 1)) {
+			if ((actor->xspr.lSkill & (1 << gGameOptions.nDifficulty)) || (actor->xspr.lS && gGameOptions.nGameType == 0)
+				|| (actor->xspr.lB && gGameOptions.nGameType == 2) || (actor->xspr.lT && gGameOptions.nGameType == 3)
+				|| (actor->xspr.lC && gGameOptions.nGameType == 1)) {
 
 				DeleteSprite(actor);
 				continue;
@@ -151,35 +290,35 @@ void StartLevel(MapRecord* level, bool newgame)
 		Printf(PRINT_NONOTIFY, "> Modern types erased: %d.\n", modernTypesErased);
 #endif
 
-	startpos.z = getflorzofslope(startsectnum, startpos.x, startpos.y);
+	startpos.Z = getflorzofslopeptr(startsector, startpos.X, startpos.Y);
 	for (int i = 0; i < kMaxPlayers; i++) {
-		gStartZone[i].x = startpos.x;
-		gStartZone[i].y = startpos.y;
-		gStartZone[i].z = startpos.z;
-		gStartZone[i].sectnum = startsectnum;
+		gStartZone[i].x = startpos.X;
+		gStartZone[i].y = startpos.Y;
+		gStartZone[i].z = startpos.Z;
+		gStartZone[i].sector = startsector;
 		gStartZone[i].ang = startang;
 
 #ifdef NOONE_EXTENSIONS
 		// Create spawn zones for players in teams mode.
 		if (gModernMap && i <= kMaxPlayers / 2) {
-			gStartZoneTeam1[i].x = startpos.x;
-			gStartZoneTeam1[i].y = startpos.y;
-			gStartZoneTeam1[i].z = startpos.z;
-			gStartZoneTeam1[i].sectnum = startsectnum;
+			gStartZoneTeam1[i].x = startpos.X;
+			gStartZoneTeam1[i].y = startpos.Y;
+			gStartZoneTeam1[i].z = startpos.Z;
+			gStartZoneTeam1[i].sector = startsector;
 			gStartZoneTeam1[i].ang = startang;
 
-			gStartZoneTeam2[i].x = startpos.x;
-			gStartZoneTeam2[i].y = startpos.y;
-			gStartZoneTeam2[i].z = startpos.z;
-			gStartZoneTeam2[i].sectnum = startsectnum;
+			gStartZoneTeam2[i].x = startpos.X;
+			gStartZoneTeam2[i].y = startpos.Y;
+			gStartZoneTeam2[i].z = startpos.Z;
+			gStartZoneTeam2[i].sector = startsector;
 			gStartZoneTeam2[i].ang = startang;
 		}
 #endif
 	}
 	InitSectorFX();
-	warpInit();
-	actInit();
-	evInit();
+	warpInit(actorlist);
+	actInit(actorlist);
+	evInit(actorlist);
 	for (int i = connecthead; i >= 0; i = connectpoint2[i])
 	{
 		if (newgame)
@@ -193,8 +332,8 @@ void StartLevel(MapRecord* level, bool newgame)
 		for (int i = connecthead; i >= 0; i = connectpoint2[i])
 		{
 			PLAYER* pPlayer = &gPlayer[i];
-			pPlayer->pXSprite->health &= 0xf000;
-			pPlayer->pXSprite->health |= gHealthTemp[i];
+			pPlayer->actor->xspr.health &= 0xf000;
+			pPlayer->actor->xspr.health |= gHealthTemp[i];
 			pPlayer->weaponQav = gPlayerTemp[i].weaponQav;
 			pPlayer->curWeapon = gPlayerTemp[i].curWeapon;
 			pPlayer->weaponState = gPlayerTemp[i].weaponState;
@@ -209,7 +348,7 @@ void StartLevel(MapRecord* level, bool newgame)
 	}
 	PreloadCache();
 	InitMirrors();
-	trInit();
+	trInit(actorlist);
 	if (!gMe->packSlots[1].isActive) // if diving suit is not active, turn off reverb sound effect
 		sfxSetReverb(0);
 	ambInit();
@@ -224,6 +363,12 @@ void StartLevel(MapRecord* level, bool newgame)
 	setLevelStarted(level);
 }
 
+
+//---------------------------------------------------------------------------
+//
+//
+//
+//---------------------------------------------------------------------------
 
 void NewLevel(MapRecord *sng, int skill, bool newgame)
 {
@@ -250,6 +395,12 @@ int GameInterface::GetCurrentSkill()
 	return gGameOptions.nDifficulty;
 }
 
+
+//---------------------------------------------------------------------------
+//
+//
+//
+//---------------------------------------------------------------------------
 
 void GameInterface::Ticker()
 {
@@ -332,6 +483,12 @@ void GameInterface::Ticker()
 	else r_NoInterpolate = true;
 }
 
+//---------------------------------------------------------------------------
+//
+//
+//
+//---------------------------------------------------------------------------
+
 void GameInterface::DrawBackground()
 {
 	twod->ClearScreen();
@@ -345,6 +502,7 @@ static void SetTileNames()
 	auto registerName = [](const char* name, int index)
 	{
 		TexMan.AddAlias(name, tileGetTexture(index));
+		TileFiles.addName(name, index);
 	};
 #include "namelist.h"
 	// Oh Joy! Plasma Pak changes the tile number of the title screen, but we preferably want mods that use the original one to display it.
@@ -356,6 +514,12 @@ static void SetTileNames()
 
 
 void ReadAllRFS();
+
+//---------------------------------------------------------------------------
+//
+//
+//
+//---------------------------------------------------------------------------
 
 void GameInterface::loadPalette(void)
 {
@@ -425,14 +589,19 @@ void GameInterface::loadPalette(void)
 	paletteloaded = PALETTE_SHADE | PALETTE_TRANSLUC | PALETTE_MAIN;
 }
 
+//---------------------------------------------------------------------------
+//
+//
+//
+//---------------------------------------------------------------------------
+
 void GameInterface::app_init()
 {
+	GC::AddMarkerFunc(markgcroots);
 	InitCheats();
 	memcpy(&gGameOptions, &gSingleGameOptions, sizeof(GAMEOPTIONS));
 	gGameOptions.nMonsterSettings = !userConfig.nomonsters;
 	ReadAllRFS();
-
-	HookReplaceFunctions();
 
 	levelLoadDefaults();
 
@@ -464,6 +633,12 @@ void GameInterface::app_init()
 	gViewIndex = myconnectindex;
 	gMe = gView = &gPlayer[myconnectindex];
 }
+
+//---------------------------------------------------------------------------
+//
+//
+//
+//---------------------------------------------------------------------------
 
 static void gameInit()
 {
@@ -504,6 +679,12 @@ void sndPlaySpecialMusicOrNothing(int nMusic)
 	}
 }
 
+//---------------------------------------------------------------------------
+//
+//
+//
+//---------------------------------------------------------------------------
+
 extern  IniFile* BloodINI;
 void GameInterface::FreeGameData()
 {
@@ -531,6 +712,12 @@ ReservedSpace GameInterface::GetReservedScreenSpace(int viewsize)
 {
 	return new GameInterface;
 }
+
+//---------------------------------------------------------------------------
+//
+//
+//
+//---------------------------------------------------------------------------
 
 enum
 {
@@ -598,8 +785,7 @@ DEFINE_ACTION_FUNCTION(_Blood, GetViewPlayer)
 DEFINE_ACTION_FUNCTION(_BloodPlayer, GetHealth)
 {
 	PARAM_SELF_STRUCT_PROLOGUE(PLAYER);
-	XSPRITE* pXSprite = self->pXSprite;
-	ACTION_RETURN_INT(pXSprite->health);
+	ACTION_RETURN_INT(self->actor->xspr.health);
 }
 
 DEFINE_ACTION_FUNCTION_NATIVE(_BloodPlayer, powerupCheck, powerupCheck)

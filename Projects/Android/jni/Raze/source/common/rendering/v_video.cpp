@@ -121,7 +121,6 @@ CUSTOM_CVAR(Int, vid_preferbackend, 0, CVAR_ARCHIVE | CVAR_GLOBALCONFIG | CVAR_N
 	Printf("Changing the video backend requires a restart for " GAMENAME ".\n");
 }
 
-CVAR(Int, vid_renderer, 1, 0)	// for some stupid mods which threw caution out of the window...
 
 CUSTOM_CVAR(Int, uiscale, 0, CVAR_ARCHIVE | CVAR_NOINITCALL)
 {
@@ -219,13 +218,13 @@ void DCanvas::Resize(int width, int height, bool optimizepitch)
 {
 	Width = width;
 	Height = height;
-	
+
 	// Making the pitch a power of 2 is very bad for performance
 	// Try to maximize the number of cache lines that can be filled
 	// for each column drawing operation by making the pitch slightly
 	// longer than the width. The values used here are all based on
 	// empirical evidence.
-	
+
 	if (width <= 640 || !optimizepitch)
 	{
 		// For low resolutions, just keep the pitch the same as the width.
@@ -282,6 +281,12 @@ void V_UpdateModeSize (int width, int height)
 	CleanHeight = screen->GetHeight() / CleanYfac;
 
 	int w = screen->GetWidth();
+	int h = screen->GetHeight();
+	
+	// clamp screen aspect ratio to 17:10, for anything wider the width will be reduced
+	double aspect = (double)w / h;
+	if (aspect > 1.7) w = int(w * 1.7 / aspect);
+	
 	int factor;
 	if (w < 640) factor = 1;
 	else if (w >= 1024 && w < 1280) factor = 2;
@@ -337,15 +342,15 @@ void V_InitScreenSize ()
 { 
 	const char *i;
 	int width, height, bits;
-	
+
 	width = height = bits = 0;
-	
+
 	if ( (i = Args->CheckValue ("-width")) )
 		width = atoi (i);
-	
+
 	if ( (i = Args->CheckValue ("-height")) )
 		height = atoi (i);
-	
+
 	if (width == 0)
 	{
 		if (height == 0)

@@ -1,11 +1,12 @@
 #pragma once
 #include "build.h"
+#include "gamefuncs.h"
 
 class FSerializer;
 struct IntRect;
 
-void render_drawrooms(spritetype* playersprite, const vec3_t& position, int sectnum, binangle angle, fixedhoriz horizon, binangle rollang, double smoothratio);
-void render_camtex(spritetype* playersprite, const vec3_t& position, int sectnum, binangle angle, fixedhoriz horizon, binangle rollang, FGameTexture* camtex, IntRect& rect, double smoothratio);
+void render_drawrooms(DCoreActor* playersprite, const vec3_t& position, int sectnum, binangle angle, fixedhoriz horizon, binangle rollang, double smoothratio);
+void render_camtex(DCoreActor* playersprite, const vec3_t& position, sectortype* sect, binangle angle, fixedhoriz horizon, binangle rollang, FGameTexture* camtex, IntRect& rect, double smoothratio);
 
 struct PortalDesc
 {
@@ -56,15 +57,15 @@ inline void mergePortals()
 					{
 						for (unsigned t = 0; t < pt2.targets.Size(); t++)
 						{
-							if (findwallbetweensectors(pt1.targets[s], pt2.targets[t]) >= 0)
+							if (sectorsConnected(pt1.targets[s], pt2.targets[t]))
 							{
 								pt1.targets.Append(pt2.targets);
 								pt2.targets.Reset();
 								pt2.type = -1;
-								for (int n = 0; n < numsectors; n++)
+								for (auto& sec : sector)
 								{
 									//Printf("Merged %d and %d\n", i, j);
-									if (sector[n].portalnum == (int)j) sector[n].portalnum = i;
+									if (sec.portalnum == (int)j) sec.portalnum = i;
 								}
 								didsomething = true;
 								break;

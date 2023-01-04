@@ -16,7 +16,7 @@ APP_SHORT_COMMANDS := true
 
 LOCAL_MODULE    := raze
 
-LOCAL_CFLAGS   := $(OPENXR_HMD) -funsigned-char  -DHAVE_GLES2 -DUSE_OPENGL -DNO_CLOCK_GETTIME -DUSE_GL_HW_BUFFERS -fvisibility=hidden -frtti  -D__MOBILE__  -DOPNMIDI_DISABLE_GX_EMULATOR -DGZDOOM  -DGZDOOM_GL3 -D__STDINT_LIMITS -DENGINE_NAME=\"gzdoom_dev\"
+LOCAL_CFLAGS   := $(OPENXR_HMD) -O1 -funsigned-char  -DHAVE_GLES2 -DUSE_OPENGL -DNO_CLOCK_GETTIME -DUSE_GL_HW_BUFFERS -fvisibility=hidden -frtti  -D__MOBILE__  -DOPNMIDI_DISABLE_GX_EMULATOR -DGZDOOM  -DGZDOOM_GL3 -D__STDINT_LIMITS -DENGINE_NAME=\"gzdoom_dev\"
 #-DNO_PIX_BUFF
 #-DUSE_GL_HW_BUFFERS
 #-DHAVE_VULKAN
@@ -70,6 +70,7 @@ LOCAL_C_INCLUDES := \
 	$(GZDOOM_TOP_PATH)/source/common/statusbar \
 	$(GZDOOM_TOP_PATH)/source/common/fonts \
 	$(GZDOOM_TOP_PATH)/source/common/objects \
+	$(GZDOOM_TOP_PATH)/source/common/startscreen \
 	$(GZDOOM_TOP_PATH)/source/common/rendering \
 	$(GZDOOM_TOP_PATH)/source/common/rendering/hwrenderer \
 	$(GZDOOM_TOP_PATH)/source/common/rendering/hwrenderer/data \
@@ -95,6 +96,8 @@ LOCAL_C_INCLUDES := \
     $(GZDOOM_TOP_PATH)/libraries/lzma/C \
     $(GZDOOM_TOP_PATH)/libraries/bzip2 \
     $(GZDOOM_TOP_PATH)/libraries/gdtoa \
+    $(GZDOOM_TOP_PATH)/libraries/libtess/Include \
+    $(GZDOOM_TOP_PATH)/libraries/discordrpc/include \
     $(GZDOOM_TOP_PATH)/mobile/src/vpx/include \
     $(GZDOOM_TOP_PATH)/source/common/rendering/gles/glad/include \
 \
@@ -133,24 +136,6 @@ PLAT_SDL_SOURCES = \
     	common/platform/posix/nosdl/st_start.cpp \
 
 
-POLYRENDER_SOURCES = \
-	common/rendering/polyrenderer/drawers/poly_triangle.cpp \
-	common/rendering/polyrenderer/drawers/poly_thread.cpp \
-	common/rendering/polyrenderer/drawers/screen_triangle.cpp \
-	common/rendering/polyrenderer/drawers/screen_scanline_setup.cpp \
-	common/rendering/polyrenderer/drawers/screen_shader.cpp \
-	common/rendering/polyrenderer/drawers/screen_blend.cpp \
-
-
-
-POLYBACKEND_SOURCES = \
-	common/rendering/polyrenderer/backend/poly_framebuffer.cpp \
-	common/rendering/polyrenderer/backend/poly_buffers.cpp \
-	common/rendering/polyrenderer/backend/poly_hwtexture.cpp \
-	common/rendering/polyrenderer/backend/poly_renderstate.cpp \
-
-
-
  FASTMATH_SOURCES = \
 	common/rendering/gl_load/gl_load.c \
 	common/textures/hires/hqnx/init.cpp \
@@ -165,6 +150,7 @@ POLYBACKEND_SOURCES = \
 
 
 PCH_SOURCES = \
+	common/thirdparty/richpresence.cpp \
 	glbackend/glbackend.cpp \
 	glbackend/gl_texture.cpp \
 	thirdparty/src/md4.cpp \
@@ -172,10 +158,12 @@ PCH_SOURCES = \
 	build/src/engine.cpp \
 	build/src/mdsprite.cpp \
 	build/src/polymost.cpp \
-    common/cutscenes/playmve.cpp \
-	common/cutscenes/movieplayer.cpp \
-	common/cutscenes/screenjob.cpp \
-	core/razefont.cpp \
+	core/actorinfo.cpp \
+	core/zcc_compile_raze.cpp \
+	core/vmexports.cpp \
+	core/thingdef_data.cpp \
+	core/thingdef_properties.cpp \
+	core/actorlist.cpp \
 	core/automap.cpp \
 	core/cheats.cpp \
 	core/cheathandler.cpp \
@@ -204,9 +192,11 @@ PCH_SOURCES = \
 	core/secrets.cpp \
 	core/savegamehelp.cpp \
 	core/precache.cpp \
+	core/psky.cpp \
 	core/quotes.cpp \
 	core/screenshot.cpp \
 	core/sectorgeometry.cpp \
+	core/razefont.cpp \
 	core/raze_music.cpp \
 	core/raze_sound.cpp \
 	core/palette.cpp \
@@ -214,28 +204,27 @@ PCH_SOURCES = \
 	core/statusbar2.cpp \
 	core/gi.cpp \
 	core/defparser.cpp \
-    core/nodebuilder/nodebuild.cpp \
-    core/nodebuilder/nodebuild_classify_nosse2.cpp \
-    core/nodebuilder/nodebuild_events.cpp \
-    core/nodebuilder/nodebuild_extract.cpp \
-    core/nodebuilder/nodebuild_gl.cpp \
-    core/nodebuilder/nodebuild_utility.cpp \
-    core/rendering/hw_entrypoint.cpp \
-    core/rendering/hw_models.cpp \
-    core/rendering/hw_voxels.cpp \
-    core/rendering/hw_palmanager.cpp \
-    core/rendering/hw_sections.cpp \
-    core/rendering/scene/hw_clipper.cpp \
-    core/rendering/scene/hw_walls.cpp \
-    core/rendering/scene/hw_flats.cpp \
-    core/rendering/scene/hw_sprites.cpp \
-    core/rendering/scene/hw_drawlistadd.cpp \
-    core/rendering/scene/hw_drawlist.cpp \
-    core/rendering/scene/hw_drawinfo.cpp \
-    core/rendering/scene/hw_bunchdrawer.cpp \
-    core/rendering/scene/hw_portal.cpp \
-    core/rendering/scene/hw_skyportal.cpp \
-    core/rendering/scene/hw_sky.cpp \
+	core/rendering/hw_entrypoint.cpp \
+	core/rendering/hw_models.cpp \
+	core/rendering/hw_voxels.cpp \
+	core/rendering/hw_palmanager.cpp \
+	core/rendering/hw_sections.cpp \
+	core/rendering/hw_vertexmap.cpp \
+	core/rendering/scene/hw_clipper.cpp \
+	core/rendering/scene/hw_walls.cpp \
+	core/rendering/scene/hw_walls_vertex.cpp \
+	core/rendering/scene/hw_flats.cpp \
+	core/rendering/scene/hw_sprites.cpp \
+	core/rendering/scene/hw_drawlistadd.cpp \
+	core/rendering/scene/hw_drawlist.cpp \
+	core/rendering/scene/hw_drawinfo.cpp \
+	core/rendering/scene/hw_bunchdrawer.cpp \
+	core/rendering/scene/hw_portal.cpp \
+	core/rendering/scene/hw_skyportal.cpp \
+	core/rendering/scene/hw_sky.cpp \
+	core/rendering/scene/hw_setcolor.cpp \
+	core/rendering/scene/hw_lighting.cpp \
+	core/r_data/gldefs.cpp \
 	core/console/c_notifybuffer.cpp \
 	core/console/d_event.cpp \
 	common/audio/sound/i_sound.cpp \
@@ -251,8 +240,15 @@ PCH_SOURCES = \
 	common/2d/v_2ddrawer.cpp \
 	common/2d/v_drawtext.cpp \
 	common/2d/v_draw.cpp \
+	common/2d/wipe.cpp \
 	common/thirdparty/gain_analysis.cpp \
 	common/thirdparty/sfmt/SFMT.cpp \
+	common/startscreen/startscreen.cpp \
+	common/startscreen/startscreen_heretic.cpp \
+	common/startscreen/startscreen_hexen.cpp \
+	common/startscreen/startscreen_strife.cpp \
+	common/startscreen/startscreen_generic.cpp \
+	common/startscreen/endoom.cpp \
 	common/fonts/singlelumpfont.cpp \
 	common/fonts/singlepicfont.cpp \
 	common/fonts/specialfont.cpp \
@@ -288,11 +284,13 @@ PCH_SOURCES = \
 	common/textures/formats/pcxtexture.cpp \
 	common/textures/formats/pngtexture.cpp \
 	common/textures/formats/rawpagetexture.cpp \
+	common/textures/formats/startuptexture.cpp \
 	common/textures/formats/emptytexture.cpp \
 	common/textures/formats/shadertexture.cpp \
 	common/textures/formats/tgatexture.cpp \
 	common/textures/formats/stbtexture.cpp \
 	common/textures/formats/anmtexture.cpp \
+	common/textures/formats/startscreentexture.cpp \
 	common/textures/hires/hqresize.cpp \
 	common/models/models_md3.cpp \
 	common/models/models_md2.cpp \
@@ -313,6 +311,9 @@ PCH_SOURCES = \
 	common/console/c_notifybufferbase.cpp \
 	common/console/c_tabcomplete.cpp \
 	common/console/c_expr.cpp \
+	common/cutscenes/playmve.cpp \
+	common/cutscenes/movieplayer.cpp \
+	common/cutscenes/screenjob.cpp \
 	common/utility/engineerrors.cpp \
 	common/utility/i_module.cpp \
 	common/utility/m_alloc.cpp \
@@ -332,6 +333,11 @@ PCH_SOURCES = \
 	common/thirdparty/base64.cpp \
 	common/thirdparty/md5.cpp \
  	common/thirdparty/superfasthash.cpp \
+	common/thirdparty/libsmackerdec/src/BitReader.cpp \
+	common/thirdparty/libsmackerdec/src/FileStream.cpp \
+	common/thirdparty/libsmackerdec/src/HuffmanVLC.cpp \
+	common/thirdparty/libsmackerdec/src/LogError.cpp \
+	common/thirdparty/libsmackerdec/src/SmackerDecoder.cpp \
 	common/filesystem/filesystem.cpp \
 	common/filesystem/ancientzip.cpp \
 	common/filesystem/file_7z.cpp \
@@ -387,8 +393,10 @@ PCH_SOURCES = \
 	common/rendering/hwrenderer/data/hw_aabbtree.cpp \
 	common/rendering/hwrenderer/data/hw_shadowmap.cpp \
 	common/rendering/hwrenderer/data/hw_shaderpatcher.cpp \
+	common/rendering/hwrenderer/postprocessing/hw_postprocessshader.cpp \
 	common/rendering/hwrenderer/postprocessing/hw_postprocess.cpp \
 	common/rendering/hwrenderer/postprocessing/hw_postprocess_cvars.cpp \
+	common/rendering/hwrenderer/postprocessing/hw_postprocessshader_ccmds.cpp \
 	common/rendering/gl_load/gl_interface.cpp \
 	common/rendering/gl/gl_renderer.cpp \
 	common/rendering/gl/gl_stereo3d.cpp \
@@ -432,16 +440,12 @@ PCH_SOURCES = \
 	common/scripting/frontend/zcc_parser.cpp \
 	common/scripting/backend/vmbuilder.cpp \
 	common/scripting/backend/codegen.cpp \
-	common/thirdparty/libsmackerdec/src/BitReader.cpp \
-    common/thirdparty/libsmackerdec/src/FileStream.cpp\
-    common/thirdparty/libsmackerdec/src/HuffmanVLC.cpp \
-    common/thirdparty/libsmackerdec/src/LogError.cpp \
-    common/thirdparty/libsmackerdec/src/SmackerDecoder.cpp \
 	core/textures/buildtiles.cpp \
 	core/textures/skytexture.cpp \
 	core/textures/hightile.cpp \
 	core/music/s_advsound.cpp \
 	core/menu/loadsavemenu.cpp \
+	core/menu/usermap.cpp \
 	core/menu/razemenu.cpp \
 	games/duke/all.cpp \
 	games/duke/all_d.cpp \
@@ -469,9 +473,7 @@ LOCAL_SRC_FILES = \
     ${RAZEXR_SRC_FILES} \
 	${SYSTEM_SOURCES} \
 	${FASTMATH_SOURCES} \
-	$(POLYBACKEND_SOURCES) \
 	${PCH_SOURCES} \
-	common/rendering/polyrenderer/poly_all.cpp \
 	common/utility/x86.cpp \
 	common/thirdparty/strnatcmp.c \
 	common/utility/zstring.cpp \
@@ -500,7 +502,7 @@ LOCAL_SRC_FILES = \
 LOCAL_LDLIBS := -ldl -llog -lOpenSLES -landroid
 LOCAL_LDLIBS +=  -lEGL -lGLESv3
 
-LOCAL_STATIC_LIBRARIES :=  zlib_gl3 lzma_gl3 gdtoa_gl3  bzip2_gl3 jpeg vpx
+LOCAL_STATIC_LIBRARIES :=  zlib_gl3 lzma_gl3 gdtoa_gl3  bzip2_gl3 jpeg vpx tess_gl3
 LOCAL_SHARED_LIBRARIES :=  openxr_loader openal zmusic
 
 include $(BUILD_SHARED_LIBRARY)

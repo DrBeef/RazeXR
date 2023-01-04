@@ -16,7 +16,6 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 */
 //-------------------------------------------------------------------------
 #include "ns.h"
-#include "compat.h"
 #include "engine.h"
 #include "exhumed.h"
 #include "sequence.h"
@@ -53,7 +52,7 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 
 BEGIN_PS_NS
 
-short nBestLevel;
+int nBestLevel;
 
 void RunCinemaScene(int num);
 void GameMove(void);
@@ -76,16 +75,21 @@ void GameInterface::Render()
 
     double const smoothratio = calc_smoothratio();
 
-    DrawView(smoothratio);
-    DrawStatusBar();
-    DrawCrosshair(kCrosshairTile, PlayerList[nLocalPlayer].nHealth >> 3, -PlayerList[nLocalPlayer].angle.look_anghalf(smoothratio), 0, 1);
 
-    if (paused && !M_Active())
+
+    DrawView(smoothratio);
+    if (nFreeze != 2) // Hide when Ramses is talking.
     {
-        auto tex = GStrings("TXTB_PAUSED");
-        auto font = PickSmallFont(tex);
-        int nStringWidth = font->StringWidth(tex);
-		DrawText(twod, font, CR_UNTRANSLATED, 160 - nStringWidth / 2, 100, tex, DTA_FullscreenScale, FSMode_Fit320x200, TAG_DONE);
+        DrawStatusBar();
+        DrawCrosshair(kCrosshairTile, PlayerList[nLocalPlayer].nHealth >> 3, -PlayerList[nLocalPlayer].angle.look_anghalf(smoothratio), 0, 1);
+
+        if (paused && !M_Active())
+        {
+            auto tex = GStrings("TXTB_PAUSED");
+            auto font = PickSmallFont(tex);
+            int nStringWidth = font->StringWidth(tex);
+            DrawText(twod, font, CR_UNTRANSLATED, 160 - nStringWidth / 2, 100, tex, DTA_FullscreenScale, FSMode_Fit320x200, TAG_DONE);
+        }
     }
 
     drawtime.Unclock();
@@ -121,9 +125,9 @@ void GameInterface::NextLevel(MapRecord *map, int skill)
 	{
 		nBestLevel = map->levelNumber - 1;
 	}
-	
+
 	STAT_NewLevel(currentLevel->labelName);
-	
+	TITLE_InformName(currentLevel->name);
 }
 
 //---------------------------------------------------------------------------

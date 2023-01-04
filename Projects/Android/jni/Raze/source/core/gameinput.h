@@ -12,7 +12,7 @@ binangle getincanglebam(binangle a, binangle na);
 
 //---------------------------------------------------------------------------
 //
-// Functions for dividing an input value by current ticrate for angle/horiz scaling.
+// Function for dividing an input value by current ticrate for angle/horiz scaling.
 //
 //---------------------------------------------------------------------------
 
@@ -21,10 +21,11 @@ inline double getTicrateScale(double const value)
 	return value / GameTicRate;
 }
 
-inline double getTicrateScale(double const value, double const scaleAdjust)
+inline double getPushScale(double const scaleAdjust)
 {
-	return scaleAdjust * getTicrateScale(value);
+	return (2. / 9.) * ((scaleAdjust < 1.) ? ((1. - scaleAdjust * 0.5) * 1.5) : (1.));
 }
+
 
 
 struct PlayerHorizon
@@ -35,7 +36,7 @@ struct PlayerHorizon
 
 	// Prototypes for functions in gameinput.cpp.
 	void applyinput(float const horz, ESyncBits* actions, double const scaleAdjust = 1);
-	void calcviewpitch(vec2_t const pos, binangle const ang, bool const aimmode, bool const canslopetilt, int const cursectnum, double const scaleAdjust = 1, bool const climbing = false);
+	void calcviewpitch(vec2_t const pos, binangle const ang, bool const aimmode, bool const canslopetilt, sectortype* const cursectnum, double const scaleAdjust = 1, bool const climbing = false);
 
 	// Interpolation helpers.
 	void backup()
@@ -55,10 +56,6 @@ struct PlayerHorizon
 	fixedhoriz interpolatedsum(double const smoothratio) { return interpolatedhorizon(osum(), sum(), smoothratio); }
 
 	// Ticrate playsim adjustment helpers.
-	void addadjustment(double value) { __addadjustment(buildfhoriz(value));	}
-	void addadjustment(fixedhoriz value) { __addadjustment(value); }
-	void settarget(double value, bool backup = false) { __settarget(buildfhoriz(value), backup); }
-	void settarget(fixedhoriz value, bool backup = false) { __settarget(value, backup); }
 	void resetadjustment() { adjustment = 0; }
 	bool targetset() { return target.asq16(); }
 
@@ -80,12 +77,40 @@ struct PlayerHorizon
 		if (object.asq16())
 		{
 			auto sgn = Sgn(object.asq16());
-			object  -= getscaledhoriz(value, scaleAdjust, &object, push == DBL_MAX ? sgn * (2. / 9.) * (scaleAdjust < 1. ? (1. - scaleAdjust * 0.5) * 1.5 : 1.) : push);
+			object  -= getscaledhoriz(value, scaleAdjust, &object, push == DBL_MAX ? sgn * getPushScale(scaleAdjust) : push);
 			if (sgn != Sgn(object.asq16())) object = q16horiz(0);
 		}
 	}
 
-	// Ticrate playsim adjustment processor.
+	// Ticrate playsim adjustment setters and processor.
+	void addadjustment(fixedhoriz const value)
+	{
+		if (!SyncInput())
+		{
+			adjustment += value.asbuildf();
+		}
+		else
+		{
+			horiz += value;
+		}
+	}
+
+	void settarget(fixedhoriz value, bool const backup = false)
+	{
+		// Clamp incoming variable because sometimes the caller can exceed bounds.
+		value = q16horiz(clamp(value.asq16(), gi->playerHorizMin(), gi->playerHorizMax()));
+
+		if (!SyncInput() && !backup)
+		{
+			target = value.asq16() ? value : q16horiz(1);
+		}
+		else
+		{
+			horiz = value;
+			if (backup) ohoriz = horiz;
+		}
+	}
+
 	void processhelpers(double const scaleAdjust)
 	{
 		if (targetset())
@@ -112,34 +137,6 @@ private:
 	fixedhoriz target;
 	double adjustment;
 	bool inputdisabled;
-
-	void __addadjustment(fixedhoriz value)
-	{
-		if (!SyncInput())
-		{
-			adjustment += value.asbuildf();
-		}
-		else
-		{
-			horiz += value;
-		}
-	}
-
-	void __settarget(fixedhoriz value, bool backup)
-	{
-		value = q16horiz(clamp(value.asq16(), gi->playerHorizMin(), gi->playerHorizMax()));
-
-		if (!SyncInput() && !backup)
-		{
-			target = value;
-			if (!targetset()) target = q16horiz(1);
-		}
-		else
-		{
-			horiz = value;
-			if (backup) ohoriz = horiz;
-		}
-	}
 };
 
 struct PlayerAngle
@@ -174,10 +171,6 @@ struct PlayerAngle
 	binangle interpolatedrotscrn(double const smoothratio) { return interpolatedangle(orotscrnang, rotscrnang, smoothratio); }
 
 	// Ticrate playsim adjustment helpers.
-	void addadjustment(double value) { __addadjustment(buildfang(value)); }
-	void addadjustment(binangle value) { __addadjustment(value); }
-	void settarget(double value, bool backup = false) { __settarget(buildfang(value), backup); }
-	void settarget(binangle value, bool backup = false) { __settarget(value, backup); }
 	void resetadjustment() { adjustment = 0; }
 	bool targetset() { return target.asbam(); }
 
@@ -200,12 +193,37 @@ struct PlayerAngle
 		if (object.asbam())
 		{
 			auto sgn = Sgn(object.signedbam());
-			object  -= getscaledangle(value, scaleAdjust, &object, push == DBL_MAX ? sgn * (2. / 9.) * (scaleAdjust < 1. ? (1. - scaleAdjust * 0.5) * 1.5 : 1.) : push);
+			object  -= getscaledangle(value, scaleAdjust, &object, push == DBL_MAX ? sgn * getPushScale(scaleAdjust) : push);
 			if (sgn != Sgn(object.signedbam())) object = bamang(0);
 		}
 	}
 
-	// Ticrate playsim adjustment processor.
+	// Ticrate playsim adjustment setters and processor.
+	void addadjustment(binangle const value)
+	{
+		if (!SyncInput())
+		{
+			adjustment += value.signedbuildf();
+		}
+		else
+		{
+			ang += value;
+		}
+	}
+
+	void settarget(binangle const value, bool const backup = false)
+	{
+		if (!SyncInput() && !backup)
+		{
+			target = value.asbam() ? value : bamang(1);
+		}
+		else
+		{
+			ang = value;
+			if (backup) oang = ang;
+		}
+	}
+
 	void processhelpers(double const scaleAdjust)
 	{
 		if (targetset())
@@ -232,73 +250,11 @@ private:
 	binangle target;
 	double adjustment;
 	bool inputdisabled;
-
-	void __addadjustment(binangle value)
-	{
-		if (!SyncInput())
-		{
-			adjustment += value.signedbuildf();
-		}
-		else
-		{
-			ang += value;
-		}
-	}
-
-	void __settarget(binangle value, bool backup)
-	{
-		if (!SyncInput() && !backup)
-		{
-			target = value;
-			if (!targetset()) target = bamang(1);
-		}
-		else
-		{
-			ang = value;
-			if (backup) oang = ang;
-		}
-	}
-};
-
-struct PlayerPosition
-{
-	vec3_t pos, opos;
-
-	// Interpolation helpers.
-	void backupx() { opos.x = pos.x; }
-	void backupy() { opos.y = pos.y; }
-	void backupz() { opos.z = pos.z; }
-	void backuppos() { opos = pos; }
-
-	// Interpolated points.
-	int32_t interpolatedx(double const smoothratio, int const scale = 16) { return interpolatedvalue(opos.x, pos.x, smoothratio, scale); }
-	int32_t interpolatedy(double const smoothratio, int const scale = 16) { return interpolatedvalue(opos.y, pos.y, smoothratio, scale); }
-	int32_t interpolatedz(double const smoothratio, int const scale = 16) { return interpolatedvalue(opos.z, pos.z, smoothratio, scale); }
-
-	// Interpolated vectors.
-	vec2_t interpolatedvec2(double const smoothratio, int const scale = 16)
-	{
-		return
-		{
-			interpolatedx(smoothratio, scale),
-			interpolatedy(smoothratio, scale)
-		};
-	}
-	vec3_t interpolatedvec3(double const smoothratio, int const scale = 16)
-	{
-		return
-		{
-			interpolatedx(smoothratio, scale),
-			interpolatedy(smoothratio, scale),
-			interpolatedz(smoothratio, scale)
-		};
-	}
 };
 
 class FSerializer;
 FSerializer& Serialize(FSerializer& arc, const char* keyname, PlayerAngle& w, PlayerAngle* def);
 FSerializer& Serialize(FSerializer& arc, const char* keyname, PlayerHorizon& w, PlayerHorizon* def);
-FSerializer& Serialize(FSerializer& arc, const char* keyname, PlayerPosition& w, PlayerPosition* def);
 
 
 void updateTurnHeldAmt(double const scaleAdjust);

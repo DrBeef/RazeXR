@@ -30,7 +30,7 @@ Prepared for public release: 03/28/2005 - Charlie Wiederhold, 3D Realms
 BEGIN_SW_NS
 
 void SectorSetup(void);
-DOOR_AUTO_CLOSEp SetDoorAutoClose(short SectorNum, short Type);
+DOOR_AUTO_CLOSE* SetDoorAutoClose(short SectorNum, short Type);
 void DoDragging(void);
 int MoveDoorVert(short door_sector, short dir, short door_speed);
 int MoveDoorUp(short door_sector, short auto_close, short door_speed);
@@ -38,12 +38,11 @@ int MoveDoorDown(short door_sector, short dir, short door_speed);
 int MoveDoorHoriz(short door_sector, short dir, short door_speed);
 void DoDoorsClose(void);
 short Switch(short SwitchSector);
-void PlayerOperateEnv(PLAYERp pp);
-int TeleportToSector(PLAYERp pp, int newsector);
-int OperateSector(short sectnum,short player_is_operating);
+void PlayerOperateEnv(PLAYER* pp);
+int TeleportToSector(PLAYER* pp, int newsector);
+int OperateSector(sectortype* sect,short player_is_operating);
 int OperateSprite(DSWActor*, short player_is_operating);
-int OperateWall(short wallnum, short player_is_operating);
-void OperateTripTrigger(PLAYERp pp);
+void OperateTripTrigger(PLAYER* pp);
 
 enum SO_SCALE_TYPE
 {
@@ -57,23 +56,24 @@ enum SO_SCALE_TYPE
 
 #define SCALE_POINT_SPEED (4 + RandomRange(8))
 
-typedef struct
+struct NEAR_TAG_INFO
 {
     int dist;
-    short sectnum, wallnum;
+    sectortype* sectp;
+    walltype* wallp;
     DSWActor* actor;
-} NEAR_TAG_INFO, *NEAR_TAG_INFOp;
+};
 extern short nti_cnt;
 
 void DoSpawnSpotsForKill(short match);
 void DoSpawnSpotsForDamage(short match);
-void DoMatchEverything(PLAYERp pp, short match, short state);
+void DoMatchEverything(PLAYER* pp, short match, short state);
 bool ComboSwitchTest(short combo_type,short match);
 void DoSoundSpotStopSound(short match);
 void DoSector(void);
-short AnimateSwitch(SPRITEp sp,short tgt_value);
+int AnimateSwitch(DSWActor* actor, int tgt_value);
 void ShootableSwitch(DSWActor*);
-bool TestKillSectorObject(SECTOR_OBJECTp sop);
+bool TestKillSectorObject(SECTOR_OBJECT* sop);
 void WeaponExplodeSectorInRange(DSWActor*);
 
 

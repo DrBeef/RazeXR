@@ -30,7 +30,6 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 #include "names2.h"
 #include "panel.h"
 #include "game.h"
-#include "mytypes.h"
 
 #include "gamecontrol.h"
 #include "gstrings.h"
@@ -51,9 +50,9 @@ BEGIN_SW_NS
 
 void GameInterface::WarpToCoords(int x, int y, int z, int ang, int horz)
 {
-    Player->oposx = Player->posx = x;
-    Player->oposy = Player->posy = y;
-    Player->oposz = Player->posz = z;
+    Player->opos.X = Player->pos.X = x;
+    Player->opos.Y = Player->pos.Y = y;
+    Player->opos.Z = Player->pos.Z = z;
 
     if (ang != INT_MIN)
     {
@@ -87,8 +86,8 @@ static int osdcmd_mirror(CCmdFuncPtr parm)
     Printf("camspic is the tile number of the drawtotile in editart");
     Printf("iscamera is whether or not this mirror is a camera type");
     Printf(" ");
-    Printf("mirror[%d].mirrorwall = %d", op1, mirror[op1].mirrorwall);
-    Printf("mirror[%d].mirrorsector = %d", op1, mirror[op1].mirrorsector);
+    Printf("mirror[%d].mirrorwall = %d", op1, wallnum(mirror[op1].mirrorWall));
+    Printf("mirror[%d].mirrorsector = %d", op1, sectnum(mirror[op1].mirrorSector));
     Printf("mirror[%d].camera = %d", op1, mirror[op1].cameraActor->GetIndex());
     Printf("mirror[%d].camsprite = %d", op1, mirror[op1].camspriteActor->GetIndex());
     Printf("mirror[%d].campic = %d", op1, mirror[op1].campic);
@@ -100,13 +99,13 @@ void GameInterface::ToggleThirdPerson()
 {
     if (gamestate != GS_LEVEL) return;
     auto pp = &Player[myconnectindex];
-    if (TEST(pp->Flags, PF_VIEW_FROM_OUTSIDE))
+    if (pp->Flags & (PF_VIEW_FROM_OUTSIDE))
     {
-        RESET(pp->Flags, PF_VIEW_FROM_OUTSIDE);
+        pp->Flags &= ~(PF_VIEW_FROM_OUTSIDE);
     }
     else
     {
-        SET(pp->Flags, PF_VIEW_FROM_OUTSIDE);
+        pp->Flags |= (PF_VIEW_FROM_OUTSIDE);
         cameradist = 0;
     }
 }
@@ -130,7 +129,7 @@ void GameInterface::SwitchCoopView()
         }
         else
         {
-            PLAYERp tp = Player + screenpeek;
+            PLAYER* tp = Player + screenpeek;
             DoPlayerDivePalette(tp);
             DoPlayerNightVisionPalette(tp);
         }

@@ -30,28 +30,31 @@ Prepared for public release: 03/28/2005 - Charlie Wiederhold, 3D Realms
 
 BEGIN_SW_NS
 
-#define MAXMIRRORDIST       3300    // At this distance, or less, the magic mirrors activate.
-#define MAXMIRRORMONSTERS   4       // Max monsters any one magic mirror can spawn
-
-typedef enum
+enum
 {
-    m_normal, m_viewon, m_pissed
-} MIRRORSTATE;
+	MAXMIRRORDIST = 3300,    // At this distance, or less, the magic mirrors activate.
+	MAXMIRRORMONSTERS = 4       // Max monsters any one magic mirror can spawn
+};
 
-typedef struct
+enum
 {
-	DSWActor* cameraActor;                       // Contains number of ST1 sprite used as a camera
-	DSWActor* camspriteActor;                    // sprite pointing to campic
-	int mirrorwall;                   // Wall number containing the mirror tile
-    int mirrorsector;                 // nextsector used internally to draw mirror rooms
-    short campic;                       // Editart tile number to draw a screen to
-    short numspawnspots;                // Number of spawnspots used
-    short spawnspots[MAXMIRRORMONSTERS]; // One spot for each possible skill level for a max of up to 4 coolie ghosts to spawn.
-    bool ismagic;                       // Is this a magic mirror?
-    uint8_t mstate;                 // What state the mirror is currently in
-    int maxtics;                       // Tic count used to time mirror events
-    int tics;                          // How much viewing time has been used on mirror?
-} MIRRORTYPE, *MIRRORTYPEp;
+	m_normal, m_viewon, m_pissed
+};
+
+struct MIRRORTYPE
+{
+	TObjPtr<DSWActor*> cameraActor;                       // Contains number of ST1 sprite used as a camera
+	TObjPtr<DSWActor*> camspriteActor;                    // sprite pointing to campic
+	walltype* mirrorWall;                   // Wall number containing the mirror tile
+	sectortype* mirrorSector;                 // used internally to draw mirror rooms
+	short campic;                       // Editart tile number to draw a screen to
+	short numspawnspots;                // Number of spawnspots used
+	short spawnspots[MAXMIRRORMONSTERS]; // One spot for each possible skill level for a max of up to 4 coolie ghosts to spawn.
+	bool ismagic;                       // Is this a magic mirror?
+	uint8_t mstate;                 // What state the mirror is currently in
+	int maxtics;                       // Tic count used to time mirror events
+	int tics;                          // How much viewing time has been used on mirror?
+};
 
 extern MIRRORTYPE mirror[MAXMIRRORS];
 
@@ -60,10 +63,10 @@ extern short floormirrorsector[MAXMIRRORS];
 extern bool mirrorinview;
 extern short NormalVisibility;
 
-void JAnalyzeSprites(tspriteptr_t tspr);
-void JS_DrawCameras(PLAYERp pp, int tx, int ty, int tz, double smoothratio);
-void JS_CameraParms(PLAYERp pp, int tx, int ty, int tz);
-void JS_DrawMirrors(PLAYERp pp,int tx,int ty,int tz,fixed_t tpq16ang,fixed_t tpq16horiz);
+void JAnalyzeSprites(tspritetype* tspr);
+void JS_DrawCameras(PLAYER* pp, int tx, int ty, int tz, double smoothratio);
+void JS_CameraParms(PLAYER* pp, int tx, int ty, int tz);
+void JS_DrawMirrors(PLAYER* pp,int tx,int ty,int tz,fixed_t tpq16ang,fixed_t tpq16horiz);
 void JS_InitMirrors(void);
 void JS_ProcessEchoSpot(void);
 void JS_SpriteSetup(void);

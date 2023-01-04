@@ -16,7 +16,6 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 */
 //-------------------------------------------------------------------------
 #include "ns.h"
-#include "compat.h"
 #include "build.h"
 #include "exhumed.h"
 #include "names.h"
@@ -149,6 +148,7 @@ void menu_DoPlasma()
             for (int y = 0; y < kPlasmaHeight - 2; y++)
             {
                 uint8_t al = *r_edx;
+                uint8_t cl;
 
                 if (al != 96)
                 {
@@ -166,8 +166,8 @@ void menu_DoPlasma()
                     }
                     else
                     {
-                        uint8_t al = *(r_edx + 1);
-                        uint8_t cl = *(r_edx - 1);
+                        al = *(r_edx + 1);
+                        cl = *(r_edx - 1);
 
                         if (al <= cl) {
                             al = cl;
@@ -355,8 +355,7 @@ void TextOverlay::ComputeCinemaText()
 void TextOverlay::ReadyCinemaText(const char* nVal)
 {
     FString label = nVal[0] == '$'? GStrings(nVal +1) : nVal;
-    screentext = label.Split("\n");
-    ComputeCinemaText();
+    Create(label, 0);
 }
 
 void TextOverlay::DisplayText()
@@ -382,7 +381,7 @@ bool TextOverlay::AdvanceCinemaText(double clock)
 {
     if (nHeight + nCrawlY > 0 || CDplaying())
     {
-        nCrawlY-= (clock - lastclock) / 15.;   // do proper interpolation.
+        nCrawlY-= min(clock - lastclock, 1.5) / 15.;   // do proper interpolation.
         lastclock = clock;
         return true;
     }

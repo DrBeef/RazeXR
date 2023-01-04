@@ -13,9 +13,6 @@ void SE40_Draw(int tag, spritetype *spr, int x, int y, int z, binangle a, fixedh
 	tileDelete(FOF);
 	if (!testgotpic(FOF, true)) return;
 
-	TArray<int> tempsectorz(numsectors, true);
-	TArray<int> tempsectorpicnum(numsectors, true);
-
 	floor1 = spr;
 
 	if (spr->lotag == tag + 2) fofmode = tag + 0;
@@ -28,15 +25,14 @@ void SE40_Draw(int tag, spritetype *spr, int x, int y, int z, binangle a, fixedh
 	DukeStatIterator it(STAT_RAROR);
 	while (auto act = it.Next())
 	{
-		auto spr = act->s;
 		if (
-			spr->picnum == SECTOREFFECTOR &&
-			spr->lotag == fofmode &&
-			spr->hitag == floor1->hitag
+			act->spr.picnum == SECTOREFFECTOR &&
+			act->spr.lotag == fofmode &&
+			act->spr.hitag == floor1->hitag
 			) 
 		{
 			floor1 = spr; 
-			fofmode = spr->lotag; 
+			fofmode = act->spr.lotag; 
 			ok++; 
 			break;
 		}
@@ -48,11 +44,10 @@ void SE40_Draw(int tag, spritetype *spr, int x, int y, int z, binangle a, fixedh
 	it.Reset(STAT_RAROR);
 	while (auto act = it.Next())
 	{
-		auto spr = act->s;
 		if (
-			spr->picnum == SECTOREFFECTOR &&
-			spr->lotag == k &&
-			spr->hitag == floor1->hitag
+			act->spr.picnum == SECTOREFFECTOR &&
+			act->spr.lotag == k &&
+			act->spr.hitag == floor1->hitag
 			) 
 		{
 			floor2 = spr; 
@@ -66,54 +61,55 @@ void SE40_Draw(int tag, spritetype *spr, int x, int y, int z, binangle a, fixedh
 	it.Reset(STAT_RAROR);
 	while (auto act = it.Next())
 	{
-		auto spr = act->s;
-		if (spr->picnum == SECTOREFFECTOR &&
-			spr->lotag == k + 2 &&
-			spr->hitag == floor1->hitag
+		if (act->spr.picnum == SECTOREFFECTOR &&
+			act->spr.lotag == k + 2 &&
+			act->spr.hitag == floor1->hitag
 			)
 		{
+			auto sect = act->sector();
+			// repurpose otherwise unused fields in sectortype as temporary storage.
 			if (k == tag + 0)
 			{
-				tempsectorz[spr->sectnum] = spr->sector()->floorz;
-				spr->sector()->floorz += (((z - spr->sector()->floorz) / 32768) + 1) * 32768;
-				tempsectorpicnum[spr->sectnum] = spr->sector()->floorpicnum;
-				spr->sector()->floorpicnum = 13;
+				sect->Flag = sect->floorz;
+				sect->addfloorz((((z - sect->floorz) / 32768) + 1) * 32768, true);
+				sect->Damage = sect->floorpicnum;
+				sect->floorpicnum = 13;
 			}
 			if (k == tag + 1)
 			{
-				tempsectorz[spr->sectnum] = spr->sector()->ceilingz;
-				spr->sector()->ceilingz += (((z - spr->sector()->ceilingz) / 32768) - 1) * 32768;
-				tempsectorpicnum[spr->sectnum] = spr->sector()->ceilingpicnum;
-				spr->sector()->ceilingpicnum = 13;
+				sect->Flag = sect->ceilingz;
+				sect->addceilingz((((z - sect->ceilingz) / 32768) - 1) * 32768, true);
+				sect->Damage = sect->ceilingpicnum;
+				sect->ceilingpicnum = 13;
 			}
 		}
 	}
 
-	offx = x - floor1->x;
-	offy = y - floor1->y;
+	offx = x - floor1->pos.X;
+	offy = y - floor1->pos.Y;
 
-	renderDrawRoomsQ16(floor2->x + offx, floor2->y + offy, z, a.asq16(), h.asq16(), floor2->sectnum, false);
-	fi.animatesprites(pm_tsprite, pm_spritesortcnt, offx + floor2->x, offy + floor2->y, a.asbuild(), smoothratio);
+	renderDrawRoomsQ16(floor2->pos.X + offx, floor2->pos.Y + offy, z, a.asq16(), h.asq16(), floor2->sectp, false);
+	fi.animatesprites(pm_tsprite, pm_spritesortcnt, offx + floor2->pos.X, offy + floor2->pos.Y, a.asbuild(), smoothratio);
 	renderDrawMasks();
 
 	it.Reset(STAT_RAROR);
 	while (auto act = it.Next())
 	{
-		auto spr = act->s;
-		if (spr->picnum == 1 &&
-			spr->lotag == k + 2 &&
-			spr->hitag == floor1->hitag
+		if (act->spr.picnum == 1 &&
+			act->spr.lotag == k + 2 &&
+			act->spr.hitag == floor1->hitag
 			)
 		{
+			auto sect = act->sector();
 			if (k == tag + 0)
 			{
-				spr->sector()->floorz = tempsectorz[spr->sectnum];
-				spr->sector()->floorpicnum = tempsectorpicnum[spr->sectnum];
+				sect->setfloorz(sect->Flag, true);
+				sect->floorpicnum = sect->Damage;
 			}
 			if (k == tag + 1)
 			{
-				spr->sector()->ceilingz = tempsectorz[spr->sectnum];
-				spr->sector()->ceilingpicnum = tempsectorpicnum[spr->sectnum];
+				sect->setceilingz(sect->Flag, true);
+				sect->ceilingpicnum = sect->Damage;
 			}
 		}// end if
 	}// end for
@@ -137,7 +133,7 @@ void se40code(int x, int y, int z, binangle a, fixedhoriz h, int smoothratio)
 	DukeStatIterator it(STAT_RAROR);
 	while (auto act = it.Next())
 	{
-		switch (act->s->lotag - tag + 40)
+		switch (act->spr.lotag - tag + 40)
 		{
 			//case 40:
 			//case 41:
@@ -147,8 +143,8 @@ void se40code(int x, int y, int z, binangle a, fixedhoriz h, int smoothratio)
 		case 43:
 		case 44:
 		case 45:
-			if (ps[screenpeek].cursectnum == act->s->sectnum)
-				SE40_Draw(tag, act->s, x, y, z, a, h, smoothratio);
+			if (ps[screenpeek].cursector == act->sector())
+				SE40_Draw(tag, &act->spr, x, y, z, a, h, smoothratio);
 			break;
 		}
 	}
@@ -163,16 +159,16 @@ void se40code(int x, int y, int z, binangle a, fixedhoriz h, int smoothratio)
 
 void renderMirror(int cposx, int cposy, int cposz, binangle cang, fixedhoriz choriz, int smoothratio)
 {
-	if (testgotpic(TILE_MIRROR, true))
+	if (mirrorcnt > 0 && testgotpic(TILE_MIRROR, true))
 	{
 		int dst = 0x7fffffff, i = 0;
 		for (int k = 0; k < mirrorcnt; k++)
 		{
-			int j = abs(mirrorwall[k]->x - cposx) + abs(mirrorwall[k]->y - cposy);
+			int j = abs(mirrorwall[k]->wall_int_pos().X - cposx) + abs(mirrorwall[k]->wall_int_pos().Y - cposy);
 			if (j < dst) dst = j, i = k;
 		}
 
-		if (mirrorwall[i]->overpicnum == TILE_MIRROR)
+		if (mirrorwall[i] && mirrorwall[i]->overpicnum == TILE_MIRROR)
 		{
 			int tposx, tposy;
 			fixed_t tang;
@@ -203,7 +199,9 @@ void renderMirror(int cposx, int cposy, int cposz, binangle cang, fixedhoriz cho
 
 static void geometryEffect(int cposx, int cposy, int cposz, binangle cang, fixedhoriz choriz, int sect, int smoothratio)
 {
-	int gs, tgsect, geosect, geoid = 0;
+	auto sectp = &sector[sect];
+	int gs, geoid = 0;
+	sectortype* tgsect, *geosect;
 	renderDrawRoomsQ16(cposx, cposy, cposz, cang.asq16(), choriz.asq16(), sect, false);
 	fi.animatesprites(pm_tsprite, pm_spritesortcnt, cposx, cposy, cang.asbuild(), smoothratio);
 	renderDrawMasks();
@@ -214,28 +212,28 @@ static void geometryEffect(int cposx, int cposy, int cposz, binangle cang, fixed
 		DukeSectIterator it(tgsect);
 		while (auto act = it.Next())
 		{
-			changeactorsect(act, geosectorwarp[gs]);
-			setsprite(act, act->s->x -= geox[gs], act->s->y -= geoy[gs], act->s->z);
+			ChangeActorSect(act, geosectorwarp[gs]);
+			SetActor(act, { act->spr.pos.X -= int(geox[gs] * worldtoint), act->spr.pos.Y -= int(geoy[gs] * worldtoint), act->spr.pos.Z });
 		}
-		if (geosector[gs] == sect)
+		if (geosector[gs] == sectp)
 		{
 			geosect = geosectorwarp[gs];
 			geoid = gs;
 		}
 	}
-	cposx -= geox[geoid];
-	cposy -= geoy[geoid];
+	cposx -= int(geox[geoid] * worldtoint);
+	cposy -= int(geoy[geoid] * worldtoint);
 	renderDrawRoomsQ16(cposx, cposy, cposz, cang.asq16(), choriz.asq16(), sect, false);
-	cposx += geox[geoid];
-	cposy += geoy[geoid];
+	cposx += int(geox[geoid] * worldtoint);
+	cposy += int(geoy[geoid] * worldtoint);
 	for (gs = 0; gs < geocnt; gs++)
 	{
 		tgsect = geosectorwarp[gs];
 		DukeSectIterator it(tgsect);
 		while (auto act = it.Next())
 		{
-			changeactorsect(act, geosector[gs]);
-			setsprite(act, act->s->x += geox[gs], act->s->y += geoy[gs], act->s->z);
+			ChangeActorSect(act, geosector[gs]);
+			SetActor(act, { act->spr.pos.X += int(geox[gs] * worldtoint), act->spr.pos.Y += int(geoy[gs] * worldtoint), act->spr.pos.Z });
 		}
 	}
 	fi.animatesprites(pm_tsprite, pm_spritesortcnt, cposx, cposy, cang.asbuild(), smoothratio);
@@ -246,28 +244,28 @@ static void geometryEffect(int cposx, int cposy, int cposz, binangle cang, fixed
 		DukeSectIterator it(tgsect);
 		while (auto act = it.Next())
 		{
-			changeactorsect(act, geosectorwarp2[gs]);
-			setsprite(act, act->s->x -= geox2[gs], act->s->y -= geoy2[gs], act->s->z);
+			ChangeActorSect(act, geosectorwarp2[gs]);
+			SetActor(act, { act->spr.pos.X -= int(geox2[gs] * worldtoint), act->spr.pos.Y -= int(geoy2[gs] * worldtoint), act->spr.pos.Z });
 		}
-		if (geosector[gs] == sect)
+		if (geosector[gs] == sectp)
 		{
 			geosect = geosectorwarp2[gs];
 			geoid = gs;
 		}
 	}
-	cposx -= geox2[geoid];
-	cposy -= geoy2[geoid];
+	cposx -= int(geox2[geoid] * worldtoint);
+	cposy -= int(geoy2[geoid] * worldtoint);
 	renderDrawRoomsQ16(cposx, cposy, cposz, cang.asq16(), choriz.asq16(), sect, false);
-	cposx += geox2[geoid];
-	cposy += geoy2[geoid];
+	cposx += int(geox2[geoid] * worldtoint);
+	cposy += int(geoy2[geoid] * worldtoint);
 	for (gs = 0; gs < geocnt; gs++)
 	{
 		tgsect = geosectorwarp2[gs];
 		DukeSectIterator it(tgsect);
 		while (auto act = it.Next())
 		{
-			changeactorsect(act, geosector[gs]);
-			setsprite(act, act->s->x += geox2[gs], act->s->y += geoy2[gs], act->s->z);
+			ChangeActorSect(act, geosector[gs]);
+			SetActor(act, { act->spr.pos.X += int(geox2[gs] * worldtoint), act->spr.pos.Y += int(geoy2[gs] * worldtoint), act->spr.pos.Z });
 		}
 	}
 	fi.animatesprites(pm_tsprite, pm_spritesortcnt, cposx, cposy, cang.asbuild(), smoothratio);

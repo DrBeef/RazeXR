@@ -23,6 +23,8 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 #include "gamefuncs.h"
 #include "gamestruct.h"
 #include "intvec.h"
+#include "coreactor.h"
+#include "interpolate.h"
 
 //---------------------------------------------------------------------------
 //
@@ -32,46 +34,41 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 
 int cameradist, cameraclock;
 
-bool calcChaseCamPos(int* px, int* py, int* pz, spritetype* pspr, int *psectnum, binangle ang, fixedhoriz horiz, double const smoothratio)
+bool calcChaseCamPos(int* px, int* py, int* pz, DCoreActor* act, sectortype** psect, binangle ang, fixedhoriz horiz, double const smoothratio)
 {
-	hitdata_t hitinfo;
+	HitInfoBase hitinfo;
 	binangle daang;
-	short bakcstat;
 	int newdist;
 
-	assert(*psectnum >= 0 && *psectnum < MAXSECTORS);
-
+	if (!*psect) return false;
 	// Calculate new pos to shoot backwards, using averaged values from the big three.
 	int nx = gi->chaseCamX(ang);
 	int ny = gi->chaseCamY(ang);
 	int nz = gi->chaseCamZ(horiz);
 
-	vec3_t pvect = { *px, *py, *pz };
-	bakcstat = pspr->cstat;
-	pspr->cstat &= ~(CSTAT_SPRITE_BLOCK | CSTAT_SPRITE_BLOCK_HITSCAN);
-	updatesectorz(*px, *py, *pz, psectnum);
-	hitscan(&pvect, *psectnum, nx, ny, nz, &hitinfo, CLIPMASK1);
-	pspr->cstat = bakcstat;
+	auto bakcstat = act->spr.cstat;
+	act->spr.cstat &= ~CSTAT_SPRITE_BLOCK_ALL;
+	updatesectorz(*px, *py, *pz, psect);
+	hitscan({ *px, *py, *pz }, *psect, { nx, ny, nz }, hitinfo, CLIPMASK1);
+	act->spr.cstat = bakcstat;
 
-	int hx = hitinfo.pos.x - *px;
-	int hy = hitinfo.pos.y - *py;
+	int hx = hitinfo.hitpos.X - *px;
+	int hy = hitinfo.hitpos.Y - *py;
 
-	if (*psectnum < 0)
+	if (*psect == nullptr)
 	{
 		return false;
 	}
 
-	assert(*psectnum >= 0 && *psectnum < MAXSECTORS);
-
 	// If something is in the way, make pp->camera_dist lower if necessary
 	if (abs(nx) + abs(ny) > abs(hx) + abs(hy))
 	{
-		if (hitinfo.wall >= 0)
+		if (hitinfo.hitWall != nullptr)
 		{
 			// Push you a little bit off the wall
-			*psectnum = hitinfo.sect;
-			daang = bvectangbam(wall[wall[hitinfo.wall].point2].x - wall[hitinfo.wall].x,
-								wall[wall[hitinfo.wall].point2].y - wall[hitinfo.wall].y);
+			*psect = hitinfo.hitSector;
+			daang = bvectangbam(hitinfo.hitWall->point2Wall()->pos.X - hitinfo.hitWall->pos.X,
+								hitinfo.hitWall->point2Wall()->pos.Y - hitinfo.hitWall->pos.Y);
 			newdist = nx * daang.bsin() + ny * -daang.bcos();
 
 			if (abs(nx) > abs(ny))
@@ -79,10 +76,10 @@ bool calcChaseCamPos(int* px, int* py, int* pz, spritetype* pspr, int *psectnum,
 			else
 				hy -= MulScale(ny, newdist, 28);
 		}
-		else if (hitinfo.sprite < 0)		
+		else if (hitinfo.hitActor == nullptr)		
 		{
 			// Push you off the ceiling/floor
-			*psectnum = hitinfo.sect;
+			*psect = hitinfo.hitSector;
 
 			if (abs(nx) > abs(ny))
 				hx -= (nx >> 5);
@@ -92,20 +89,20 @@ bool calcChaseCamPos(int* px, int* py, int* pz, spritetype* pspr, int *psectnum,
 		else
 		{
 			// If you hit a sprite that's not a wall sprite - try again.
-			spritetype* hspr = &sprite[hitinfo.sprite];
+			auto hit = hitinfo.hitActor;
 
-			if (!(hspr->cstat & CSTAT_SPRITE_ALIGNMENT_WALL))
+			if (!(hit->spr.cstat & CSTAT_SPRITE_ALIGNMENT_WALL))
 			{
-				bakcstat = hspr->cstat;
-				hspr->cstat &= ~(CSTAT_SPRITE_BLOCK | CSTAT_SPRITE_BLOCK_HITSCAN);
-				calcChaseCamPos(px, py, pz, pspr, psectnum, ang, horiz, smoothratio);
-				hspr->cstat = bakcstat;
+				bakcstat = hit->spr.cstat;
+				hit->spr.cstat &= ~(CSTAT_SPRITE_BLOCK | CSTAT_SPRITE_BLOCK_HITSCAN);
+				calcChaseCamPos(px, py, pz, act, psect, ang, horiz, smoothratio);
+				hit->spr.cstat = bakcstat;
 				return false;
 			}
 			else
 			{
 				// same as wall calculation.
-				daang = buildang(pspr->ang - 512);
+				daang = buildang(act->spr.ang - 512);
 				newdist = nx * daang.bsin() + ny * -daang.bcos();
 
 				if (abs(nx) > abs(ny))
@@ -142,42 +139,99 @@ bool calcChaseCamPos(int* px, int* py, int* pz, spritetype* pspr, int *psectnum,
 	cameraclock = myclock;
 
 	// Make sure psectnum is correct.
-	updatesectorz(*px, *py, *pz, psectnum);
+	updatesectorz(*px, *py, *pz, psect);
 
 	return true;
 }
 
 //==========================================================================
 //
-// note that this returns values in renderer coordinate space with inverted sign!
+// consolidated slope calculation
 //
 //==========================================================================
 
-void PlanesAtPoint(const sectortype* sec, int dax, int day, float* pceilz, float* pflorz)
+void calcSlope(const sectortype* sec, float xpos, float ypos, float* pceilz, float* pflorz)
 {
-	float ceilz = float(sec->ceilingz);
-	float florz = float(sec->floorz);
-
-	if (((sec->ceilingstat | sec->floorstat) & CSTAT_SECTOR_SLOPE) == CSTAT_SECTOR_SLOPE)
+	int bits = 0;
+	if (pceilz)
 	{
-		auto wal = &wall[sec->wallptr];
-		auto wal2 = &wall[wal->point2];
+		bits |= sec->ceilingstat;
+		*pceilz = float(sec->ceilingz);
+	}
+	if (pflorz)
+	{
+		bits |= sec->floorstat;
+		*pflorz = float(sec->floorz);
+	}
 
-		float dx = float(wal2->x - wal->x);
-		float dy = float(wal2->y - wal->y);
-
-		int i = (int)sqrt(dx * dx + dy * dy) << 5; // length of sector's first wall.
-		if (i != 0)
+	if ((bits & CSTAT_SECTOR_SLOPE) == CSTAT_SECTOR_SLOPE)
+	{
+		auto wal = sec->firstWall();
+		int len = wal->Length();
+		if (len != 0)
 		{
-			float const j = (dx * (float(day - wal->y)) - dy * (float(dax - wal->x))) * (1.f / 8.f);
-			if (sec->ceilingstat & CSTAT_SECTOR_SLOPE) ceilz += (sec->ceilingheinum * j) / i;
-			if (sec->floorstat & CSTAT_SECTOR_SLOPE) florz += (sec->floorheinum * j) / i;
+			float fac = (wal->deltax() * (float(ypos - wal->wall_int_pos().Y)) - wal->deltay() * (float(xpos - wal->wall_int_pos().X))) * (1.f / 256.f) / len;
+			if (pceilz && sec->ceilingstat & CSTAT_SECTOR_SLOPE) *pceilz += (sec->ceilingheinum * fac);
+			if (pflorz && sec->floorstat & CSTAT_SECTOR_SLOPE) *pflorz += (sec->floorheinum * fac);
 		}
 	}
-	// Scale to render coordinates.
-	if (pceilz) *pceilz = ceilz * -(1.f / 256.f);
-	if (pflorz) *pflorz = florz * -(1.f / 256.f);
 }
+
+//==========================================================================
+//
+// for the renderer (Polymost variants are in polymost.cpp)
+//
+//==========================================================================
+
+void PlanesAtPoint(const sectortype* sec, float dax, float day, float* pceilz, float* pflorz)
+{
+	calcSlope(sec, dax * worldtoint, day * worldtoint, pceilz, pflorz);
+	if (pceilz) *pceilz *= -(1 / 256.f);
+	if (pflorz) *pflorz *= -(1 / 256.f);
+}
+
+//==========================================================================
+//
+// for the games (these are not inlined so that they can inline calcSlope)
+//
+//==========================================================================
+
+int getceilzofslopeptr(const sectortype* sec, int dax, int day)
+{
+	float z;
+	calcSlope(sec, dax, day, &z, nullptr);
+	return int(z);
+}
+
+int getflorzofslopeptr(const sectortype* sec, int dax, int day)
+{
+	float z;
+	calcSlope(sec, dax, day, nullptr, &z);
+	return int(z);
+}
+
+void getzsofslopeptr(const sectortype* sec, int dax, int day, int* ceilz, int* florz)
+{
+	float c, f;
+	calcSlope(sec, dax, day, &c, &f);
+	*ceilz = int(c);
+	*florz = int(f);
+}
+
+//==========================================================================
+//
+// 
+//
+//==========================================================================
+
+int getslopeval(sectortype* sect, int x, int y, int z, int basez)
+{
+	auto wal = sect->firstWall();
+	auto delta = wal->delta();
+	int i = (y - wal->wall_int_pos().Y) * delta.X - (x - wal->wall_int_pos().X) * delta.Y;
+	return i == 0? 0 : Scale((z - basez) << 8, wal->Length(), i);
+}
+
 
 //==========================================================================
 //
@@ -185,7 +239,7 @@ void PlanesAtPoint(const sectortype* sec, int dax, int day, float* pceilz, float
 //
 //==========================================================================
 
-void GetWallSpritePosition(const spritetype* spr, vec2_t pos, vec2_t* out, bool render)
+void GetWallSpritePosition(const tspritetype* spr, vec2_t pos, vec2_t* out, bool render)
 {
 	auto tex = tileGetTexture(spr->picnum);
 
@@ -208,10 +262,10 @@ void GetWallSpritePosition(const spritetype* spr, vec2_t pos, vec2_t* out, bool 
 	if (spr->cstat & CSTAT_SPRITE_XFLIP) xoff = -xoff;
 	int origin = (width >> 1) + xoff;
 
-	out[0].x = pos.x - MulScale(x, origin, 16);
-	out[0].y = pos.y - MulScale(y, origin, 16);
-	out[1].x = out[0].x + MulScale(x, width, 16);
-	out[1].y = out[0].y + MulScale(y, width, 16);
+	out[0].X = pos.X - MulScale(x, origin, 16);
+	out[0].Y = pos.Y - MulScale(y, origin, 16);
+	out[1].X = out[0].X + MulScale(x, width, 16);
+	out[1].Y = out[0].Y + MulScale(y, width, 16);
 }
 
 
@@ -221,24 +275,29 @@ void GetWallSpritePosition(const spritetype* spr, vec2_t pos, vec2_t* out, bool 
 //
 //==========================================================================
 
-void GetFlatSpritePosition(const spritetype* spr, vec2_t pos, vec2_t* out, bool render)
+void TGetFlatSpritePosition(const spritetypebase* spr, vec2_t pos, vec2_t* out, int* outz, int heinum, bool render)
 {
 	auto tex = tileGetTexture(spr->picnum);
 
 	int width, height, leftofs, topofs;
+	int ratio = ksqrt(heinum * heinum + 4096 * 4096);
+
+	int xo = heinum ? 0 : spr->xoffset;
+	int yo = heinum ? 0 : spr->yoffset;
+
 	if (render && hw_hightile && TileFiles.tiledata[spr->picnum].hiofs.xsize)
 	{
 		width = TileFiles.tiledata[spr->picnum].hiofs.xsize * spr->xrepeat;
 		height = TileFiles.tiledata[spr->picnum].hiofs.ysize * spr->yrepeat;
-		leftofs = (TileFiles.tiledata[spr->picnum].hiofs.xoffs + spr->xoffset) * spr->xrepeat;
-		topofs = (TileFiles.tiledata[spr->picnum].hiofs.yoffs + spr->yoffset) * spr->yrepeat;
+		leftofs = (TileFiles.tiledata[spr->picnum].hiofs.xoffs + xo) * spr->xrepeat;
+		topofs = (TileFiles.tiledata[spr->picnum].hiofs.yoffs + yo) * spr->yrepeat;
 	}
 	else
 	{
 		width = (int)tex->GetDisplayWidth() * spr->xrepeat;
 		height = (int)tex->GetDisplayHeight() * spr->yrepeat;
-		leftofs = ((int)tex->GetDisplayLeftOffset() + spr->xoffset) * spr->xrepeat;
-		topofs = ((int)tex->GetDisplayTopOffset() + spr->yoffset) * spr->yrepeat;
+		leftofs = ((int)tex->GetDisplayLeftOffset() + xo) * spr->xrepeat;
+		topofs = ((int)tex->GetDisplayTopOffset() + yo) * spr->yrepeat;
 	}
 
 	if (spr->cstat & CSTAT_SPRITE_XFLIP) leftofs = -leftofs;
@@ -249,18 +308,41 @@ void GetFlatSpritePosition(const spritetype* spr, vec2_t pos, vec2_t* out, bool 
 
 	int cosang = bcos(spr->ang);
 	int sinang = bsin(spr->ang);
+	int cosangslope = DivScale(cosang, ratio, 12);
+	int sinangslope = DivScale(sinang, ratio, 12);
 
-	out[0].x = pos.x + DMulScale(sinang, sprcenterx, cosang, sprcentery, 16);
-	out[0].y = pos.y + DMulScale(sinang, sprcentery, -cosang, sprcenterx, 16);
+	out[0].X = pos.X + DMulScale(sinang, sprcenterx, cosangslope, sprcentery, 16);
+	out[0].Y = pos.Y + DMulScale(sinangslope, sprcentery, -cosang, sprcenterx, 16);
 
-	out[1].x = out[0].x - MulScale(sinang, width, 16);
-	out[1].y = out[0].y + MulScale(cosang, width, 16);
+	out[1].X = out[0].X - MulScale(sinang, width, 16);
+	out[1].Y = out[0].Y + MulScale(cosang, width, 16);
 
-	vec2_t sub = { MulScale(cosang, height, 16), MulScale(sinang, height, 16) };
+	vec2_t sub = { MulScale(cosangslope, height, 16), MulScale(sinangslope, height, 16) };
 	out[2] = out[1] - sub;
 	out[3] = out[0] - sub;
+	if (outz)
+	{
+		if (!heinum) outz[3] = outz[2] = outz[1] = outz[0] = 0;
+		else
+		{
+			for (int i = 0; i < 4; i++)
+			{
+				int spos = DMulScale(-sinang, out[i].Y - spr->pos.Y, -cosang, out[i].X - spr->pos.X, 4);
+				outz[i] = MulScale(heinum, spos, 18);
+			}
+		}
+	}
 }
 
+void GetFlatSpritePosition(DCoreActor* actor, vec2_t pos, vec2_t* out, bool render)
+{
+	TGetFlatSpritePosition(&actor->spr, pos, out, nullptr, spriteGetSlope(actor), render);
+}
+
+void GetFlatSpritePosition(const tspritetype* spr, vec2_t pos, vec2_t* out, int* outz, bool render)
+{
+	TGetFlatSpritePosition(spr, pos, out, outz, tspriteGetSlope(spr), render);
+}
 
 //==========================================================================
 //
@@ -272,11 +354,10 @@ void GetFlatSpritePosition(const spritetype* spr, vec2_t pos, vec2_t* out, bool 
 
 void checkRotatedWalls()
 {
-	for (int i = 0; i < numwalls; ++i)
+	for (auto& w : wall)
 	{
-		if (wall[i].cstat & CSTAT_WALL_ROTATE_90)
+		if (w.cstat & CSTAT_WALL_ROTATE_90)
 		{
-			auto& w = wall[i];
 			auto& tile = RotTile(w.picnum + animateoffs(w.picnum, 16384));
 
 			if (tile.newtile == -1 && tile.owner == -1)
@@ -295,6 +376,145 @@ void checkRotatedWalls()
 
 //==========================================================================
 //
+// check if two sectors share a wall connection
+//
+//==========================================================================
+
+bool sectorsConnected(int sect1, int sect2)
+{
+	for (auto& wal : wallsofsector(sect1))
+	{
+		if (wal.nextsector == sect2) return true;
+	}
+	return false;
+}
+
+//==========================================================================
+//
+// 
+//
+//==========================================================================
+
+void dragpoint(walltype* startwall, int newx, int newy)
+{
+	vertexscan(startwall, [&](walltype* wal)
+	{
+		wal->movexy(newx, newy);
+		wal->sectorp()->exflags |= SECTOREX_DRAGGED;
+	});
+}
+
+void dragpoint(walltype* startwall, const DVector2& pos)
+{
+	vertexscan(startwall, [&](walltype* wal)
+		{
+			wal->move(pos);
+			wal->sectorp()->exflags |= SECTOREX_DRAGGED;
+		});
+}
+
+//==========================================================================
+//
+// 
+//
+//==========================================================================
+
+DVector2 rotatepoint(const DVector2& pivot, const DVector2& point, binangle angle)
+{
+	auto cosang = g_cosbam(angle.asbam());
+	auto sinang = g_sinbam(angle.asbam());
+	auto p = point - pivot;
+	return {
+		p.X * cosang - p.Y * sinang + pivot.X,
+		p.Y * cosang + p.X * sinang + pivot.Y };
+}
+
+//==========================================================================
+//
+// 
+//
+//==========================================================================
+
+int inside(double x, double y, const sectortype* sect)
+{
+	if (sect)
+	{
+		int64_t acc = 1;
+		for (auto& wal : wallsofsector(sect))
+		{
+			// Perform the checks here in 48.16 fixed point.
+			// Doing it directly with floats and multiplications does not work reliably.
+			// Unfortunately, due to the conversions, this is a bit slower. :(
+			int64_t xs = int64_t(0x10000 * (wal.pos.X - x));
+			int64_t ys = int64_t(0x10000 * (wal.pos.Y - y));
+			auto wal2 = wal.point2Wall();
+			int64_t xe = int64_t(0x10000 * (wal2->pos.X - x));
+			int64_t ye = int64_t(0x10000 * (wal2->pos.Y - y));
+
+			if ((ys ^ ye) < 0)
+			{
+				int64_t val;
+
+				if ((xs ^ xe) >= 0) val = xs;
+				else val = ((xs * ye) - xe * ys) ^ ye;
+				acc ^= val;
+			}
+		}
+		return acc < 0;
+	}
+	return -1;
+}
+
+//==========================================================================
+//
+// 
+//
+//==========================================================================
+
+tspritetype* renderAddTsprite(tspritetype* tsprite, int& spritesortcnt, DCoreActor* actor)
+{
+	validateTSpriteSize(tsprite, spritesortcnt);
+
+	if (spritesortcnt >= MAXSPRITESONSCREEN) return nullptr;
+	auto tspr = &tsprite[spritesortcnt++];
+
+	tspr->pos = actor->spr.pos;
+	tspr->cstat = actor->spr.cstat;
+	tspr->picnum = actor->spr.picnum;
+	tspr->shade = actor->spr.shade;
+	tspr->pal = actor->spr.pal;
+	tspr->clipdist = 0;
+	tspr->blend = actor->spr.blend;
+	tspr->xrepeat = actor->spr.xrepeat;
+	tspr->yrepeat = actor->spr.yrepeat;
+	tspr->xoffset = actor->spr.xoffset;
+	tspr->yoffset = actor->spr.yoffset;
+	tspr->sectp = actor->spr.sectp;
+	tspr->statnum = actor->spr.statnum;
+	tspr->ang = actor->spr.ang;
+	tspr->xvel = actor->spr.xvel;
+	tspr->yvel = actor->spr.yvel;
+	tspr->zvel = actor->spr.zvel;
+	tspr->lotag = actor->spr.lotag;
+	tspr->hitag = actor->spr.hitag;
+	tspr->extra = actor->spr.extra;
+	tspr->time = actor->time;
+	tspr->cstat2 = actor->spr.cstat2;
+	tspr->ownerActor = actor;
+
+	// need to copy the slope sprite flag around because for tsprites the bit combination means 'voxel'.
+	if ((tspr->cstat & CSTAT_SPRITE_ALIGNMENT_MASK) == CSTAT_SPRITE_ALIGNMENT_SLOPE)
+	{
+		tspr->cstat &= ~CSTAT_SPRITE_ALIGNMENT_WALL;
+		tspr->clipdist |= TSPR_SLOPESPRITE;
+	}
+
+	return tspr;
+}
+
+
+//==========================================================================
+//
 // vector serializers
 //
 //==========================================================================
@@ -304,8 +524,8 @@ FSerializer& Serialize(FSerializer& arc, const char* key, vec2_t& c, vec2_t* def
 	if (arc.isWriting() && def && !memcmp(&c, def, sizeof(c))) return arc;
 	if (arc.BeginObject(key))
 	{
-		arc("x", c.x, def ? &def->x : nullptr)
-			("y", c.y, def ? &def->y : nullptr)
+		arc("x", c.X, def ? &def->X : nullptr)
+			("y", c.Y, def ? &def->Y : nullptr)
 			.EndObject();
 	}
 	return arc;
@@ -316,9 +536,9 @@ FSerializer& Serialize(FSerializer& arc, const char* key, vec3_t& c, vec3_t* def
 	if (arc.isWriting() && def && !memcmp(&c, def, sizeof(c))) return arc;
 	if (arc.BeginObject(key))
 	{
-		arc("x", c.x, def ? &def->x : nullptr)
-			("y", c.y, def ? &def->y : nullptr)
-			("z", c.z, def ? &def->z : nullptr)
+		arc("x", c.X, def ? &def->X : nullptr)
+			("y", c.Y, def ? &def->Y : nullptr)
+			("z", c.Z, def ? &def->Z : nullptr)
 			.EndObject();
 	}
 	return arc;

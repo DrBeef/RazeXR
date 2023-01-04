@@ -32,11 +32,12 @@ struct Interpolation
 	double old, bak;
 	int index;
 	int type;
+	DCoreActor* actor;
 };
 
 static TArray<Interpolation> interpolations;
 
-double Get(int index, int type)
+double Get(int index, DCoreActor* actor, int type)
 {
 	switch(type)
 	{
@@ -49,36 +50,36 @@ double Get(int index, int type)
 	case Interp_Sect_CeilingPanX:		return sector[index].ceilingxpan_;
 	case Interp_Sect_CeilingPanY:		return sector[index].ceilingypan_;
 
-	case Interp_Wall_X:					return wall[index].x;
-	case Interp_Wall_Y:					return wall[index].y;
+	case Interp_Wall_X:					return wall[index].pos.X;
+	case Interp_Wall_Y:					return wall[index].pos.Y;
 	case Interp_Wall_PanX:				return wall[index].xpan_;
 	case Interp_Wall_PanY:				return wall[index].ypan_;
 
-	case Interp_Sprite_Z:				return sprite[index].z;
+	case Interp_Sprite_Z:				return !actor? 0 : actor->spr.pos.Z;
 	default: return 0;
 	}
 }
 
-void Set(int index, int type, double val)
+void Set(int index, DCoreActor* actor, int type, double val)
 {
 	int old;
 	switch(type)
 	{
-	case Interp_Sect_Floorz:			sector[index].floorz = xs_CRoundToInt(val); break;
-	case Interp_Sect_Ceilingz:          sector[index].ceilingz = xs_CRoundToInt(val); break;
+	case Interp_Sect_Floorz:			sector[index].setfloorz(xs_CRoundToInt(val)); break;
+	case Interp_Sect_Ceilingz:          sector[index].setceilingz(xs_CRoundToInt(val)); break;
 	case Interp_Sect_Floorheinum:       sector[index].floorheinum = (short)xs_CRoundToInt(val); break;
 	case Interp_Sect_Ceilingheinum:     sector[index].ceilingheinum = (short)xs_CRoundToInt(val); break;
 	case Interp_Sect_FloorPanX:         sector[index].floorxpan_ = float(val); break;
 	case Interp_Sect_FloorPanY:	        sector[index].floorypan_ = float(val); break;
 	case Interp_Sect_CeilingPanX:       sector[index].ceilingxpan_ = float(val); break;
 	case Interp_Sect_CeilingPanY:       sector[index].ceilingypan_ = float(val); break;
-                                        
-	case Interp_Wall_X:                 old = wall[index].x; wall[index].x = xs_CRoundToInt(val); if (wall[index].x != old) sector[wall[index].sector].dirty = 255; break;
-	case Interp_Wall_Y:                 old = wall[index].y; wall[index].y = xs_CRoundToInt(val); if (wall[index].y != old) sector[wall[index].sector].dirty = 255; break;
+
+	case Interp_Wall_X:                 old = wall[index].pos.X; wall[index].pos.X = val; if (wall[index].pos.X != old) wall[index].moved(); break;
+	case Interp_Wall_Y:                 old = wall[index].pos.Y; wall[index].pos.Y = val; if (wall[index].pos.Y != old) wall[index].moved(); break;
 	case Interp_Wall_PanX:              wall[index].xpan_ = float(val);  break;
 	case Interp_Wall_PanY:              wall[index].ypan_ = float(val);  break;
                                         
-	case Interp_Sprite_Z:               sprite[index].z = xs_CRoundToInt(val); break;
+	case Interp_Sprite_Z:               if (actor) actor->spr.pos.Z = xs_CRoundToInt(val); break;
 	}
 }
 
@@ -92,8 +93,9 @@ void StartInterpolation(int index, int type)
 	int n = interpolations.Reserve(1);
 
     interpolations[n].index = index;
+	interpolations[n].actor = nullptr;
     interpolations[n].type = type;
-    interpolations[n].old = Get(index, type);
+    interpolations[n].old = Get(index, nullptr, type);
 }
 
 void StopInterpolation(int index, int type)
@@ -109,11 +111,41 @@ void StopInterpolation(int index, int type)
     }
 }
 
+void StartInterpolation(DCoreActor* actor, int type)
+{
+	assert(type == Interp_Sprite_Z);
+	for (unsigned i = 0; i < interpolations.Size(); i++)
+	{
+		if (interpolations[i].actor == actor && interpolations[i].type == type)
+			return;
+	}
+	int n = interpolations.Reserve(1);
+
+	interpolations[n].index = -1;
+	interpolations[n].actor = actor;
+	interpolations[n].type = type;
+	interpolations[n].old = Get(-1, actor, type);
+}
+
+void StopInterpolation(DCoreActor* actor, int type)
+{
+	assert(type == Interp_Sprite_Z);
+	for (unsigned i = 0; i < interpolations.Size(); i++)
+	{
+		if (interpolations[i].actor == actor && interpolations[i].type == type)
+		{
+			interpolations[i] = interpolations.Last();
+			interpolations.Pop();
+			return;
+		}
+	}
+}
+
 void UpdateInterpolations()
 {
     for (unsigned i = 0; i < interpolations.Size(); i++)
     {
-		interpolations[i].old = Get(interpolations[i].index, interpolations[i].type);
+		interpolations[i].old = Get(interpolations[i].index, interpolations[i].actor, interpolations[i].type);
 	}		
 }
 
@@ -123,11 +155,11 @@ void DoInterpolations(double smoothratio)
     for (unsigned i = 0; i < interpolations.Size(); i++)
     {
 		double bak;
-		interpolations[i].bak = bak = Get(interpolations[i].index, interpolations[i].type);
+		interpolations[i].bak = bak = Get(interpolations[i].index, interpolations[i].actor, interpolations[i].type);
 		double old = interpolations[i].old;
 		if (interpolations[i].type < Interp_Pan_First || fabs(bak-old) < 128.)
 		{
-			Set(interpolations[i].index, interpolations[i].type, old + (bak - old) * smoothratio);
+			Set(interpolations[i].index, interpolations[i].actor, interpolations[i].type, old + (bak - old) * smoothratio);
 		}
 		else
 		{
@@ -136,7 +168,7 @@ void DoInterpolations(double smoothratio)
 			else old += 256;
 			double cur = old + (bak - old) * smoothratio;
 			if (cur >= 256.) cur -= 256.;
-			Set(interpolations[i].index, interpolations[i].type, cur);
+			Set(interpolations[i].index, interpolations[i].actor, interpolations[i].type, cur);
 		}
 	}
 }
@@ -146,7 +178,7 @@ void RestoreInterpolations()
 	if (!cl_interpolate) return;
 	for (unsigned i = 0; i < interpolations.Size(); i++)
     {
-		Set(interpolations[i].index, interpolations[i].type, interpolations[i].bak);
+		Set(interpolations[i].index, interpolations[i].actor, interpolations[i].type, interpolations[i].bak);
 	}		
 }
 
@@ -178,15 +210,15 @@ void ClearMovementInterpolations()
 	}
 }
 
-void setsectinterpolate(int sectnum)
+void setsectinterpolate(sectortype* sect)
 {
-	for (auto&wal : wallsofsector(sectnum))
+	for (auto&wal : wallsofsector(sect))
 	{
 		StartInterpolation(&wal, Interp_Wall_X);
 		StartInterpolation(&wal, Interp_Wall_Y);
-		auto nwal = wal.nextWall();
-		if (nwal)
+		if (wal.twoSided())
 		{
+			auto nwal = wal.nextWall();
 			StartInterpolation(nwal, Interp_Wall_X);
 			StartInterpolation(nwal, Interp_Wall_Y);
 			nwal = nwal->point2Wall();
@@ -196,15 +228,13 @@ void setsectinterpolate(int sectnum)
 	}
 }
 
-void clearsectinterpolate(int sectnum)
+void clearsectinterpolate(sectortype* sect)
 {
-	auto sect = &sector[sectnum];
-
-	for (auto& wal : wallsofsector(sectnum))
+	for (auto& wal : wallsofsector(sect))
 	{
 		StopInterpolation(&wal, Interp_Wall_X);
 		StopInterpolation(&wal, Interp_Wall_Y);
-		if (wal.nextwall >= 0)
+		if (wal.twoSided())
 		{
 			StopInterpolation(wal.nextWall(), Interp_Wall_X);
 			StopInterpolation(wal.nextWall(), Interp_Wall_Y);
@@ -217,12 +247,13 @@ FSerializer& Serialize(FSerializer& arc, const char* keyname, Interpolation& w, 
     if (arc.BeginObject(keyname))
     {
         arc ("index", w.index)
+			("actor", w.actor)
             ("type", w.type)
             .EndObject();
     }
 	if (arc.isReading())
 	{
-		w.old = Get(w.index, w.type);
+		w.old = Get(w.index, w.actor, w.type);
 	}
     return arc;
 }

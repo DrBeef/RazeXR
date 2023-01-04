@@ -313,12 +313,12 @@ int ConCompiler::getkeyword(const char* text)
 {
 	ptrdiff_t min = 0;
 	ptrdiff_t max = countof(cmdList) - 1;
-	
+
 	while (min <= max)
 	{
 		auto mid = (min + max) >> 1;
 		const int comp = strcmp(text, cmdList[mid].cmd);
-		
+
 		if (comp == 0)
 		{
 			return cmdList[mid].instr;
@@ -1218,7 +1218,7 @@ int ConCompiler::parsecommand()
 				while (keyword() == -1)
 				{
 					transnum(LABEL_DEFINE);
-					
+
 					j |= popscriptvalue();
 				}
 				appendscriptvalue(j);
@@ -1292,12 +1292,6 @@ int ConCompiler::parsecommand()
 			Printf(TEXTCOLOR_RED "  * WARNING!(%s, line %d) tried to set cstat 32767, using 32768 instead.\n", fn, line_number);
 			warningcount++;
 		}
-		else if ((i & 48) == 48)
-		{
-			Printf(TEXTCOLOR_RED "  * WARNING!(%s, line %d) tried to set cstat %d, using %d instead.\n", fn, line_number, i, i ^ 48);
-			i ^= 48;
-			warningcount++;
-		}
 		appendscriptvalue(i);
 #endif
 		return 0;
@@ -1314,6 +1308,7 @@ int ConCompiler::parsecommand()
 	case concmd_spawn:
 	case concmd_count:
 	case concmd_endofgame:
+	case concmd_endoflevel:
 	case concmd_spritepal:
 	case concmd_cactor:
 	case concmd_quote:
@@ -1457,7 +1452,7 @@ int ConCompiler::parsecommand()
 			ReportError(ERROR_NOTAGAMEDEF);
 			return 0;
 		}
-	
+
 		appendscriptvalue(i);	// the ID of the DEF (offset into array...)
 		return 0;
 
@@ -1591,6 +1586,7 @@ int ConCompiler::parsecommand()
 	case concmd_ifactorhealthl:
 	case concmd_ifsoundid:
 	case concmd_ifsounddist:
+	case concmd_ifplayersl:
 		transnum(tw == concmd_ifai? LABEL_AI : tw == concmd_ifaction? LABEL_ACTION : tw == concmd_ifmove? LABEL_MOVE : LABEL_DEFINE);
 		[[fallthrough]];
 	case concmd_ifonwater:
@@ -1635,7 +1631,7 @@ int ConCompiler::parsecommand()
 		parsecommand();
 
 		setscriptvalue(tempscrptr, scriptpos());
-		auto k = keyword();
+		auto kw = keyword();
 		// Cannot be done - the code starts misbehaving with this check, it is especially noticeable on the soldiers in NAM.
 		// Unfortunately this means one less error check, but ultimately CON is too broken to begin with anyway
 #if 0
@@ -1788,7 +1784,7 @@ int ConCompiler::parsecommand()
 			Printf(TEXTCOLOR_RED "  * ERROR!(%s, line %d) Quote number exceeds limit of %d.\n", fn, line_number, MAXQUOTES);
 			errorcount++;
 		}
-		
+
 		i = 0;
 		while (*textptr == ' ' || *textptr == '\t') textptr++;
 
@@ -1917,7 +1913,7 @@ int ConCompiler::parsecommand()
 		// What a mess. The only way to detect which game version we are running is to count the parsed values here.
 		int params[34]; // 34 is the maximum for RRRA.
 		int pcount = 0;
-		for (int i = 0; i < 34; i++)
+		for (int ii = 0; ii < 34; ii++)
 		{
 			transnum(LABEL_DEFINE);
 			params[pcount++] = popscriptvalue();
@@ -1929,6 +1925,7 @@ int ConCompiler::parsecommand()
 		{
 			if (pcount == 30) g_gameType |= GAMEFLAG_PLUTOPAK;
 			else if (pcount == 31) g_gameType |= GAMEFLAG_PLUTOPAK | GAMEFLAG_WORLDTOUR;
+			else if (pcount == 22) g_gameType |= GAMEFLAG_SHAREWARE;
 			else if (pcount != 26) I_FatalError("Invalid CONs. Cannot detect version. gamestartup has %d entries", pcount);
 		}
 		gameinfo.gametype = g_gameType;
@@ -2725,10 +2722,10 @@ int ConCompiler::parsecommand()
 	{
 		popscriptvalue();
 		transnum(LABEL_DEFINE);
-		int k = popscriptvalue();
-		if (k > VERSIONCHECK)
+		int val = popscriptvalue();
+		if (val > VERSIONCHECK)
 		{
-			Printf(TEXTCOLOR_RED "  * ERROR: This CON Code requires at least Build %d, but we are only Build %d\n", k, (int)VERSIONCHECK);
+			Printf(TEXTCOLOR_RED "  * ERROR: This CON Code requires at least Build %d, but we are only Build %d\n", val, (int)VERSIONCHECK);
 			errorcount++;
 		}
 		break;
@@ -3072,6 +3069,11 @@ int ConCompiler::parsecommand()
 		return 0;
 
 
+	case concmd_shadeto:
+		popscriptvalue();
+		transnum(LABEL_DEFINE);
+		popscriptvalue();
+		break;
 	}
 	return 0;
 }
@@ -3235,8 +3237,7 @@ void loadcons()
 	}
 
 	// These can only be retrieved AFTER loading the scripts.
-	InitGameVarPointers();
-	ResetSystemDefaults();
+	FinalizeGameVars();
 	S_WorldTourMappingsForOldSounds(); // create a sound mapping for World Tour.
 	S_CacheAllSounds();
 	comp.setmusic();

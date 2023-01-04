@@ -428,15 +428,14 @@ CCMD(map)
 		return;
 	}
 
-	FString mapname = argv[1];
-	FString mapfilename = mapname;
+	FString mapfilename = argv[1];
 	DefaultExtension(mapfilename, ".map");
 
 	// Check if the map is already defined.
-	auto map = FindMapByName(mapname);
+	auto map = FindMapByName(argv[1]);
 	if (map == nullptr)
 	{
-		map = SetupUserMap(mapfilename, g_gameType & GAMEFLAG_DUKE? "dethtoll.mid" : nullptr);
+		map = SetupUserMap(mapfilename, g_gameType & GAMEFLAG_DUKE ? "dethtoll.mid" : nullptr);
 	}
 	if (map)
 	{

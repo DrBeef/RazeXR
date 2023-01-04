@@ -14,6 +14,7 @@
 #include "gamecontrol.h"
 #include "hw_renderstate.h"
 #include "hw_cvars.h"
+#include "coreactor.h"
 
 #ifdef _MSC_VER
 #pragma warning(disable:4244) // this gets a bit annoying in the renderer...
@@ -30,6 +31,7 @@ class VSMatrix;
 struct FSpriteModelFrame;
 class FRenderState;
 struct voxmodel_t;
+struct Section;
 
 struct HWSectorPlane
 {
@@ -158,10 +160,10 @@ public:
 	float alpha;
 
 	FRenderStyle RenderStyle;
-	
+
 	float ViewDistance;
 	float visibility;
-	int walldist;
+	walltype* walldist;
 	short shade, palette;
 
 	PalEntry fade;
@@ -178,8 +180,7 @@ public:
 		HWSkyInfo * sky;			// for normal sky
 		//HWHorizonInfo * horizon;	// for horizon information
 		PortalDesc * portal;			// stacked sector portals
-		int * planemirror;	// for plane mirrors
-		spritetype* teleport;	// SW's teleport-views
+		const int * planemirror;	// for plane mirrors
 	};
 
 	unsigned int vertindex;
@@ -187,7 +188,7 @@ public:
 
 public:
 	walltype* seg;
-	spritetype* Sprite;
+	tspritetype* Sprite;
 	sectortype* frontsector, * backsector;
 //private:
 
@@ -221,17 +222,22 @@ public:
 
 	int CreateVertices(FFlatVertex *&ptr, bool nosplit);
 
-	//int CountVertices();
+	int CountVertices();
+	void SplitLeftEdge(FFlatVertex*& ptr);
+	void SplitRightEdge(FFlatVertex*& ptr);
+	void CountLeftEdge(unsigned& ptr);
+	void CountRightEdge(unsigned& ptr);
 
 	void RenderWall(HWDrawInfo *di, FRenderState &state, int textured);
 	void RenderFogBoundary(HWDrawInfo *di, FRenderState &state);
 	void RenderMirrorSurface(HWDrawInfo *di, FRenderState &state);
 	void RenderTexturedWall(HWDrawInfo *di, FRenderState &state, int rflags);
 	void RenderTranslucentWall(HWDrawInfo *di, FRenderState &state);
+	int CheckWallSprite(tspritetype* spr, tspritetype* last);
 
 public:
 	void Process(HWDrawInfo* di, walltype* seg, sectortype* frontsector, sectortype* backsector);
-	void ProcessWallSprite(HWDrawInfo* di, spritetype* spr, sectortype* frontsector);
+	void ProcessWallSprite(HWDrawInfo* di, tspritetype* spr, sectortype* frontsector);
 
 	float PointOnSide(float x,float y)
 	{
@@ -244,18 +250,30 @@ public:
 
 //==========================================================================
 //
+// Common fields needed by the sprite sorter.
+//
+//==========================================================================
+
+class HWFlatOrSprite
+{
+public:
+	float depth;
+	tspritetype* Sprite; // for flat sprites.
+};
+
+//==========================================================================
+//
 // One flat plane in the draw list
 //
 //==========================================================================
 
-class HWFlat
+class HWFlat : public HWFlatOrSprite
 {
 public:
-	int section;
-	sectortype * sec;
-	spritetype* Sprite; // for flat sprites.
-	FGameTexture *texture;
+	sectortype* sec;
+	FGameTexture* texture;
 
+	int section;
 	float z; // the z position of the flat (only valid for non-sloped planes)
 
 	PalEntry fade;
@@ -265,12 +283,15 @@ public:
 	FRenderStyle RenderStyle;
 	int iboindex;
 	bool stack;
+	uint8_t plane;
+	short slopecount;
 	FVector2 geoofs;
+	FVector3 normal;
 	//int vboheight;
 
-	int plane;
+	int slopeindex;
 	int vertindex, vertcount;	// this should later use a static vertex buffer, but that'd hinder the development phase, so for now vertex data gets created on the fly.
-	void MakeVertices();
+	void MakeVertices(HWDrawInfo* di);
 
 	int dynlightindex;
 
@@ -279,8 +300,8 @@ public:
 
 	void PutFlat(HWDrawInfo* di, int whichplane);
 	void ProcessSector(HWDrawInfo *di, sectortype * frontsector, int sectionnum, int which = 7 /*SSRF_RENDERALL*/);	// cannot use constant due to circular dependencies.
-	void ProcessFlatSprite(HWDrawInfo* di, spritetype* sprite, sectortype* sector);
-	
+	void ProcessFlatSprite(HWDrawInfo* di, tspritetype* sprite, sectortype* sector);
+
 	void DrawSubsectors(HWDrawInfo *di, FRenderState &state);
 	void DrawFlat(HWDrawInfo* di, FRenderState& state, bool translucent);
 };
@@ -292,11 +313,10 @@ public:
 //==========================================================================
 
 
-class HWSprite
+class HWSprite : public HWFlatOrSprite
 {
 public:
 
-	spritetype* Sprite;
 	PalEntry fade;
 	int shade, palette;
 	float visibility;
@@ -306,7 +326,6 @@ public:
 	voxmodel_t* voxel;
 
 	int index;
-	float depth;
 	int vertexindex;
 
 	float x,y,z;	// needed for sorting!
@@ -323,6 +342,7 @@ public:
 		VSMatrix rotmat;
 	};
 	int dynlightindex;
+	float alphaThreshold;
 
 	FGameTexture *texture;
 	DRotator Angles;
@@ -334,8 +354,8 @@ public:
 
 	void CreateVertices(HWDrawInfo* di);
 	void PutSprite(HWDrawInfo *di, bool translucent);
-	void Process(HWDrawInfo *di, spritetype* thing,sectortype * sector, int thruportal = false);
-	bool ProcessVoxel(HWDrawInfo* di, voxmodel_t* voxel, spritetype* tspr, sectortype* sector, bool rotate);
+	void Process(HWDrawInfo *di, tspritetype* thing,sectortype * sector, int thruportal = false);
+	bool ProcessVoxel(HWDrawInfo* di, voxmodel_t* voxel, tspritetype* tspr, sectortype* sector, bool rotate);
 
 	void DrawSprite(HWDrawInfo* di, FRenderState& state, bool translucent);
 };
@@ -347,7 +367,7 @@ inline float Dist2(float x1,float y1,float x2,float y2)
 	return sqrtf((x1-x2)*(x1-x2)+(y1-y2)*(y1-y2));
 }
 
-void hw_GetDynModelLight(AActor *self, FDynLightData &modellightdata);
+//void hw_GetDynModelLight(AActor *self, FDynLightData &modellightdata);
 
 extern const float LARGE_VALUE;
 
@@ -372,64 +392,32 @@ inline bool maskWallHasTranslucency(const walltype* wall)
 	return (wall->cstat & CSTAT_WALL_TRANSLUCENT) || checkTranslucentReplacement(tileGetTexture(wall->picnum)->GetID(), wall->pal);
 }
 
-inline bool spriteHasTranslucency(const spritetype* tspr)
+inline bool spriteHasTranslucency(const tspritetype* tspr)
 {
 	if ((tspr->cstat & CSTAT_SPRITE_TRANSLUCENT) || //(tspr->clipdist & TSPR_FLAGS_DRAW_LAST) ||
-		((unsigned)tspr->owner < MAXSPRITES && spriteext[tspr->owner].alpha))
+		(tspr->ownerActor->sprext.alpha))
 		return true;
 
 	return checkTranslucentReplacement(tileGetTexture(tspr->picnum)->GetID(), tspr->pal);
 }
 
-inline void SetSpriteTranslucency(const spritetype* sprite, float& alpha, FRenderStyle& RenderStyle)
+inline void SetSpriteTranslucency(const tspritetype* sprite, float& alpha, FRenderStyle& RenderStyle)
 {
 	bool trans = (sprite->cstat & CSTAT_SPRITE_TRANSLUCENT);
 	if (trans)
 	{
-		RenderStyle = GetRenderStyle(0, !!(sprite->cstat & CSTAT_SPRITE_TRANSLUCENT_INVERT));
-		alpha = GetAlphaFromBlend((sprite->cstat & CSTAT_SPRITE_TRANSLUCENT_INVERT) ? DAMETH_TRANS2 : DAMETH_TRANS1, 0);
+		RenderStyle = GetRenderStyle(0, !!(sprite->cstat & CSTAT_SPRITE_TRANS_FLIP));
+		alpha = GetAlphaFromBlend((sprite->cstat & CSTAT_SPRITE_TRANS_FLIP) ? DAMETH_TRANS2 : DAMETH_TRANS1, 0);
 	}
 	else
 	{
 		RenderStyle = LegacyRenderStyles[STYLE_Translucent];
 		alpha = 1.f;
 	}
-	alpha *= 1.f - spriteext[sprite->owner].alpha;
+	alpha *= 1.f - sprite->ownerActor->sprext.alpha;
 }
 
-//==========================================================================
-//
-// 
-//
-//==========================================================================
 extern PalEntry GlobalMapFog;
 extern float GlobalFogDensity;
 
-__forceinline void SetLightAndFog(FRenderState& state, PalEntry fade, int palette, int shade, float visibility, float alpha)
-{
-	// Fog must be done before the texture so that the texture selector can override it.
-	bool foggy = (GlobalMapFog || (fade & 0xffffff));
-	auto ShadeDiv = lookups.tables[palette].ShadeFactor;
-	if (shade == 127) state.SetObjectColor(0xff000000);	// 127 is generally used for shadow objects that must be black, even in foggy areas.
-
-	// Disable brightmaps if non-black fog is used.
-	if (ShadeDiv >= 1 / 1000.f && foggy)
-	{
-		state.EnableFog(1);
-		float density = GlobalMapFog ? GlobalFogDensity : 350.f - Scale(numshades - shade, 150, numshades);
-		state.SetFog((GlobalMapFog) ? GlobalMapFog : fade, density * hw_density);
-		state.SetSoftLightLevel(255);
-		state.SetLightParms(128.f, 1 / 1000.f);
-	}
-	else 
-	{
-		state.EnableFog(0);
-		state.SetFog(0, 0);
-		state.SetSoftLightLevel(gl_fogmode != 0 && ShadeDiv >= 1 / 1000.f ? max(0, 255 - Scale(shade, 255, numshades)) : 255);
-		state.SetLightParms(visibility, ShadeDiv / (numshades - 2));
-	}
-
-	// The shade rgb from the tint is ignored here.
-	state.SetColor(globalr * (1 / 255.f), globalg * (1 / 255.f), globalb * (1 / 255.f), alpha);
-}
-
+void SetLightAndFog(HWDrawInfo* di, FRenderState& state, PalEntry fade, int palette, int shade, float visibility, float alpha);

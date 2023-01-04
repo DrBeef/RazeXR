@@ -17,7 +17,6 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 //-------------------------------------------------------------------------
 #include "ns.h"
 #include "automap.h"
-#include "compat.h"
 #include "aistuff.h"
 #include "player.h"
 #include "view.h"
@@ -41,25 +40,13 @@ enum
 };
 
 int initx, inity, initz;
-short inita;
-int initsect;
+int16_t inita;
+sectortype* initsectp;
 
-short nCurChunkNum = 0;
+int nCurChunkNum = 0;
 
-DExhumedActor* nBodyGunSprite[50];
 int movefifoend;
 int movefifopos;
-
-short nCurBodyGunNum;
-
-int SectSoundSect[kMaxSectors] = { 0 };
-short SectSound[kMaxSectors]     = { 0 };
-short SectFlag[kMaxSectors]      = { 0 };
-int   SectDepth[kMaxSectors]     = { 0 };
-int   SectAbove[kMaxSectors]     = { 0 };
-short SectDamage[kMaxSectors]    = { 0 };
-short SectSpeed[kMaxSectors]     = { 0 };
-int   SectBelow[kMaxSectors]     = { 0 };
 
 int Counters[kNumCounters];
 
@@ -67,6 +54,36 @@ int Counters[kNumCounters];
 uint8_t bIsVersion6 = true;
 
 
+//---------------------------------------------------------------------------
+//
+// this is just a dummy for now to provide the intended setup.
+//
+//---------------------------------------------------------------------------
+
+static TArray<DExhumedActor*> spawnactors(SpawnSpriteDef& sprites)
+{
+    TArray<DExhumedActor*> spawns(sprites.sprites.Size(), true);
+    InitSpriteLists();
+    int j = 0;
+    for (unsigned i = 0; i < sprites.sprites.Size(); i++)
+    {
+        if (sprites.sprites[i].statnum == MAXSTATUS)
+        {
+            spawns.Pop();
+            continue;
+        }
+        auto sprt = &sprites.sprites[i];
+        auto actor = insertActor(sprt->sectp, sprt->statnum);
+        spawns[j++] = actor;
+        actor->spr = sprites.sprites[i];
+        actor->time = i;
+        if (sprites.sprext.Size()) actor->sprext = sprites.sprext[i];
+        else actor->sprext = {};
+        actor->spsmooth = {};
+    }
+    leveltimer = sprites.sprites.Size();
+    return spawns;
+}
 
 
 uint8_t LoadLevel(MapRecord* map)
@@ -79,9 +96,6 @@ uint8_t LoadLevel(MapRecord* map)
         nClockVal = 0;
         nEnergyTowers = 0;
     }
-
-    initspritelists();
-
 
     // init stuff
     {
@@ -127,10 +141,14 @@ uint8_t LoadLevel(MapRecord* map)
     }
 
     vec3_t startPos;
-    engineLoadBoard(currentLevel->fileName, 0, &startPos, &inita, &initsect);
-    initx = startPos.x;
-    inity = startPos.y;
-    initz = startPos.z;
+    int initsect;
+    SpawnSpriteDef spawned;
+    loadMap(currentLevel->fileName, 0, &startPos, &inita, &initsect, spawned);
+    initx = startPos.X;
+    inity = startPos.Y;
+    initz = startPos.Z;
+    initsectp = &sector[initsect];
+    auto actors = spawnactors(spawned);
 
     int i;
 
@@ -139,23 +157,11 @@ uint8_t LoadLevel(MapRecord* map)
         PlayerList[i].pActor = nullptr;
     }
 
-    psky_t* pSky = tileSetupSky(DEFAULTPSKY);
-
-    pSky->tileofs[0] = 0;
-    pSky->tileofs[1] = 0;
-    pSky->tileofs[2] = 0;
-    pSky->tileofs[3] = 0;
-    pSky->yoffs = 256;
-    pSky->yoffs2 = 256;
-    pSky->lognumtiles = 2;
-    pSky->horizfrac = 65536;
-    pSky->yscale = 65536;
-    parallaxtype = 2;
     g_visibility = 1024;
     flash = 0;
     precache();
 
-    LoadObjects();
+    LoadObjects(actors);
     return true;
 }
 
@@ -169,7 +175,7 @@ void InitLevel(MapRecord* map)
 
     for (int i = 0; i < nTotalPlayers; i++)
     {
-        SetSavePoint(i, initx, inity, initz, initsect, inita);
+        SetSavePoint(i, initx, inity, initz, initsectp, inita);
         RestartPlayer(i);
         InitPlayerKeys(i);
     }
@@ -204,48 +210,22 @@ void InitNewGame()
     }
 }
 
-void SetBelow(short nCurSector, short nBelowSector)
+void SnapSectors(sectortype* pSectorA, sectortype* pSectorB, int b)
 {
-    SectBelow[nCurSector] = nBelowSector;
-}
-
-void SetAbove(short nCurSector, short nAboveSector)
-{
-    SectAbove[nCurSector] = nAboveSector;
-}
-
-void SnapSectors(int nSectorA, int nSectorB, int b)
-{
-    // edx - nSectorA
-    // eax - nSectorB
-
-    int nWallA = sector[nSectorA].wallptr;
-    int nWallB = sector[nSectorB].wallptr;
-
-    int num1 = sector[nSectorA].wallnum;
-    int num2 = sector[nSectorB].wallnum;
-
-    int nCount = 0;
-
-    while (num1 > nCount)
+	for(auto& wal1 : wallsofsector(pSectorA))
     {
-        int dx = nWallB;
-
-        int bestx = 0x7FFFFFF;
+		int bestx = 0x7FFFFFF;
         int besty = bestx;
 
-        int x = wall[nWallA].x;
-        int y = wall[nWallA].y;
+        int x = wal1.wall_int_pos().X;
+        int y = wal1.wall_int_pos().Y;
 
         walltype* bestwall = nullptr;
 
-        int nCount2 = 0;
-
-        while (nCount2 < num2)
+        for(auto& wal2 : wallsofsector(pSectorB))
         {
-			auto wal = &wall[dx];
-            int thisx = x - wal->x;
-            int thisy = y - wal->y;
+            int thisx = x - wal2.wall_int_pos().X;
+            int thisy = y - wal2.wall_int_pos().Y;
             int thisdist = abs(thisx) + abs(thisy);
 			int bestdist = abs(bestx) + abs(besty);
 
@@ -253,46 +233,24 @@ void SnapSectors(int nSectorA, int nSectorB, int b)
             {
                 bestx = thisx;
                 besty = thisy;
-                bestwall = wal;
+                bestwall = &wal2;
             }
-
-            dx++;
-            nCount2++;
         }
 
-        dragpoint(bestwall, bestwall->x + bestx, bestwall->y + besty);
-
-        nCount++;
-        nWallA++;
+        dragpoint(bestwall, bestwall->wall_int_pos().X + bestx, bestwall->wall_int_pos().Y + besty);
     }
 
     if (b) {
-        sector[nSectorB].ceilingz = sector[nSectorA].floorz;
+        pSectorB->setceilingz(pSectorA->floorz);
     }
 
-    if (SectFlag[nSectorA] & 0x1000) {
-        SnapBobs(nSectorA, nSectorB);
-    }
-}
-
-void InitSectFlag()
-{
-    for (int i = 0; i < kMaxSectors; i++)
-    {
-        SectSoundSect[i] = -1;
-        SectSound[i] = -1;
-        SectAbove[i] = -1;
-        SectBelow[i] = -1;
-        SectDepth[i] = 0;
-        SectFlag[i]  = 0;
-        SectSpeed[i] = 0;
-        SectDamage[i] = 0;
+    if (pSectorA->Flag & 0x1000) {
+        SnapBobs(pSectorA, pSectorB);
     }
 }
 
-void ProcessSpriteTag(DExhumedActor* pActor, short nLotag, short nHitag)
+void ProcessSpriteTag(DExhumedActor* pActor, int nLotag, int nHitag)
 {
-	auto pSprite = &pActor->s();
     int nChannel = runlist_AllocChannel(nHitag % 1000);
 
     int nSpeed = nLotag / 1000;
@@ -315,7 +273,7 @@ void ProcessSpriteTag(DExhumedActor* pActor, short nLotag, short nHitag)
         {
             nVal = 3 * (nHitag / 3);
             // fall through to 6,7 etc
-            fallthrough__;
+            [[fallthrough]];
         }
         case 6:
         case 7:
@@ -364,33 +322,33 @@ void ProcessSpriteTag(DExhumedActor* pActor, short nLotag, short nHitag)
         case 58:
         case 60:
         {
-            pSprite->hitag = nVal;
+            pActor->spr.hitag = nVal;
             ChangeActorStat(pActor, nLotag + 900);
-            pSprite->cstat &= 0xFEFE;
+            pActor->spr.cstat &= ~CSTAT_SPRITE_BLOCK_ALL;
             BuildItemAnim(pActor);
             return;
         }
         case 12: // berry twig
         {
-            pSprite->hitag = 40;
+            pActor->spr.hitag = 40;
             ChangeActorStat(pActor, nLotag + 900);
-            pSprite->cstat &= 0xFEFE;
+            pActor->spr.cstat &= ~CSTAT_SPRITE_BLOCK_ALL;
             BuildItemAnim(pActor);
             return;
         }
         case 13: // blood bowl
         {
-            pSprite->hitag = 160;
+            pActor->spr.hitag = 160;
             ChangeActorStat(pActor, nLotag + 900);
-            pSprite->cstat &= 0xFEFE;
+            pActor->spr.cstat &= ~CSTAT_SPRITE_BLOCK_ALL;
             BuildItemAnim(pActor);
             return;
         }
         case 14: // venom bowl
         {
-            pSprite->hitag = -200;
+            pActor->spr.hitag = -200;
             ChangeActorStat(pActor, nLotag + 900);
-            pSprite->cstat &= 0xFEFE;
+            pActor->spr.cstat &= ~CSTAT_SPRITE_BLOCK_ALL;
             BuildItemAnim(pActor);
             return;
         }
@@ -411,18 +369,18 @@ void ProcessSpriteTag(DExhumedActor* pActor, short nLotag, short nHitag)
             }
             else
             {
-                pSprite->hitag = nVal;
+                pActor->spr.hitag = nVal;
                 ChangeActorStat(pActor, nLotag + 900);
-                pSprite->cstat &= 0xFEFE;
+                pActor->spr.cstat &= ~CSTAT_SPRITE_BLOCK_ALL;
                 BuildItemAnim(pActor);
                 return;
             }
         }
         case 27:
         {
-            pSprite->hitag = 1;
+            pActor->spr.hitag = 1;
             ChangeActorStat(pActor, 9 + 900);
-            pSprite->cstat &= 0xFEFE;
+            pActor->spr.cstat &= ~CSTAT_SPRITE_BLOCK_ALL;
             BuildItemAnim(pActor);
             return;
         }
@@ -431,9 +389,9 @@ void ProcessSpriteTag(DExhumedActor* pActor, short nLotag, short nHitag)
         {
             nVal++;
             nVal--; // CHECKME ??
-            pSprite->hitag = nVal;
+            pActor->spr.hitag = nVal;
             ChangeActorStat(pActor, nLotag + 900);
-            pSprite->cstat &= 0xFEFE;
+            pActor->spr.cstat &= ~CSTAT_SPRITE_BLOCK_ALL;
             BuildItemAnim(pActor);
             return;
         }
@@ -452,12 +410,12 @@ void ProcessSpriteTag(DExhumedActor* pActor, short nLotag, short nHitag)
         {
             case 999:
             {
-                AddFlicker(pSprite->sectnum, nSpeed);
+                AddFlicker(pActor->sector(), nSpeed);
                 break;
             }
             case 998:
             {
-                AddGlow(pSprite->sectnum, nSpeed);
+                AddGlow(pActor->sector(), nSpeed);
                 break;
             }
             case 118: // Anubis with drum
@@ -467,7 +425,7 @@ void ProcessSpriteTag(DExhumedActor* pActor, short nLotag, short nHitag)
                     return;
                 }
 
-                BuildAnubis(pActor, 0, 0, 0, 0, 0, 1);
+                BuildAnubis(pActor, 0, 0, 0, nullptr, 0, 1);
                 return;
             }
             case 117:
@@ -477,27 +435,27 @@ void ProcessSpriteTag(DExhumedActor* pActor, short nLotag, short nHitag)
                     return;
                 }
 
-                BuildWasp(pActor, 0, 0, 0, 0, 0, false);
+                BuildWasp(pActor, 0, 0, 0, nullptr, 0, false);
                 return;
             }
             case 116:
             {
-                BuildRat(pActor, 0, 0, 0, 0, -1);
+                BuildRat(pActor, 0, 0, 0, nullptr, -1);
                 return;
             }
             case 115: // Rat (eating)
             {
-                BuildRat(pActor, 0, 0, 0, 0, 0);
+                BuildRat(pActor, 0, 0, 0, nullptr, 0);
                 return;
             }
             case 113:
             {
-                BuildQueen(pActor, 0, 0, 0, 0, 0, nChannel);
+                BuildQueen(pActor, 0, 0, 0, nullptr, 0, nChannel);
                 return;
             }
             case 112:
             {
-                BuildScorp(pActor, 0, 0, 0, 0, 0, nChannel);
+                BuildScorp(pActor, 0, 0, 0, nullptr, 0, nChannel);
                 return;
             }
             case 111:
@@ -507,7 +465,7 @@ void ProcessSpriteTag(DExhumedActor* pActor, short nLotag, short nHitag)
                     return;
                 }
 
-                BuildSet(pActor, 0, 0, 0, 0, 0, nChannel);
+                BuildSet(pActor, 0, 0, 0, nullptr, 0, nChannel);
                 return;
             }
             case 108:
@@ -517,7 +475,7 @@ void ProcessSpriteTag(DExhumedActor* pActor, short nLotag, short nHitag)
                     return;
                 }
 
-                BuildLava(pActor, 0, 0, 0, 0, 0, nChannel);
+                BuildLava(pActor, 0, 0, 0, nullptr, 0, nChannel);
                 return;
             }
             case 107:
@@ -527,7 +485,7 @@ void ProcessSpriteTag(DExhumedActor* pActor, short nLotag, short nHitag)
                     return;
                 }
 
-                BuildRex(pActor, 0, 0, 0, 0, 0, nChannel);
+                BuildRex(pActor, 0, 0, 0, nullptr, 0, nChannel);
                 return;
             }
             case 106:
@@ -537,7 +495,7 @@ void ProcessSpriteTag(DExhumedActor* pActor, short nLotag, short nHitag)
                     return;
                 }
 
-                BuildFish(pActor, 0, 0, 0, 0, 0);
+                BuildFish(pActor, 0, 0, 0, nullptr, 0);
                 return;
             }
             case 105:
@@ -547,7 +505,7 @@ void ProcessSpriteTag(DExhumedActor* pActor, short nLotag, short nHitag)
                     return;
                 }
 
-                BuildSpider(pActor, 0, 0, 0, 0, 0);
+                BuildSpider(pActor, 0, 0, 0, nullptr, 0);
                 return;
             }
             case 104:
@@ -557,7 +515,7 @@ void ProcessSpriteTag(DExhumedActor* pActor, short nLotag, short nHitag)
                     return;
                 }
 
-                BuildRoach(1, pActor, 0, 0, 0, 0, 0);
+                BuildRoach(1, pActor, 0, 0, 0, nullptr, 0);
                 return;
             }
             case 103:
@@ -567,7 +525,7 @@ void ProcessSpriteTag(DExhumedActor* pActor, short nLotag, short nHitag)
                     return;
                 }
 
-                BuildRoach(0, pActor, 0, 0, 0, 0, 0);
+                BuildRoach(0, pActor, 0, 0, 0, nullptr, 0);
                 return;
             }
             case 102:
@@ -577,7 +535,7 @@ void ProcessSpriteTag(DExhumedActor* pActor, short nLotag, short nHitag)
                     return;
                 }
 
-                BuildLion(pActor, 0, 0, 0, 0, 0);
+                BuildLion(pActor, 0, 0, 0, nullptr, 0);
                 return;
             }
             case 101:
@@ -587,7 +545,7 @@ void ProcessSpriteTag(DExhumedActor* pActor, short nLotag, short nHitag)
                     return;
                 }
 
-                BuildMummy(pActor, 0, 0, 0, 0, 0);
+                BuildMummy(pActor, 0, 0, 0, nullptr, 0);
                 return;
             }
             case 100:
@@ -597,30 +555,30 @@ void ProcessSpriteTag(DExhumedActor* pActor, short nLotag, short nHitag)
                     return;
                 }
 
-                BuildAnubis(pActor, 0, 0, 0, 0, 0, 0);
+                BuildAnubis(pActor, 0, 0, 0, nullptr, 0, 0);
                 return;
             }
             case 99: // underwater type 2
             {
-                int nSector =pSprite->sectnum;
-                SetAbove(nSector, nHitag);
-                SectFlag[nSector] |= kSectUnderwater;
+                auto pSector =pActor->sector();
+                pSector->pAbove = &sector[nHitag];
+                pSector->Flag |= kSectUnderwater;
 
                 DeleteActor(pActor);
                 return;
             }
             case 98:
             {
-                int nSector =pSprite->sectnum;
-                SetBelow(nSector, nHitag);
-                SnapSectors(nSector, nHitag, 1);
+                auto pSector = pActor->sector();
+                pSector->pBelow = &sector[nHitag];
+                SnapSectors(pSector, pSector->pBelow, 1);
 
                 DeleteActor(pActor);
                 return;
             }
             case 97:
             {
-                AddSectorBob(pSprite->sectnum, nHitag, 1);
+                AddSectorBob(pActor->sector(), nHitag, 1);
 
                 DeleteActor(pActor);
                 return;
@@ -632,25 +590,25 @@ void ProcessSpriteTag(DExhumedActor* pActor, short nLotag, short nHitag)
                     nDamage = 1;
                 }
 
-                int nSector =pSprite->sectnum;
+                auto pSector =pActor->sector();
 
-                SectDamage[nSector] = nDamage;
-                SectFlag[nSector] |= kSectLava;
+                pSector->Damage = nDamage;
+                pSector->Flag |= kSectLava;
 
                 DeleteActor(pActor);
                 return;
             }
             case 95:
             {
-                AddSectorBob(pSprite->sectnum, nHitag, 0);
+                AddSectorBob(pActor->sector(), nHitag, 0);
 
                 DeleteActor(pActor);
                 return;
             }
             case 94: // water
             {
-                int nSector =pSprite->sectnum;
-                SectDepth[nSector] = nHitag << 8;
+                auto pSector = pActor->sector();
+                pSector->Depth = nHitag << 8;
 
                 DeleteActor(pActor);
                 return;
@@ -668,35 +626,34 @@ void ProcessSpriteTag(DExhumedActor* pActor, short nLotag, short nHitag)
             case 79:
             case 89:
             {
-                int nSector =pSprite->sectnum;
-
-                SectSpeed[nSector] = nSpeed;
-                SectFlag[nSector] |= pSprite->ang;
+                auto pSector = pActor->sector();
+                pSector->Speed = nSpeed;
+                pSector->Flag |= pActor->spr.ang;
 
                 DeleteActor(pActor);
                 return;
             }
             case 88:
             {
-                AddFlow(pSprite->sectnum, nSpeed, 0, pSprite->ang);
+                AddFlow(pActor->sector(), nSpeed, 0, pActor->spr.ang);
 
                 DeleteActor(pActor);
                 return;
             }
             case 80: // underwater
             {
-                int nSector =pSprite->sectnum;
-                SectFlag[nSector] |= kSectUnderwater;
+                auto pSector = pActor->sector();
+                pSector->Flag |= kSectUnderwater;
 
                 DeleteActor(pActor);
                 return;
             }
             case 78:
             {
-                AddFlow(pSprite->sectnum, nSpeed, 1, pSprite->ang);
+                AddFlow(pActor->sector(), nSpeed, 1, pActor->spr.ang);
 
-                int nSector =pSprite->sectnum;
-                SectFlag[nSector] |= 0x8000;
+                auto pSector = pActor->sector();
+                pSector->Flag |= 0x8000;
 
                 DeleteActor(pActor);
                 return;
@@ -733,13 +690,13 @@ void ProcessSpriteTag(DExhumedActor* pActor, short nLotag, short nHitag)
             case 63:
             {
                 ChangeActorStat(pActor, 405);
-                pSprite->cstat = 0x8000;
+                pActor->spr.cstat = CSTAT_SPRITE_INVISIBLE;
                 return;
             }
             case 62:
             {
                 nNetStartSprite[nNetStartSprites] = pActor;
-                pSprite->cstat = 0x8000;
+                pActor->spr.cstat = CSTAT_SPRITE_INVISIBLE;
 
                 nNetStartSprites++;
                 return;
@@ -747,7 +704,7 @@ void ProcessSpriteTag(DExhumedActor* pActor, short nLotag, short nHitag)
             case kTagRamses: // Ramses head
             {
                 pSpiritSprite = pActor;
-                pSprite->cstat |= 0x8000;
+                pActor->spr.cstat |= CSTAT_SPRITE_INVISIBLE;
                 return;
             }
             default: // TODO - checkme!
@@ -761,26 +718,23 @@ void ProcessSpriteTag(DExhumedActor* pActor, short nLotag, short nHitag)
     DeleteActor(pActor);
 }
 
-void ExamineSprites()
+void ExamineSprites(TArray<DExhumedActor*>& actors)
 {
     nNetStartSprites = 0;
     nCurStartSprite = 0;
 
-	ExhumedLinearSpriteIterator it;
-    while (auto ac = it.Next())
+    for(auto& ac : actors)
     {
-		auto pSprite = &ac->s();
-
-        int nStatus = pSprite->statnum;
+        int nStatus = ac->spr.statnum;
         if (!nStatus)
         {
-            int lotag = pSprite->lotag;
-            int hitag = pSprite->hitag;
+            int lotag = ac->spr.lotag;
+            int hitag = ac->spr.hitag;
 
             if ((nStatus < kMaxStatus) && lotag)
             {
-                pSprite->lotag = 0;
-                pSprite->hitag = 0;
+                ac->spr.lotag = 0;
+                ac->spr.hitag = 0;
 
                 ProcessSpriteTag(ac, lotag, hitag);
             }
@@ -793,19 +747,18 @@ void ExamineSprites()
 
     if (nNetPlayerCount)
     {
-        auto pActor = insertActor(initsect, 0);
-		auto pSprite = &pActor->s();
+        auto pActor = insertActor(initsectp, 0);
 
-        pSprite->x = initx;
-        pSprite->y = inity;
-        pSprite->z = initz;
-        pSprite->cstat = 0x8000;
+        pActor->spr.pos.X = initx;
+        pActor->spr.pos.Y = inity;
+        pActor->spr.pos.Z = initz;
+        pActor->spr.cstat = CSTAT_SPRITE_INVISIBLE;
         nNetStartSprite[nNetStartSprites] = pActor;
         nNetStartSprites++;
     }
 }
 
-void LoadObjects()
+void LoadObjects(TArray<DExhumedActor*>& actors)
 {
     runlist_InitRun();
     runlist_InitChan();
@@ -815,44 +768,42 @@ void LoadObjects()
     InitSwitch();
     InitElev();
     InitWallFace();
-    InitSectFlag();
 
-    for (int nSector = 0; nSector < numsectors; nSector++)
+	for (auto& sect: sector)
     {
-        auto sectp = &sector[nSector];
-        int hitag = sectp->hitag;
-        int lotag = sectp->lotag;
+        int hitag = sect.hitag;
+        int lotag = sect.lotag;
 
-        sectp->hitag = 0;
-        sectp->lotag = 0;
-        sectp->extra = -1;
+        sect.hitag = 0;
+        sect.lotag = 0;
+        sect.extra = -1;
 
         if (hitag || lotag)
         {
-            sectp->lotag = runlist_HeadRun() + 1;
-            sectp->hitag = lotag;
+            sect.lotag = runlist_HeadRun() + 1;
+            sect.hitag = lotag;
 
-            runlist_ProcessSectorTag(nSector, lotag, hitag);
+            runlist_ProcessSectorTag(&sect, lotag, hitag);
         }
     }
 
-    for (int nWall = 0; nWall < numwalls; nWall++)
+    for (auto& wal : wall)
     {
-        wall[nWall].extra = -1;
+        wal.extra = -1;
 
-        int lotag = wall[nWall].lotag;
-        int hitag = wall[nWall].hitag;
+        int lotag = wal.lotag;
+        int hitag = wal.hitag;
 
-        wall[nWall].lotag = 0;
+        wal.lotag = 0;
 
         if (hitag || lotag)
         {
-            wall[nWall].lotag = runlist_HeadRun() + 1;
-            runlist_ProcessWallTag(nWall, lotag, hitag);
+            wal.lotag = runlist_HeadRun() + 1;
+            runlist_ProcessWallTag(&wal, lotag, hitag);
         }
     }
 
-    ExamineSprites();
+    ExamineSprites(actors);
     PostProcess();
     InitRa();
     InitChunks();
@@ -876,18 +827,8 @@ void SerializeInit(FSerializer& arc)
             ("inity", inity)
             ("initz", initz)
             ("inita", inita)
-            ("initsect", initsect)
+            ("initsect", initsectp)
             ("curchunk", nCurChunkNum)
-            .Array("bodygunsprite", nBodyGunSprite, countof(nBodyGunSprite))
-            ("curbodygun", nCurBodyGunNum)
-            .Array("soundsect", SectSoundSect, numsectors)
-            .Array("sectsound", SectSound, numsectors)
-            .Array("sectflag", SectFlag, numsectors)
-            .Array("sectdepth", SectDepth, numsectors)
-            .Array("sectabove", SectAbove, numsectors)
-            .Array("sectdamage", SectDamage, numsectors)
-            .Array("sectspeed", SectSpeed, numsectors)
-            .Array("sectbelow", SectBelow, numsectors)
             .Array("counters", Counters, kNumCounters)
             .EndObject();
     }

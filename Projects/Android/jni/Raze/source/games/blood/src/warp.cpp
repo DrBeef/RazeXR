@@ -23,7 +23,6 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 #include "ns.h"	// Must come before everything else!
 
 #include "build.h"
-#include "compat.h"
 
 #include "blood.h"
 
@@ -31,264 +30,293 @@ BEGIN_BLD_NS
 
 ZONE gStartZone[8];
 #ifdef NOONE_EXTENSIONS
-    ZONE gStartZoneTeam1[8];
-    ZONE gStartZoneTeam2[8];
-    bool gTeamsSpawnUsed = false;
+ZONE gStartZoneTeam1[8];
+ZONE gStartZoneTeam2[8];
+bool gTeamsSpawnUsed = false;
 #endif
-void warpInit(void)
+
+//---------------------------------------------------------------------------
+//
+//
+//
+//---------------------------------------------------------------------------
+
+void validateLinks()
 {
-    for (int i = 0; i < kMaxSectors; i++)
-    {
-        gUpperLink[i] = nullptr;
-        gLowerLink[i] = nullptr;
-    }
-    #ifdef NOONE_EXTENSIONS
-    int team1 = 0; int team2 = 0; gTeamsSpawnUsed = false; // increment if team start positions specified.
-    #endif
-    BloodLinearSpriteIterator it;
-    while (auto actor = it.Next())
-    {
-        spritetype* pSprite = &actor->s();
-            if (actor->hasX()) {
-                XSPRITE *pXSprite = &actor->x();
-                switch (pSprite->type) {
-                    case kMarkerSPStart:
-                        if (gGameOptions.nGameType < 2 && pXSprite->data1 >= 0 && pXSprite->data1 < kMaxPlayers) {
-                            ZONE *pZone = &gStartZone[pXSprite->data1];
-                            pZone->x = pSprite->x;
-                            pZone->y = pSprite->y;
-                            pZone->z = pSprite->z;
-                            pZone->sectnum = pSprite->sectnum;
-                            pZone->ang = pSprite->ang;
-                        }
-                        DeleteSprite(actor);
-                        break;
-                    case kMarkerMPStart:
-                        if (pXSprite->data1 >= 0 && pXSprite->data2 < kMaxPlayers) {
-                            if (gGameOptions.nGameType >= 2) {
-                                // default if BB or teams without data2 specified
-                                ZONE* pZone = &gStartZone[pXSprite->data1];
-                                pZone->x = pSprite->x;
-                                pZone->y = pSprite->y;
-                                pZone->z = pSprite->z;
-                                pZone->sectnum = pSprite->sectnum;
-                                pZone->ang = pSprite->ang;
-                            
-                                #ifdef NOONE_EXTENSIONS
-                                    // fill player spawn position according team of player in TEAMS mode.
-                                    if (gModernMap && gGameOptions.nGameType == 3) {
-                                        if (pXSprite->data2 == 1) {
-                                            pZone = &gStartZoneTeam1[team1];
-                                            pZone->x = pSprite->x;
-                                            pZone->y = pSprite->y;
-                                            pZone->z = pSprite->z;
-                                            pZone->sectnum = pSprite->sectnum;
-                                            pZone->ang = pSprite->ang;
-                                            team1++;
-
-                                        } else if (pXSprite->data2 == 2) {
-                                            pZone = &gStartZoneTeam2[team2];
-                                            pZone->x = pSprite->x;
-                                            pZone->y = pSprite->y;
-                                            pZone->z = pSprite->z;
-                                            pZone->sectnum = pSprite->sectnum;
-                                            pZone->ang = pSprite->ang;
-                                            team2++;
-                                        }
-                                    }
-                                #endif
-
-                            }
-                            DeleteSprite(actor);
-                        }
-                        break;
-                    case kMarkerUpLink:
-                        gUpperLink[pSprite->sectnum] = actor;
-                        pSprite->cstat |= 32768;
-                        pSprite->cstat &= ~257;
-                        break;
-                    case kMarkerLowLink:
-                        gLowerLink[pSprite->sectnum] = actor;
-                        pSprite->cstat |= 32768;
-                        pSprite->cstat &= ~257;
-                        break;
-                    case kMarkerUpWater:
-                    case kMarkerUpStack:
-                    case kMarkerUpGoo:
-                        gUpperLink[pSprite->sectnum] = actor;
-                        pSprite->cstat |= 32768;
-                        pSprite->cstat &= ~257;
-                        pSprite->z = getflorzofslope(pSprite->sectnum, pSprite->x, pSprite->y);
-                        break;
-                    case kMarkerLowWater:
-                    case kMarkerLowStack:
-                    case kMarkerLowGoo:
-                        gLowerLink[pSprite->sectnum] = actor;
-                        pSprite->cstat |= 32768;
-                        pSprite->cstat &= ~257;
-                        pSprite->z = getceilzofslope(pSprite->sectnum, pSprite->x, pSprite->y);
-                        break;
-                }
-            }
-    }
-    
-    #ifdef NOONE_EXTENSIONS
-    // check if there is enough start positions for teams, if any used
-    if (team1 > 0 || team2 > 0) {
-        gTeamsSpawnUsed = true;
-        if (team1 < kMaxPlayers / 2 || team2 < kMaxPlayers / 2) {
-            viewSetSystemMessage("At least 4 spawn positions for each team is recommended.");
-            viewSetSystemMessage("Team A positions: %d, Team B positions: %d.", team1, team2);
-        }
-    }
-    #endif
-
-    for (int i = 0; i < kMaxSectors; i++)
-    {
-        auto actor = getUpperLink(i);
-        if (actor && actor->hasX())
-        {
-            spritetype *pSprite = &actor->s();
-            XSPRITE *pXSprite = &actor->x();
-            int nLink = pXSprite->data1;
-            for (int j = 0; j < kMaxSectors; j++)
-            {
-                auto actor2 = getLowerLink(j);
-                if (actor2 && actor2->hasX())
-                {
-                    spritetype *pSprite2 = &actor2->s();
-                    XSPRITE *pXSprite2 = &actor2->x();
-                    if (pXSprite2->data1 == nLink)
-                    {
-                        actor->SetOwner(actor2);
-                        actor2->SetOwner(actor);
-                    }
-                }
-            }
-        }
-    }
+	int snum = 0;
+	for (auto& sect : sector)
+	{
+		DCoreActor* upper = sect.upperLink;
+		if (upper && !static_cast<DBloodActor*>(upper)->GetOwner())
+		{
+			Printf(PRINT_HIGH, "Unpartnered upper link in sector %d\n", snum);
+			sect.upperLink = nullptr;
+		}
+		DCoreActor* lower = sect.lowerLink;
+		if (lower && !static_cast<DBloodActor*>(lower)->GetOwner())
+		{
+			Printf(PRINT_HIGH, "Unpartnered lower link in sector %d\n", snum);
+			sect.lowerLink = nullptr;
+		}
+		snum++;
+	}
 }
 
-int CheckLink(DBloodActor *actor)
+
+//---------------------------------------------------------------------------
+//
+//
+//
+//---------------------------------------------------------------------------
+
+void warpInit(TArray<DBloodActor*>& actors)
 {
-    auto pSprite = &actor->s();
-    int nSector = pSprite->sectnum;
-    auto aUpper = getUpperLink(nSector);
-    auto aLower = getLowerLink(nSector);
-    if (aUpper)
-    {
-        spritetype* pUpper = &aUpper->s();
-        int z;
-        if (pUpper->type == kMarkerUpLink)
-            z = pUpper->z;
-        else
-            z = getflorzofslope(pSprite->sectnum, pSprite->x, pSprite->y);
-        if (z <= pSprite->z)
-        {
-            aLower = aUpper->GetOwner();
-            assert(aLower);
-            spritetype *pLower = &aLower->s();
-            assert(pLower->sectnum >= 0 && pLower->sectnum < kMaxSectors);
-            ChangeActorSect(actor, pLower->sectnum);
-            pSprite->x += pLower->x-pUpper->x;
-            pSprite->y += pLower->y-pUpper->y;
-            int z2;
-            if (pLower->type == kMarkerLowLink)
-                z2 = pLower->z;
-            else
-                z2 = getceilzofslope(pSprite->sectnum, pSprite->x, pSprite->y);
-            pSprite->z += z2-z;
-            actor->interpolated = false;
-            return pUpper->type;
-        }
-    }
-    if (aLower)
-    {
-        spritetype *pLower = &aLower->s();
-        int z;
-        if (pLower->type == kMarkerLowLink)
-            z = pLower->z;
-        else
-            z = getceilzofslope(pSprite->sectnum, pSprite->x, pSprite->y);
-        if (z >= pSprite->z)
-        {
-            aUpper = aLower->GetOwner();
-            assert(aUpper);
-            spritetype *pUpper = &aUpper->s();
-            assert(pUpper->sectnum >= 0 && pUpper->sectnum < kMaxSectors);
-            ChangeActorSect(actor, pUpper->sectnum);
-            pSprite->x += pUpper->x-pLower->x;
-            pSprite->y += pUpper->y-pLower->y;
-            int z2;
-            if (pUpper->type == kMarkerUpLink)
-                z2 = pUpper->z;
-            else
-                z2 = getflorzofslope(pSprite->sectnum, pSprite->x, pSprite->y);
-            pSprite->z += z2-z;
-            actor->interpolated = false;
-            return pLower->type;
-        }
-    }
-    return 0;
+#ifdef NOONE_EXTENSIONS
+	int team1 = 0; int team2 = 0; gTeamsSpawnUsed = false; // increment if team start positions specified.
+#endif
+
+	for (auto actor : actors)
+	{
+		if (!actor->exists()) continue;
+		if (actor->hasX()) {
+			switch (actor->spr.type) {
+			case kMarkerSPStart:
+				if (gGameOptions.nGameType < 2 && actor->xspr.data1 >= 0 && actor->xspr.data1 < kMaxPlayers) {
+					ZONE* pZone = &gStartZone[actor->xspr.data1];
+					pZone->x = actor->spr.pos.X;
+					pZone->y = actor->spr.pos.Y;
+					pZone->z = actor->spr.pos.Z;
+					pZone->sector = actor->sector();
+					pZone->ang = actor->spr.ang;
+				}
+				DeleteSprite(actor);
+				break;
+			case kMarkerMPStart:
+				if (actor->xspr.data1 >= 0 && actor->xspr.data2 < kMaxPlayers) {
+					if (gGameOptions.nGameType >= 2) {
+						// default if BB or teams without data2 specified
+						ZONE* pZone = &gStartZone[actor->xspr.data1];
+						pZone->x = actor->spr.pos.X;
+						pZone->y = actor->spr.pos.Y;
+						pZone->z = actor->spr.pos.Z;
+						pZone->sector = actor->sector();
+						pZone->ang = actor->spr.ang;
+
+#ifdef NOONE_EXTENSIONS
+						// fill player spawn position according team of player in TEAMS mode.
+						if (gModernMap && gGameOptions.nGameType == 3) {
+							if (actor->xspr.data2 == 1) {
+								pZone = &gStartZoneTeam1[team1];
+								pZone->x = actor->spr.pos.X;
+								pZone->y = actor->spr.pos.Y;
+								pZone->z = actor->spr.pos.Z;
+								pZone->sector = actor->sector();
+								pZone->ang = actor->spr.ang;
+								team1++;
+
+							}
+							else if (actor->xspr.data2 == 2) {
+								pZone = &gStartZoneTeam2[team2];
+								pZone->x = actor->spr.pos.X;
+								pZone->y = actor->spr.pos.Y;
+								pZone->z = actor->spr.pos.Z;
+								pZone->sector = actor->sector();
+								pZone->ang = actor->spr.ang;
+								team2++;
+							}
+						}
+#endif
+
+					}
+					DeleteSprite(actor);
+				}
+				break;
+			case kMarkerUpLink:
+				actor->sector()->upperLink = actor;
+				actor->spr.cstat |= CSTAT_SPRITE_INVISIBLE;
+				actor->spr.cstat &= ~CSTAT_SPRITE_BLOCK_ALL;
+				break;
+			case kMarkerLowLink:
+				actor->sector()->lowerLink = actor;
+				actor->spr.cstat |= CSTAT_SPRITE_INVISIBLE;
+				actor->spr.cstat &= ~CSTAT_SPRITE_BLOCK_ALL;
+				break;
+			case kMarkerUpWater:
+			case kMarkerUpStack:
+			case kMarkerUpGoo:
+				actor->sector()->upperLink = actor;
+				actor->spr.cstat |= CSTAT_SPRITE_INVISIBLE;
+				actor->spr.cstat &= ~CSTAT_SPRITE_BLOCK_ALL;
+				actor->spr.pos.Z = getflorzofslopeptr(actor->sector(), actor->spr.pos.X, actor->spr.pos.Y);
+				break;
+			case kMarkerLowWater:
+			case kMarkerLowStack:
+			case kMarkerLowGoo:
+				actor->sector()->lowerLink = actor;
+				actor->spr.cstat |= CSTAT_SPRITE_INVISIBLE;
+				actor->spr.cstat &= ~CSTAT_SPRITE_BLOCK_ALL;
+				actor->spr.pos.Z = getceilzofslopeptr(actor->sector(), actor->spr.pos.X, actor->spr.pos.Y);
+				break;
+			}
+		}
+	}
+
+#ifdef NOONE_EXTENSIONS
+	// check if there is enough start positions for teams, if any used
+	if (team1 > 0 || team2 > 0) {
+		gTeamsSpawnUsed = true;
+		if (team1 < kMaxPlayers / 2 || team2 < kMaxPlayers / 2) {
+			viewSetSystemMessage("At least 4 spawn positions for each team is recommended.");
+			viewSetSystemMessage("Team A positions: %d, Team B positions: %d.", team1, team2);
+		}
+	}
+#endif
+
+	for (auto& sect : sector)
+	{
+		auto actor = barrier_cast<DBloodActor*>(sect.upperLink);
+		if (actor && actor->hasX())
+		{
+			int nLink = actor->xspr.data1;
+			for (auto& isect : sector)
+			{
+				auto actor2 = barrier_cast<DBloodActor*>(isect.lowerLink);
+				if (actor2 && actor2->hasX())
+				{
+					if (actor2->xspr.data1 == nLink)
+					{
+						actor->SetOwner(actor2);
+						actor2->SetOwner(actor);
+					}
+				}
+			}
+		}
+	}
+	validateLinks();
 }
 
-int CheckLink(int *x, int *y, int *z, int *nSector)
+//---------------------------------------------------------------------------
+//
+//
+//
+//---------------------------------------------------------------------------
+
+int CheckLink(DBloodActor* actor)
 {
-    auto upper = getUpperLink(*nSector);
-    auto lower = getLowerLink(*nSector);
-    if (upper)
-    {
-        spritetype *pUpper = &upper->s();
-        int z1;
-        if (pUpper->type == kMarkerUpLink)
-            z1 = pUpper->z;
-        else
-            z1 = getflorzofslope(*nSector, *x, *y);
-        if (z1 <= *z)
-        {
-            lower = upper->GetOwner();
-            assert(lower);
-            spritetype *pLower = &lower->s();
-            assert(pLower->sectnum >= 0 && pLower->sectnum < kMaxSectors);
-            *nSector = pLower->sectnum;
-            *x += pLower->x-pUpper->x;
-            *y += pLower->y-pUpper->y;
-            int z2;
-            if (pUpper->type == kMarkerLowLink)
-                z2 = pLower->z;
-            else
-                z2 = getceilzofslope(*nSector, *x, *y);
-            *z += z2-z1;
-            return pUpper->type;
-        }
-    }
-    if (lower)
-    {
-        spritetype *pLower = &lower->s();
-        int z1;
-        if (pLower->type == kMarkerLowLink)
-            z1 = pLower->z;
-        else
-            z1 = getceilzofslope(*nSector, *x, *y);
-        if (z1 >= *z)
-        {
-            upper = lower->GetOwner();
-            assert(upper);
-            spritetype *pUpper = &upper->s();
-            assert(pUpper->sectnum >= 0 && pUpper->sectnum < kMaxSectors);
-            *nSector = pUpper->sectnum;
-            *x += pUpper->x-pLower->x;
-            *y += pUpper->y-pLower->y;
-            int z2;
-            if (pLower->type == kMarkerUpLink)
-                z2 = pUpper->z;
-            else
-                z2 = getflorzofslope(*nSector, *x, *y);
-            *z += z2-z1;
-            return pLower->type;
-        }
-    }
-    return 0;
+	auto pSector = actor->sector();
+	auto aUpper = barrier_cast<DBloodActor*>(pSector->upperLink);
+	auto aLower = barrier_cast<DBloodActor*>(pSector->lowerLink);
+	if (aUpper)
+	{
+		int z;
+		if (aUpper->spr.type == kMarkerUpLink)
+			z = aUpper->spr.pos.Z;
+		else
+			z = getflorzofslopeptr(actor->sector(), actor->spr.pos.X, actor->spr.pos.Y);
+		if (z <= actor->spr.pos.Z)
+		{
+			aLower = aUpper->GetOwner();
+			assert(aLower);
+			assert(aLower->insector());
+			ChangeActorSect(actor, aLower->sector());
+			actor->spr.pos.X += aLower->spr.pos.X - aUpper->spr.pos.X;
+			actor->spr.pos.Y += aLower->spr.pos.Y - aUpper->spr.pos.Y;
+			int z2;
+			if (aLower->spr.type == kMarkerLowLink)
+				z2 = aLower->spr.pos.Z;
+			else
+				z2 = getceilzofslopeptr(actor->sector(), actor->spr.pos.X, actor->spr.pos.Y);
+			actor->spr.pos.Z += z2 - z;
+			actor->interpolated = false;
+			return aUpper->spr.type;
+		}
+	}
+	if (aLower)
+	{
+		int z;
+		if (aLower->spr.type == kMarkerLowLink)
+			z = aLower->spr.pos.Z;
+		else
+			z = getceilzofslopeptr(actor->sector(), actor->spr.pos.X, actor->spr.pos.Y);
+		if (z >= actor->spr.pos.Z)
+		{
+			aUpper = aLower->GetOwner();
+			assert(aUpper);
+			assert(aUpper->insector());
+			ChangeActorSect(actor, aUpper->sector());
+			actor->spr.pos.X += aUpper->spr.pos.X - aLower->spr.pos.X;
+			actor->spr.pos.Y += aUpper->spr.pos.Y - aLower->spr.pos.Y;
+			int z2;
+			if (aUpper->spr.type == kMarkerUpLink)
+				z2 = aUpper->spr.pos.Z;
+			else
+				z2 = getflorzofslopeptr(actor->sector(), actor->spr.pos.X, actor->spr.pos.Y);
+			actor->spr.pos.Z += z2 - z;
+			actor->interpolated = false;
+			return aLower->spr.type;
+		}
+	}
+	return 0;
+}
+
+//---------------------------------------------------------------------------
+//
+//
+//
+//---------------------------------------------------------------------------
+
+int CheckLink(int* x, int* y, int* z, sectortype** pSector)
+{
+	auto aUpper = barrier_cast<DBloodActor*>((*pSector)->upperLink);
+	auto aLower = barrier_cast<DBloodActor*>((*pSector)->lowerLink);
+	if (aUpper)
+	{
+		int z1;
+		if (aUpper->spr.type == kMarkerUpLink)
+			z1 = aUpper->spr.pos.Z;
+		else
+			z1 = getflorzofslopeptr(*pSector, *x, *y);
+		if (z1 <= *z)
+		{
+			aLower = aUpper->GetOwner();
+			assert(aLower);
+			assert(aLower->insector());
+			*pSector = aLower->sector();
+			*x += aLower->spr.pos.X - aUpper->spr.pos.X;
+			*y += aLower->spr.pos.Y - aUpper->spr.pos.Y;
+			int z2;
+			if (aUpper->spr.type == kMarkerLowLink)
+				z2 = aLower->spr.pos.Z;
+			else
+				z2 = getceilzofslopeptr(*pSector, *x, *y);
+			*z += z2 - z1;
+			return aUpper->spr.type;
+		}
+	}
+	if (aLower)
+	{
+		int z1;
+		if (aLower->spr.type == kMarkerLowLink)
+			z1 = aLower->spr.pos.Z;
+		else
+			z1 = getceilzofslopeptr(*pSector, *x, *y);
+		if (z1 >= *z)
+		{
+			aUpper = aLower->GetOwner();
+			assert(aUpper);
+			*pSector = aUpper->sector();
+			*x += aUpper->spr.pos.X - aLower->spr.pos.X;
+			*y += aUpper->spr.pos.Y - aLower->spr.pos.Y;
+			int z2;
+			if (aLower->spr.type == kMarkerUpLink)
+				z2 = aUpper->spr.pos.Z;
+			else
+				z2 = getflorzofslopeptr(*pSector, *x, *y);
+			*z += z2 - z1;
+			return aLower->spr.type;
+		}
+	}
+	return 0;
 }
 
 //---------------------------------------------------------------------------
@@ -304,7 +332,7 @@ FSerializer& Serialize(FSerializer& arc, const char* keyname, ZONE& w, ZONE* def
 		arc("x", w.x)
 			("y", w.y)
 			("z", w.z)
-			("sector", w.sectnum)
+			("sector", w.sector)
 			("angle", w.ang)
 			.EndObject();
 	}
@@ -316,8 +344,6 @@ void SerializeWarp(FSerializer& arc)
 	if (arc.BeginObject("warp"))
 	{
 		arc.Array("startzone", gStartZone, kMaxPlayers)
-			.Array("upperlink", gUpperLink, numsectors)
-			.Array("lowerlink", gLowerLink, numsectors)
 			.EndObject();
 	}
 }
