@@ -49,8 +49,7 @@ CVAR(Float, vr_ipd, 0.062f, CVAR_ARCHIVE|CVAR_GLOBALCONFIG) // METERS
 // distance between viewer and the display screen
 CVAR(Float, vr_screendist, 0.80f, CVAR_ARCHIVE | CVAR_GLOBALCONFIG) // METERS
 
-// default conversion between (vertical) DOOM units and meters
-CVAR(Float, vr_hunits_per_meter, 28.0f, CVAR_ARCHIVE | CVAR_GLOBALCONFIG) // METERS
+CVAR(Float, vr_hunits_per_meter, 24.0f, CVAR_ARCHIVE | CVAR_GLOBALCONFIG) // METERS
 
 CVAR(Float, vr_height_adjust, 0.0f, CVAR_ARCHIVE | CVAR_GLOBALCONFIG) // METERS
 CVAR(Int, vr_control_scheme, 0, CVAR_ARCHIVE | CVAR_GLOBALCONFIG | CVAR_NOINITCALL)
@@ -70,11 +69,18 @@ CVAR(Bool, vr_crouch_use_button, true, CVAR_ARCHIVE | CVAR_GLOBALCONFIG)
 CVAR(Float, vr_pickup_haptic_level, 0.2, CVAR_ARCHIVE | CVAR_GLOBALCONFIG)
 CVAR(Float, vr_quake_haptic_level, 0.8, CVAR_ARCHIVE | CVAR_GLOBALCONFIG)
 
-int playerHeight = 0.0f;
+int playerHeight = 0;
 
 float getHmdAdjustedHeightInMapUnit()
 {
-	return ((hmdPosition[1] + vr_height_adjust) * vr_hunits_per_meter);
+	if (playerHeight != 0)
+	{
+		return ((hmdPosition[1] + vr_height_adjust) * vr_hunits_per_meter) -
+			   (float) (playerHeight >> 8);
+	}
+
+	//Just use offset from origin
+	return ((hmdPosition[1] - hmdOrigin[1]) * vr_hunits_per_meter);
 }
 
 #define isqrt2 0.7071067812f
@@ -237,7 +243,7 @@ DVector3 VREyeInfo::GetViewShift(FRotator viewAngles) const
 
 		eyeOffset[1] += -posforward * vr_hunits_per_meter;
 		eyeOffset[0] += posside * vr_hunits_per_meter;
-		eyeOffset[2] += getHmdAdjustedHeightInMapUnit() - (float)(playerHeight >> 8);
+		eyeOffset[2] += getHmdAdjustedHeightInMapUnit();
 
 		return {eyeOffset[1], eyeOffset[0], eyeOffset[2]};
 	}

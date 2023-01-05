@@ -30,6 +30,8 @@ Prepared for public release, 03/21/2003 - Charlie Wiederhold, 3D Realms
 #include "global.h"
 #include "names_r.h"
 
+extern int playerHeight;
+
 BEGIN_DUKE_NS
 
 void initactorflags_r()
@@ -323,7 +325,7 @@ void initactorflags_r()
 	TILE_BIGORBIT1 = BIGORBIT1;
 	TILE_EGG = EGG;
 
-	gs.playerheight = PHEIGHT_RR;
+	gs.playerheight = playerHeight = PHEIGHT_RR;
 }
 
 END_DUKE_NS
