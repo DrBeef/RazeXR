@@ -35,6 +35,8 @@ extern float cinemamodePitch;
 
 extern bool weaponStabilised;
 
+EXTERN_CVAR(Float, vr_hunits_per_meter)
+
 int getGameState();
 int getMenuState();
 void Joy_GenerateButtonEvents(int oldbuttons, int newbuttons, int numbuttons, int base);
@@ -206,39 +208,15 @@ void HandleInput_Default( int control_scheme, ovrInputStateTrackedRemote *pDomin
 
         //Positional movement
         {
-            ALOGV("        Right-Controller-Position: %f, %f, %f",
-                  pDominantTracking->Pose.position.x,
-                  pDominantTracking->Pose.position.y,
-                  pDominantTracking->Pose.position.z);
-
             vec2_t v;
-            rotateAboutOrigin(positionDeltaThisFrame[0], positionDeltaThisFrame[2],
-                              -(gameYaw - hmdorientation[YAW]), v);
+            rotateAboutOrigin(positionDelta[0], positionDelta[2],
+                              gameYaw+hmdorientation[YAW], v);
             positional_movementSideways = v[1];
             positional_movementForward = v[0];
-
-            ALOGV("        positional_movementSideways: %f, positional_movementForward: %f",
-                  positional_movementSideways,
-                  positional_movementForward);
         }
 
         //Off-hand specific stuff
         {
-            ALOGV("        Left-Controller-Position: %f, %f, %f",
-                  pOffTracking->Pose.position.x,
-                  pOffTracking->Pose.position.y,
-                  pOffTracking->Pose.position.z);
-
-            //Teleport - only does anything if vr_teleport cvar is true
-            if (vr_teleport) {
-                if ((pSecondaryTrackedRemoteOld->Joystick.y > 0.7f) && !ready_teleport) {
-                    ready_teleport = true;
-                } else if ((pSecondaryTrackedRemoteOld->Joystick.y < 0.7f) && ready_teleport) {
-                    ready_teleport = false;
-                    trigger_teleport = true;
-                }
-            }
-
             //Apply a filter and quadratic scaler so small movements are easier to make
             //and we don't get movement jitter when the joystick doesn't quite center properly
             float dist = length(pSecondaryTrackedRemoteNew->Joystick.x, pSecondaryTrackedRemoteNew->Joystick.y);
@@ -389,12 +367,15 @@ void HandleInput_Default( int control_scheme, ovrInputStateTrackedRemote *pDomin
 
         {
             //Weapon/Inventory Chooser
-            int rightJoyState = (pPrimaryTrackedRemoteNew->Joystick.y < -0.7f ? 1 : 0);
-            if (rightJoyState != (pPrimaryTrackedRemoteOld->Joystick.y < -0.7f ? 1 : 0)) {
+            bool newRightJoyState = pPrimaryTrackedRemoteNew->Joystick.y < -0.7f;
+            bool oldRightJoyState = pPrimaryTrackedRemoteOld->Joystick.y < -0.7f;
+            if (newRightJoyState && !oldRightJoyState) {
                 AddCommandString("weapnext");
             }
-            rightJoyState = (pPrimaryTrackedRemoteNew->Joystick.y > 0.7f ? 1 : 0);
-            if (rightJoyState != (pPrimaryTrackedRemoteOld->Joystick.y > 0.7f ? 1 : 0)) {
+
+            newRightJoyState = pPrimaryTrackedRemoteNew->Joystick.y > 0.7f;
+            oldRightJoyState = pPrimaryTrackedRemoteOld->Joystick.y > 0.7f;
+            if (newRightJoyState && !oldRightJoyState) {
                 AddCommandString("weapprev");
             }
         }

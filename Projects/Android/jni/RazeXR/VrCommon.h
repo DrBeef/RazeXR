@@ -43,16 +43,10 @@ extern float cinemamodePitch;
 extern float playerYaw;
 extern bool resetGameYaw;
 extern float gameYaw;
-extern bool resetPreviousPitch;
-extern float previousPitch;
-
-extern float vrFOV;
-
-extern vec3_t worldPosition;
 
 extern vec3_t hmdPosition;
 extern vec3_t hmdorientation;
-extern vec3_t positionDeltaThisFrame;
+extern vec3_t positionDelta;
 
 extern vec3_t weaponangles;
 extern vec3_t weaponoffset;

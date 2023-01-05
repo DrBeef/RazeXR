@@ -110,9 +110,12 @@ void hud_input(int plnum)
 
 	if (!PlayerInputBits(plnum, SB_INTERFACE_BITS))
 		p->interface_toggle_flag = 0;
-	else if (p->interface_toggle_flag == 0)
+	else
 	{
-		p->interface_toggle_flag = 1;
+		if (p->interface_toggle_flag == 0)
+		{
+			p->interface_toggle_flag = 1;
+		}
 
 		// Don't go on if paused or dead.
 		if (paused) return;

@@ -39,14 +39,11 @@ int argc=0;
 long long global_time;
 float playerYaw;
 bool resetGameYaw;
-bool resetPreviousPitch;
 float gameYaw;
-float previousPitch;
-float vrFOV;
-vec3_t worldPosition;
 vec3_t hmdPosition;
+vec3_t hmdOrigin;
 vec3_t hmdorientation;
-vec3_t positionDeltaThisFrame;
+vec3_t positionDelta;
 vec3_t weaponangles;
 vec3_t weaponoffset;
 bool weaponStabilised;
@@ -180,7 +177,7 @@ void VR_SetHMDOrientation(float pitch, float yaw, float roll)
 {
 	VectorSet(hmdorientation, pitch, yaw, roll);
 
-	if (!VR_UseScreenLayer())
+	if (!VR_UseScreenLayer() || playerYaw == 0.0f)
     {
     	playerYaw = yaw;
 	}
@@ -190,13 +187,12 @@ void VR_SetHMDPosition(float x, float y, float z )
 {
  	VectorSet(hmdPosition, x, y, z);
 
-    positionDeltaThisFrame[0] = (worldPosition[0] - x);
-    positionDeltaThisFrame[1] = (worldPosition[1] - y);
-    positionDeltaThisFrame[2] = (worldPosition[2] - z);
+	if (VR_UseScreenLayer() || hmdOrigin[0] == 0.0f)
+	{
+		VectorSet(hmdOrigin, x, y, z);
+	}
 
-    worldPosition[0] = x;
-    worldPosition[1] = y;
-    worldPosition[2] = z;
+	VectorSubtract(hmdPosition, hmdOrigin, positionDelta);
 }
 
 void VR_GetMove(float *joy_forward, float *joy_side, float *hmd_forward, float *hmd_side, float *up,
@@ -216,8 +212,8 @@ void VR_Init()
 {
 	//Initialise all our variables
 	playerYaw = 0.0f;
+	VectorClear(hmdOrigin);
     resetGameYaw = true;
-	resetPreviousPitch = true;
 	remote_movementSideways = 0.0f;
 	remote_movementForward = 0.0f;
 	remote_movementUp = 0.0f;

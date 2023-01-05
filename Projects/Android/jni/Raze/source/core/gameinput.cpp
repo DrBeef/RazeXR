@@ -170,15 +170,13 @@ void processMovement(InputPacket* const currInput, InputPacket* const inputBuffe
 
 	float joyforward=0;
 	float joyside=0;
-	float posforward=0;
-	float posside=0;
 	float yaw=0;
 	float pitch=0;
 	float dummy=0;
 	//static float last_yaw = 0;
-	VR_GetMove(&joyforward, &joyside, &posforward, &posside, &dummy, &yaw, &pitch, &dummy);
-	currInput->fvel += clamp((int)((joyforward + posforward) * keymove), -keymove, keymove) ;
-	currInput->svel += clamp((int)((joyside + posside) * -keymove), -keymove, keymove) ;
+	VR_GetMove(&joyforward, &joyside, &dummy, &dummy, &dummy, &yaw, &pitch, &dummy);
+	currInput->fvel += joyforward * keymove;
+	currInput->svel += joyside * -keymove;
 	//currInput->avel += last_yaw;
 	currInput->avel = -yaw;
 	//last_yaw = yaw;

@@ -50,6 +50,9 @@ Modifications for JonoF's port by Jonathon Fowler (jf@jonof.id.au)
 
 extern TArray<TPointer<MapRecord>> mapList;
 
+extern int playerHeight;
+
+
 BEGIN_DUKE_NS
 
 enum { VERSIONCHECK = 41 };
@@ -407,7 +410,7 @@ bool ConCompiler::ispecial(char c)
 static bool isaltok(char c)
 {
 	// isalnum pukes on negative input.
-	return c > 0 && (isalnum(c) || c == '{' || c == '}' || c == '/' || c == '*' || c == '-' || c == '_' || c == '.');
+	return c > 0 && (isalnum((uint8_t) c) || c == '{' || c == '}' || c == '/' || c == '*' || c == '-' || c == '_' || c == '.');
 }
 
 //---------------------------------------------------------------------------
@@ -532,7 +535,7 @@ void ConCompiler::getlabel(void)
 
 	skipcomments();
 
-	while (isalnum(*textptr & 0xff) == 0)
+	while (isalnum(((uint8_t)*textptr) & 0xff) == 0)
 	{
 		if (*textptr == 0x0a) line_number++;
 		textptr++;
@@ -3174,7 +3177,7 @@ void ConCompiler::setmusic()
 
 void loadcons()
 {
-	gs = {};
+	memset(&gs, 0, sizeof(gs));
 	gs.respawnactortime = 768;
 	gs.bouncemineblastradius = 2500;
 	gs.respawnitemtime = 768;
@@ -3187,7 +3190,7 @@ void loadcons()
 	gs.shrinkerblastradius = 650;
 	gs.gravity = 176;
 	gs.tripbombblastradius = 3880;
-	gs.playerheight = PHEIGHT_DUKE;
+	gs.playerheight = playerHeight = PHEIGHT_DUKE;
 	gs.displayflags = DUKE3D_NO_WIDESCREEN_PINNING;
 
 

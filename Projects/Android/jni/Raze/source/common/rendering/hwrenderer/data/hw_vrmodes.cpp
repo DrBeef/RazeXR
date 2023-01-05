@@ -33,6 +33,9 @@
 #include "i_interface.h"
 #include "RazeXR/mathlib.h"
 
+extern vec3_t hmdPosition;
+extern vec3_t hmdOrigin;
+
 // Set up 3D-specific console variables:
 CVAR(Int, vr_mode, 15, CVAR_GLOBALCONFIG|CVAR_ARCHIVE)
 
@@ -66,6 +69,13 @@ CVAR(Bool, vr_crouch_use_button, true, CVAR_ARCHIVE | CVAR_GLOBALCONFIG)
 
 CVAR(Float, vr_pickup_haptic_level, 0.2, CVAR_ARCHIVE | CVAR_GLOBALCONFIG)
 CVAR(Float, vr_quake_haptic_level, 0.8, CVAR_ARCHIVE | CVAR_GLOBALCONFIG)
+
+int playerHeight = 0.0f;
+
+float getHmdAdjustedHeightInMapUnit()
+{
+	return ((hmdPosition[1] + vr_height_adjust) * vr_hunits_per_meter);
+}
 
 #define isqrt2 0.7071067812f
 static VRMode vrmi_mono = { 1, 1.f, 1.f, 1.f,{ { 0.f, 1.f },{ 0.f, 0.f } } };
@@ -197,6 +207,9 @@ VSMatrix VREyeInfo::GetProjection(float fov, float aspectRatio, float fovRatio) 
 	}
 }
 
+void VR_GetMove(float *joy_forward, float *joy_side, float *hmd_forward, float *hmd_side, float *up,
+				float *yaw, float *pitch, float *roll);
+
 /* virtual */
 DVector3 VREyeInfo::GetViewShift(FRotator viewAngles) const
 {
@@ -216,9 +229,15 @@ DVector3 VREyeInfo::GetViewShift(FRotator viewAngles) const
 		vec3_t tmp;
 		VectorScale(v_right, getShift(), tmp);
 
+		float posforward=0;
+		float posside=0;
+		float dummy=0;
+		VR_GetMove(&dummy, &dummy, &posforward, &posside, &dummy, &dummy, &dummy, &dummy);
 		DVector3 eyeOffset(tmp[0], tmp[1], tmp[2]);
 
-		//eyeOffset[2] += getHmdAdjustedHeightInMapUnit() - getDoomPlayerHeightWithoutCrouch(&player);
+		eyeOffset[1] += -posforward * vr_hunits_per_meter;
+		eyeOffset[0] += posside * vr_hunits_per_meter;
+		eyeOffset[2] += getHmdAdjustedHeightInMapUnit() - (float)(playerHeight >> 8);
 
 		return {eyeOffset[1], eyeOffset[0], eyeOffset[2]};
 	}
