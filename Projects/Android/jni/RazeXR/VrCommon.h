@@ -41,8 +41,8 @@ extern float cinemamodeYaw;
 extern float cinemamodePitch;
 
 extern float playerYaw;
-extern bool resetDoomYaw;
-extern float doomYaw;
+extern bool resetGameYaw;
+extern float gameYaw;
 extern bool resetPreviousPitch;
 extern float previousPitch;
 

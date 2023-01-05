@@ -25,6 +25,8 @@
 **
 */
 
+#include <gamestate.h>
+#include <menustate.h>
 #include "gi.h"
 #include "build.h"
 #include "v_draw.h"
@@ -59,6 +61,9 @@ float GlobalFogDensity = 350.f;
 TArray<PortalDesc> allPortals;
 void Draw2D(F2DDrawer* drawer, FRenderState& state);
 
+extern bool resetGameYaw;
+extern float gameYaw;
+extern bool cinemamode;
 
 #if 0
 void CollectLights(FLevelLocals* Level)
@@ -139,6 +144,7 @@ void RenderViewpoint(FRenderViewpoint& mainvp, IntRect* bounds, float fov, float
 
 		auto di = HWDrawInfo::StartDrawInfo(nullptr, mainvp, nullptr);
 		di->SetVisibility();
+		di->eye = eye_ix;
 		auto& vp = di->Viewpoint;
 		vp = mainvp;
 
@@ -188,15 +194,44 @@ void RenderViewpoint(FRenderViewpoint& mainvp, IntRect* bounds, float fov, float
 
 FRenderViewpoint SetupViewpoint(DCoreActor* cam, const vec3_t& position, int sectnum, binangle angle, fixedhoriz horizon, binangle rollang)
 {
-	float dummy, pitch, roll;
-	VR_GetMove(&dummy, &dummy, &dummy, &dummy, &dummy, &dummy, &pitch, &roll);
+	float dummy, yaw, pitch, roll;
+	VR_GetMove(&dummy, &dummy, &dummy, &dummy, &dummy, &yaw, &pitch, &roll);
+
+	//Some crazy stuff to ascertain the actual yaw that doom is using at the right times!
+	if (gamestate != GS_LEVEL || menuactive	!= MENU_Off)
+	{
+		gameYaw = (float)-90.f + angle.asdeg();
+		resetGameYaw = true;
+	}
+	else if (gamestate == GS_LEVEL && resetGameYaw) {
+		gameYaw = (float)-90.f + angle.asdeg();
+		resetGameYaw = false;
+	}
+
+	//Yaw
+	double hmdYawDeltaDegrees;
+	{
+		static double previousHmdYaw = 0;
+		static bool havePreviousYaw = false;
+		if (!havePreviousYaw) {
+			previousHmdYaw = yaw;
+			havePreviousYaw = true;
+		}
+		hmdYawDeltaDegrees = yaw - previousHmdYaw;
+		previousHmdYaw = yaw;
+	}
+
+	if (!cinemamode && gamestate == GS_LEVEL && menuactive == MENU_Off)
+	{
+		gameYaw -= hmdYawDeltaDegrees;
+	}
 
 	FRenderViewpoint r_viewpoint{};
 	r_viewpoint.CameraActor = cam;
 	r_viewpoint.SectNums = nullptr;
 	r_viewpoint.SectCount = sectnum;
 	r_viewpoint.Pos = { position.X / 16.f, position.Y / -16.f, position.Z / -256.f };
-	r_viewpoint.HWAngles.Yaw = -90.f + angle.asdeg();
+	r_viewpoint.HWAngles.Yaw = gameYaw;
 	r_viewpoint.HWAngles.Pitch = pitch;
 	r_viewpoint.HWAngles.Roll = roll;
 	r_viewpoint.FieldOfView = (float)RazeXR_GetFOV();

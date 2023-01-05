@@ -795,7 +795,7 @@ static void FinalizeInput(player_struct *p, InputPacket& input)
 
 		if (p->newOwner != nullptr || (p->sync.actions & SB_CENTERVIEW && abs(p->horizon.horiz.asbuild()) > 5))
 		{
-			loc.horz = input.horz = 0;
+			//loc.horz = input.horz = 0;
 		}
 	}
 }

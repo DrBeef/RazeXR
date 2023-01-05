@@ -170,18 +170,22 @@ void processMovement(InputPacket* const currInput, InputPacket* const inputBuffe
 
 	float joyforward=0;
 	float joyside=0;
+	float posforward=0;
+	float posside=0;
 	float yaw=0;
+	float pitch=0;
 	float dummy=0;
-	static float last_yaw = 0;
-	VR_GetMove(&joyforward, &joyside, &dummy, &dummy, &dummy, &yaw, &dummy, &dummy);
-	currInput->fvel += joyforward * keymove;
-	currInput->svel += -joyside * keymove;
-	currInput->avel -= (AngleToFloat(buildfang(-last_yaw).signedbam()) / BAngToDegree);
-	currInput->avel += (AngleToFloat(buildfang(-yaw).signedbam()) / BAngToDegree);
-	last_yaw = yaw;
+	//static float last_yaw = 0;
+	VR_GetMove(&joyforward, &joyside, &posforward, &posside, &dummy, &yaw, &pitch, &dummy);
+	currInput->fvel += clamp((int)((joyforward + posforward) * keymove), -keymove, keymove) ;
+	currInput->svel += clamp((int)((joyside + posside) * -keymove), -keymove, keymove) ;
+	//currInput->avel += last_yaw;
+	currInput->avel = -yaw;
+	//last_yaw = yaw;
+	currInput->horz = -pitch;
 
 	// process remaining controller input.
-	currInput->horz -= float(scaleAdjust * hidInput->dpitch * hidspeed);
+	//currInput->horz -= float(scaleAdjust * hidInput->dpitch * hidspeed);
 	currInput->svel += xs_CRoundToInt(scaleAdjust * hidInput->dx * keymove * hidprescale);
 	currInput->fvel += xs_CRoundToInt(scaleAdjust * hidInput->dz * keymove * hidprescale);
 
@@ -258,7 +262,7 @@ void processMovement(InputPacket* const currInput, InputPacket* const inputBuffe
 	inputBuffer->fvel = clamp(inputBuffer->fvel + currInput->fvel, -keymove, keymove);
 	inputBuffer->svel = clamp(inputBuffer->svel + currInput->svel, -keymove, keymove);
 	inputBuffer->avel += currInput->avel;
-	inputBuffer->horz += currInput->horz;
+	inputBuffer->horz = currInput->horz;
 }
 
 //---------------------------------------------------------------------------
@@ -296,8 +300,9 @@ void PlayerHorizon::applyinput(float const horz, ESyncBits* actions, double cons
 	// Process only if movewment isn't locked.
 	if (!movementlocked())
 	{
+		horiz = pitchhoriz(horz);
 		// Test if we have input to process.
-		if (horz || *actions & (SB_AIM_UP | SB_AIM_DOWN | SB_LOOK_UP | SB_LOOK_DOWN))
+/*		if (horz || *actions & (SB_AIM_UP | SB_AIM_DOWN | SB_LOOK_UP | SB_LOOK_DOWN))
 		{
 			// Store current horizon as true pitch.
 			double pitch = horiz.aspitch();
@@ -328,7 +333,7 @@ void PlayerHorizon::applyinput(float const horz, ESyncBits* actions, double cons
 			doKbdInput(SB_LOOK_UP, SB_LOOK_DOWN, LOOKSPEED, false);
 
 			// clamp before converting back to horizon
-			horiz = q16horiz(clamp(PitchToHoriz(pitch), gi->playerHorizMin(), gi->playerHorizMax()));
+			//horiz = q16horiz(clamp(PitchToHoriz(pitch), gi->playerHorizMin(), gi->playerHorizMax()));
 		}
 
 		// return to center if conditions met.
@@ -337,6 +342,7 @@ void PlayerHorizon::applyinput(float const horz, ESyncBits* actions, double cons
 			scaletozero(horiz, CNTRSPEED, scaleAdjust);
 			if (!horiz.asq16()) *actions &= ~SB_CENTERVIEW;
 		}
+		*/
 	}
 	else
 	{
@@ -413,7 +419,8 @@ void PlayerAngle::applyinput(float const avel, ESyncBits* actions, double const 
 		if (avel)
 		{
 			// add player's input
-			ang += degang(avel);
+			//ang += degang(avel);
+			ang = degang(avel);
 		}
 
 		if (spin < 0)

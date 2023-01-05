@@ -38,9 +38,9 @@ int argc=0;
 //Define all variables here that were externs in the VrCommon.h
 long long global_time;
 float playerYaw;
-bool resetDoomYaw;
+bool resetGameYaw;
 bool resetPreviousPitch;
-float doomYaw;
+float gameYaw;
 float previousPitch;
 float vrFOV;
 vec3_t worldPosition;
@@ -216,7 +216,7 @@ void VR_Init()
 {
 	//Initialise all our variables
 	playerYaw = 0.0f;
-    resetDoomYaw = true;
+    resetGameYaw = true;
 	resetPreviousPitch = true;
 	remote_movementSideways = 0.0f;
 	remote_movementForward = 0.0f;
@@ -296,7 +296,7 @@ void * AppThreadFunction(void * parm ) {
 //All the stuff we want to do each frame specifically for this game
 void VR_FrameSetup()
 {
-
+	RazeXR_SetRefreshRate(REFRESH);
 }
 
 bool VR_GetVRProjection(int eye, float zNear, float zFar, float* projection)
