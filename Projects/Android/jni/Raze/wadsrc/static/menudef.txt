@@ -1098,6 +1098,8 @@ OptionMenu "VideoOptions" protected
 	Slider "$DSPLYMNU_AMBIENT_LIGHT",			"r_ambientlight",  				0.5, 4.0, 0.1
 
 	StaticText ""
+	Option "Show FPS",					        "vid_fps",						"OnOff"
+	Option "Draw Sky",					        "draw_sky",						"OnOff"
 	Option "$DSPLYMNU_VOXELS",					"r_voxels",						"OnOff"
 	Option "$DSPLYMNU_SHADOWS",					"r_shadows",					"OnOff"
 	Option "$DSPLYMNU_SLOPETILT",				"cl_slopetilting",				"OnOff"
@@ -1111,7 +1113,6 @@ OptionMenu "VideoOptions" protected
 		Option "$DSPLYMNU_VIEWBOB",					"cl_viewvbob",					"OnOff"
 		Option "$DSPLYMNU_VIEWSWAY",				"cl_viewhbob",					"OnOff"
 	}
-	Slider "$DSPLYMNU_FOV",						"r_fov",						60, 130, 10, 1
 
 	StaticText ""
 	Option "$GLPREFMNU_RENDERQUALITY",			gl_seamless,					"Precision"
