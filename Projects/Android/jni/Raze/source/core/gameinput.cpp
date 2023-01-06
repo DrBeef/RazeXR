@@ -140,7 +140,7 @@ enum
 
 void VR_GetMove(float *joy_forward, float *joy_side, float *hmd_forward, float *hmd_side, float *up,
 				float *yaw, float *pitch, float *roll);
-
+extern bool resetGameYaw;
 
 void processMovement(InputPacket* const currInput, InputPacket* const inputBuffer, ControlInfo* const hidInput, double const scaleAdjust, int const drink_amt, bool const allowstrafe, double const turnscale)
 {
@@ -386,6 +386,12 @@ enum
 
 void PlayerAngle::applyinput(float const avel, ESyncBits* actions, double const scaleAdjust)
 {
+	if (look_ang.asdeg() != 0.0f ||
+			rotscrnang.asdeg() != 0.0f)
+	{
+		resetGameYaw = true;
+	}
+
 	// Process angle return to zeros.
 	scaletozero(rotscrnang, LOOKROTRETBASE, scaleAdjust);
 	scaletozero(look_ang, +LOOKROTRETBASE * 0.5, scaleAdjust);
@@ -433,10 +439,12 @@ void PlayerAngle::applyinput(float const avel, ESyncBits* actions, double const 
 				spin = 0;
 			}
 			ang += buildfang(add);
+			resetGameYaw = true;
 		}
 	}
 	else
 	{
+		resetGameYaw = true;
 		spin = 0;
 	}
 }

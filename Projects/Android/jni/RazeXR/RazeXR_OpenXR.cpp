@@ -219,7 +219,7 @@ void VR_Init()
 	remote_movementUp = 0.0f;
 	positional_movementSideways = 0.0f;
 	positional_movementForward = 0.0f;
-	snapTurn = 0.0f;
+	snapTurn = 180.0f;
 	cinemamodeYaw = 0.0f;
 	cinemamodePitch = 0.0f;
 

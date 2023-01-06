@@ -199,10 +199,16 @@ void HWDrawInfo::ClearBuffers()
 //
 //-----------------------------------------------------------------------------
 
+void VR_GetMove(float *joy_forward, float *joy_side, float *hmd_forward, float *hmd_side, float *up,
+				float *yaw, float *pitch, float *roll);
+
 angle_t HWDrawInfo::FrustumAngle()
 {
+	float dummy, yaw, pitch, roll;
+	VR_GetMove(&dummy, &dummy, &dummy, &dummy, &dummy, &yaw, &pitch, &roll);
+
 	float WidescreenRatio = (float)screen->GetWidth() / screen->GetHeight();
-	float tilt = fabs(Viewpoint.HWAngles.Pitch.Degrees);
+	float tilt = fabs(pitch);
 
 	// If the pitch is larger than this you can look all around at a FOV of 90°
 	if (tilt > 46.0f) return 0xffffffff;
