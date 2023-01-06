@@ -34,7 +34,6 @@ Projects/Android/.externalNativeBuild/*
 Projects/Android/.gradle/*
 *.ser
 Projects/Android/.idea/codeStyles/Project.xml
-*.xml
 Projects/Android/.gradle/*
 drbeef-release-key.keystore
 Projects/Android/.idea/.name
