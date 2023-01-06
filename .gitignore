@@ -19,7 +19,7 @@ $RECYCLE.BIN/
 *.so
 
 #libs
-*.a
+#*.a
 
 #files created by build
 *.apk
