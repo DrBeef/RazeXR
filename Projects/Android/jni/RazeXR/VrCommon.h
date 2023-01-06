@@ -45,6 +45,7 @@ extern bool resetGameYaw;
 extern float gameYaw;
 
 extern vec3_t hmdPosition;
+extern vec3_t hmdOrigin;
 extern vec3_t hmdorientation;
 extern vec3_t positionDelta;
 

@@ -246,7 +246,7 @@ void HandleInput_Default( int control_scheme, ovrInputStateTrackedRemote *pDomin
                 static int increaseSnap = true;
                 if (pPrimaryTrackedRemoteNew->Joystick.x > 0.6f) {
                     if (increaseSnap) {
-                        //resetGameYaw = true;
+                        VectorCopy(hmdPosition, hmdOrigin);
                         snapTurn -= vr_snapTurn;
                         if (vr_snapTurn > 10.0f) {
                             increaseSnap = false;
@@ -263,7 +263,7 @@ void HandleInput_Default( int control_scheme, ovrInputStateTrackedRemote *pDomin
                 static int decreaseSnap = true;
                 if (pPrimaryTrackedRemoteNew->Joystick.x < -0.6f) {
                     if (decreaseSnap) {
-                        //resetGameYaw = true;
+                        VectorCopy(hmdPosition, hmdOrigin);
                         snapTurn += vr_snapTurn;
 
                         //If snap turn configured for less than 10 degrees
@@ -481,13 +481,13 @@ void HandleInput_Default( int control_scheme, ovrInputStateTrackedRemote *pDomin
                     !dominantGripPushedNew ? 1 : 0,
                     1, KEY_LSHIFT);
 
-            //No Default Binding
+            //Inv Next
             Joy_GenerateButtonEvents(
                     ((secondaryButtonsOld & secondaryButton1) != 0) && !dominantGripPushedOld ? 1
                                                                                               : 0,
                     ((secondaryButtonsNew & secondaryButton1) != 0) && !dominantGripPushedNew ? 1
                                                                                               : 0,
-                    1, KEY_PAD_X);
+                    1, KEY_PAD_DPAD_RIGHT);
 
             //Toggle Map
             Joy_GenerateButtonEvents(
@@ -497,13 +497,13 @@ void HandleInput_Default( int control_scheme, ovrInputStateTrackedRemote *pDomin
                                                                                               : 0,
                     1, KEY_TAB);
 
-            //"Use" (open door, toggle switch etc) - Can be rebound for other uses
+            //Inventory Use
             Joy_GenerateButtonEvents(
                     ((pOffTrackedRemoteOld->Buttons & xrButton_Joystick) != 0) &&
                     !dominantGripPushedOld ? 1 : 0,
                     ((pOffTrackedRemoteNew->Buttons & xrButton_Joystick) != 0) &&
                     !dominantGripPushedNew ? 1 : 0,
-                    1, KEY_SPACE);
+                    1, KEY_ENTER);
 
             //No Default Binding
             Joy_GenerateButtonEvents(

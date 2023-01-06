@@ -61,9 +61,9 @@ CVAR(Float, vr_snapTurn, 45.0f, CVAR_ARCHIVE | CVAR_GLOBALCONFIG)
 CVAR(Int, vr_move_speed, 19, CVAR_ARCHIVE | CVAR_GLOBALCONFIG)
 CVAR(Float, vr_run_multiplier, 1.5, CVAR_ARCHIVE | CVAR_GLOBALCONFIG)
 CVAR(Bool, vr_switch_sticks, false, CVAR_ARCHIVE | CVAR_GLOBALCONFIG)
-CVAR(Bool, vr_secondary_button_mappings, true, CVAR_ARCHIVE | CVAR_GLOBALCONFIG)
+CVAR(Bool, vr_secondary_button_mappings, false, CVAR_ARCHIVE | CVAR_GLOBALCONFIG)
 CVAR(Bool, vr_two_handed_weapons, true, CVAR_ARCHIVE | CVAR_GLOBALCONFIG)
-CVAR(Bool, vr_momentum, false, CVAR_ARCHIVE | CVAR_GLOBALCONFIG) // Only used in player.zs
+CVAR(Bool, vr_positional_tracking, true, CVAR_ARCHIVE | CVAR_GLOBALCONFIG)
 CVAR(Bool, vr_crouch_use_button, true, CVAR_ARCHIVE | CVAR_GLOBALCONFIG)
 
 CVAR(Float, vr_pickup_haptic_level, 0.2, CVAR_ARCHIVE | CVAR_GLOBALCONFIG)
@@ -241,9 +241,12 @@ DVector3 VREyeInfo::GetViewShift(FRotator viewAngles) const
 		VR_GetMove(&dummy, &dummy, &posforward, &posside, &dummy, &dummy, &dummy, &dummy);
 		DVector3 eyeOffset(tmp[0], tmp[1], tmp[2]);
 
-		eyeOffset[1] += -posforward * vr_hunits_per_meter;
-		eyeOffset[0] += posside * vr_hunits_per_meter;
-		eyeOffset[2] += getHmdAdjustedHeightInMapUnit();
+		if (vr_positional_tracking)
+		{
+			eyeOffset[1] += -posforward * vr_hunits_per_meter;
+			eyeOffset[0] += posside * vr_hunits_per_meter;
+			eyeOffset[2] += getHmdAdjustedHeightInMapUnit();
+		}
 
 		return {eyeOffset[1], eyeOffset[0], eyeOffset[2]};
 	}

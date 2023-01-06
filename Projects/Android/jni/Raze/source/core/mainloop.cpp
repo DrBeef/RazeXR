@@ -163,7 +163,7 @@ void NewGame(MapRecord* map, int skill, bool ns = false)
 //
 //
 //==========================================================================
-
+void VR_Init();
 static void GameTicker()
 {
 	int i;
@@ -193,6 +193,7 @@ static void GameTicker()
 				NewGame(g_nextmap, -1);
 				BackupSaveGame = "";
 			}
+			VR_Init();
 			break;
 
 		case ga_completed:
@@ -207,10 +208,12 @@ static void GameTicker()
 			gi->NextLevel(g_nextmap, g_nextskill);
 			ResetStatusBar();
 			Net_ClearFifo();
+			VR_Init();
 			break;
 
 		case ga_newgame:
 			FX_StopAllSounds();
+			VR_Init();
 			[[fallthrough]];
 		case ga_newgamenostopsound:
 			DeleteScreenJob();
@@ -220,6 +223,7 @@ static void GameTicker()
 			gameaction = ga_level;
 			BackupSaveGame = "";
 			NewGame(g_nextmap, g_nextskill, ga == ga_newgamenostopsound);
+			VR_Init();
 			break;
 
 		case ga_startup:
@@ -260,6 +264,7 @@ static void GameTicker()
 		case ga_loadgamehidecon:
 		//case ga_autoloadgame:
 			G_DoLoadGame();
+			VR_Init(); // reset VR stuff
 			break;
 
 		case ga_autosave:

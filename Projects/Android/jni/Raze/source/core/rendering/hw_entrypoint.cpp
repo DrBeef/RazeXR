@@ -198,14 +198,18 @@ FRenderViewpoint SetupViewpoint(DCoreActor* cam, const vec3_t& position, int sec
 	VR_GetMove(&dummy, &dummy, &dummy, &dummy, &dummy, &yaw, &pitch, &roll);
 
 	//Some crazy stuff to ascertain the actual yaw that doom is using at the right times!
-	if (gamestate != GS_LEVEL || menuactive	!= MENU_Off)
-	{
-		gameYaw = (float)-90.f + angle.asdeg();
-		resetGameYaw = true;
-	}
-	else if (gamestate == GS_LEVEL && resetGameYaw) {
+	static int resetCount = 0;
+	if (gamestate == GS_LEVEL && (resetGameYaw || resetCount > 0)) {
 		gameYaw = (float)-90.f + angle.asdeg();
 		resetGameYaw = false;
+		if (resetCount == 0)
+		{
+			resetCount = 3; // reset a few times
+		}
+		else
+		{
+			resetCount--;
+		}
 	}
 
 	//Yaw
@@ -221,7 +225,7 @@ FRenderViewpoint SetupViewpoint(DCoreActor* cam, const vec3_t& position, int sec
 		previousHmdYaw = yaw;
 	}
 
-	if (!cinemamode && gamestate == GS_LEVEL && menuactive == MENU_Off)
+	if (!cinemamode && gamestate == GS_LEVEL)
 	{
 		gameYaw -= hmdYawDeltaDegrees;
 	}
