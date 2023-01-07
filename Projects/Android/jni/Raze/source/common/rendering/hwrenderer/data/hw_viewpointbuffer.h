@@ -20,6 +20,7 @@ class HWViewpointBuffer
 	TArray<bool> mClipPlaneInfo;
 
 	int m2DWidth = -1, m2DHeight = -1;
+	float m2DScale = -1;
 
 	unsigned int mBlockSize;
 

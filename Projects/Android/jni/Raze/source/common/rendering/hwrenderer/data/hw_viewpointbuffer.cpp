@@ -30,6 +30,8 @@
 #include "hw_renderstate.h"
 #include "hw_viewpointbuffer.h"
 #include "hw_cvars.h"
+#include "menustate.h" // Hack?!
+#include "gamestate.h" // Hack?!
 
 static const int INITIAL_BUFFER_SIZE = 100;	// 100 viewpoints per frame should nearly always be enough
 
@@ -84,7 +86,8 @@ int HWViewpointBuffer::Bind(FRenderState &di, unsigned int index)
 
 void HWViewpointBuffer::Set2D(FRenderState &di, int width, int height, int pll)
 {
-	if (width != m2DWidth || height != m2DHeight)
+	float scale = (menuactive != MENU_Off || gamestate != GS_LEVEL) ? 1.0f : 1.1f;
+	if (width != m2DWidth || height != m2DHeight || scale != m2DScale)
 	{
 		HWViewpointUniforms matrices;
 
@@ -96,7 +99,9 @@ void HWViewpointBuffer::Set2D(FRenderState &di, int width, int height, int pll)
 		matrices.mClipLine.X = -10000000.0f;
 		matrices.mShadowmapFilter = gl_shadowmap_filter;
 
-		matrices.mProjectionMatrix.ortho(0, (float)width, (float)height, 0, -1.0f, 1.0f);
+		int left = (int)(width * (1.0f - scale));
+		int top = (int)(height * (1.0f - scale));
+		matrices.mProjectionMatrix.ortho(left, (float)width * scale, (float)height * scale, top, -1.0f, 1.0f);
 		matrices.CalcDependencies();
 
 		for (int n = 0; n < mPipelineNbr; n++)
@@ -108,6 +113,7 @@ void HWViewpointBuffer::Set2D(FRenderState &di, int width, int height, int pll)
 
 		m2DWidth = width;
 		m2DHeight = height;
+		m2DScale = scale;
 		mLastMappedIndex = -1;
 	}
 	Bind(di, 0);
