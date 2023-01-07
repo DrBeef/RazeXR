@@ -338,50 +338,6 @@ void HandleInput_Default( int control_scheme, ovrInputStateTrackedRemote *pDomin
     }
     else
     {
-        //if in cinema mode, then the dominant joystick is used differently
-        if (!cinemamode)
-        {
-            //Default this is Weapon Chooser - This _could_ be remapped
-            Joy_GenerateButtonEvents(
-                    (pPrimaryTrackedRemoteOld->Joystick.y < -0.7f && !dominantGripPushedOld ? 1 : 0),
-                    (pPrimaryTrackedRemoteNew->Joystick.y < -0.7f && !dominantGripPushedNew ? 1 : 0),
-                    1, KEY_MWHEELUP);
-
-            //Default this is Weapon Chooser - This _could_ be remapped
-            Joy_GenerateButtonEvents(
-                    (pPrimaryTrackedRemoteOld->Joystick.y > 0.7f && !dominantGripPushedOld ? 1 : 0),
-                    (pPrimaryTrackedRemoteNew->Joystick.y > 0.7f && !dominantGripPushedNew ? 1 : 0),
-                    1, KEY_MWHEELDOWN);
-
-            //If snap turn set to 0, then we can use left/right on the stick as mappable functions
-            Joy_GenerateButtonEvents(
-                    (pPrimaryTrackedRemoteOld->Joystick.x > 0.7f && !dominantGripPushedOld && !vr_snapTurn ? 1 : 0),
-                    (pPrimaryTrackedRemoteNew->Joystick.x > 0.7f && !dominantGripPushedNew && !vr_snapTurn ? 1 : 0),
-                    1, KEY_MWHEELLEFT);
-
-            Joy_GenerateButtonEvents(
-                    (pPrimaryTrackedRemoteOld->Joystick.x < -0.7f && !dominantGripPushedOld && !vr_snapTurn ? 1 : 0),
-                    (pPrimaryTrackedRemoteNew->Joystick.x < -0.7f && !dominantGripPushedNew && !vr_snapTurn ? 1 : 0),
-                    1, KEY_MWHEELRIGHT);
-        }
-
-        {
-            //Weapon/Inventory Chooser
-            bool newRightJoyState = pPrimaryTrackedRemoteNew->Joystick.y < -0.7f;
-            bool oldRightJoyState = pPrimaryTrackedRemoteOld->Joystick.y < -0.7f;
-            if (newRightJoyState && !oldRightJoyState) {
-                AddCommandString("weapnext");
-            }
-
-            newRightJoyState = pPrimaryTrackedRemoteNew->Joystick.y > 0.7f;
-            oldRightJoyState = pPrimaryTrackedRemoteOld->Joystick.y > 0.7f;
-            if (newRightJoyState && !oldRightJoyState) {
-                AddCommandString("weapprev");
-            }
-        }
-
-
-
         //Dominant Hand - Primary keys (no grip pushed) - All keys are re-mappable, default bindngs are shown below
         {
             //Fire
@@ -392,25 +348,25 @@ void HandleInput_Default( int control_scheme, ovrInputStateTrackedRemote *pDomin
                     !dominantGripPushedNew ? 1 : 0,
                     1, KEY_MOUSE1);
 
-            //Crouch
+            //Jump
             Joy_GenerateButtonEvents(
                     ((primaryButtonsOld & primaryButton1) != 0) && !dominantGripPushedOld ? 1 : 0,
                     ((primaryButtonsNew & primaryButton1) != 0) && !dominantGripPushedNew ? 1 : 0,
-                    1, KEY_LCTRL);
-
-            //Jump
-            Joy_GenerateButtonEvents(
-                    ((primaryButtonsOld & primaryButton2) != 0) && !dominantGripPushedOld ? 1 : 0,
-                    ((primaryButtonsNew & primaryButton2) != 0) && !dominantGripPushedNew ? 1 : 0,
                     1, KEY_SPACE);
 
             // Open Door
+            Joy_GenerateButtonEvents(
+                    ((primaryButtonsOld & primaryButton2) != 0) && !dominantGripPushedOld ? 1 : 0,
+                    ((primaryButtonsNew & primaryButton2) != 0) && !dominantGripPushedNew ? 1 : 0,
+                    1, KEY_PAD_A);
+
+            //Crouch
             Joy_GenerateButtonEvents(
                     ((pDominantTrackedRemoteOld->Buttons & xrButton_Joystick) != 0) &&
                     !dominantGripPushedOld ? 1 : 0,
                     ((pDominantTrackedRemoteNew->Buttons & xrButton_Joystick) != 0) &&
                     !dominantGripPushedNew ? 1 : 0,
-                    1, KEY_PAD_A);
+                    1, KEY_LCTRL);
 
             //No Default Binding
             Joy_GenerateButtonEvents(
@@ -418,21 +374,21 @@ void HandleInput_Default( int control_scheme, ovrInputStateTrackedRemote *pDomin
                     !dominantGripPushedOld ? 1 : 0,
                     ((pDominantTrackedRemoteNew->Touches & xrButton_ThumbRest) != 0) &&
                     !dominantGripPushedNew ? 1 : 0,
-                    1, KEY_JOY5);
+                    1, KEY_PAD_B);
 
         }
 
         //Dominant Hand - Secondary keys (grip pushed)
         {
-            //Alt-Fire
+            //No Binding
             Joy_GenerateButtonEvents(
                     ((pDominantTrackedRemoteOld->Buttons & xrButton_Trigger) != 0) &&
                     dominantGripPushedOld ? 1 : 0,
                     ((pDominantTrackedRemoteNew->Buttons & xrButton_Trigger) != 0) &&
                     dominantGripPushedNew ? 1 : 0,
-                    1, KEY_PAD_LTRIGGER);
+                    1, KEY_PAD_RSHOULDER);
 
-            //Crouch
+            //No Binding
             Joy_GenerateButtonEvents(
                     ((primaryButtonsOld & primaryButton1) != 0) && dominantGripPushedOld ? 1 : 0,
                     ((primaryButtonsNew & primaryButton1) != 0) && dominantGripPushedNew ? 1 : 0,
@@ -450,7 +406,7 @@ void HandleInput_Default( int control_scheme, ovrInputStateTrackedRemote *pDomin
                     dominantGripPushedOld ? 1 : 0,
                     ((pDominantTrackedRemoteNew->Buttons & xrButton_Joystick) != 0) &&
                     dominantGripPushedNew ? 1 : 0,
-                    1, KEY_TAB);
+                    1, KEY_PAD_LSHOULDER);
 
             //No Default Binding
             Joy_GenerateButtonEvents(
@@ -460,34 +416,33 @@ void HandleInput_Default( int control_scheme, ovrInputStateTrackedRemote *pDomin
                     dominantGripPushedNew ? 1 : 0,
                     1, KEY_JOY6);
 
-            //Use grip as an extra button
-            //Alt-Fire
+            //No Default Binding
             Joy_GenerateButtonEvents(
                     ((pDominantTrackedRemoteOld->Buttons & xrButton_GripTrigger) != 0) &&
                     !dominantGripPushedOld ? 1 : 0,
                     ((pDominantTrackedRemoteNew->Buttons & xrButton_GripTrigger) != 0) &&
                     !dominantGripPushedNew ? 1 : 0,
-                    1, KEY_PAD_LTRIGGER);
+                    1, KEY_JOY4);
         }
 
 
         //Off Hand - Primary keys (no grip pushed)
         {
-            //No Default Binding
+            //Alt Fire
             Joy_GenerateButtonEvents(
                     ((pOffTrackedRemoteOld->Buttons & xrButton_Trigger) != 0) &&
                     !dominantGripPushedOld ? 1 : 0,
                     ((pOffTrackedRemoteNew->Buttons & xrButton_Trigger) != 0) &&
                     !dominantGripPushedNew ? 1 : 0,
-                    1, KEY_LSHIFT);
+                    1, KEY_PAD_LTRIGGER);
 
-            //Inv Next
+            //Inventory Use
             Joy_GenerateButtonEvents(
                     ((secondaryButtonsOld & secondaryButton1) != 0) && !dominantGripPushedOld ? 1
                                                                                               : 0,
                     ((secondaryButtonsNew & secondaryButton1) != 0) && !dominantGripPushedNew ? 1
                                                                                               : 0,
-                    1, KEY_PAD_DPAD_RIGHT);
+                    1, KEY_ENTER);
 
             //Toggle Map
             Joy_GenerateButtonEvents(
@@ -497,13 +452,13 @@ void HandleInput_Default( int control_scheme, ovrInputStateTrackedRemote *pDomin
                                                                                               : 0,
                     1, KEY_TAB);
 
-            //Inventory Use
+            //No Default Binding
             Joy_GenerateButtonEvents(
                     ((pOffTrackedRemoteOld->Buttons & xrButton_Joystick) != 0) &&
                     !dominantGripPushedOld ? 1 : 0,
                     ((pOffTrackedRemoteNew->Buttons & xrButton_Joystick) != 0) &&
                     !dominantGripPushedNew ? 1 : 0,
-                    1, KEY_ENTER);
+                    1, KEY_PAD_RTHUMB);
 
             //No Default Binding
             Joy_GenerateButtonEvents(
@@ -513,12 +468,13 @@ void HandleInput_Default( int control_scheme, ovrInputStateTrackedRemote *pDomin
                     !dominantGripPushedNew ? 1 : 0,
                     1, KEY_JOY7);
 
+            // "Run"
             Joy_GenerateButtonEvents(
                     ((pOffTrackedRemoteOld->Buttons & xrButton_GripTrigger) != 0) &&
                     !dominantGripPushedOld ? 1 : 0,
                     ((pOffTrackedRemoteNew->Buttons & xrButton_GripTrigger) != 0) &&
                     !dominantGripPushedNew ? 1 : 0,
-                    1, KEY_PAD_RTHUMB);
+                    1, KEY_LSHIFT);
         }
 
         //Off Hand - Secondary keys (grip pushed)
@@ -563,6 +519,7 @@ void HandleInput_Default( int control_scheme, ovrInputStateTrackedRemote *pDomin
                     dominantGripPushedNew ? 1 : 0,
                     1, KEY_JOY8);
 
+            //No Default Binding
             Joy_GenerateButtonEvents(
                     ((pOffTrackedRemoteOld->Buttons & xrButton_GripTrigger) != 0) &&
                     dominantGripPushedOld && !vr_two_handed_weapons ? 1 : 0,
@@ -601,15 +558,17 @@ void HandleInput_Default( int control_scheme, ovrInputStateTrackedRemote *pDomin
                 (pSecondaryTrackedRemoteNew->Joystick.y > 0.7f && !dominantGripPushedNew ? 1 : 0),
                 1, KEY_JOYAXIS2PLUS);
 
+        //weapprev
         Joy_GenerateButtonEvents(
                 (pPrimaryTrackedRemoteOld->Joystick.y < -0.7f && !dominantGripPushedOld ? 1 : 0),
                 (pPrimaryTrackedRemoteNew->Joystick.y < -0.7f && !dominantGripPushedNew ? 1 : 0),
-                1, KEY_JOYAXIS4MINUS);
+                1, KEY_MWHEELDOWN);
 
+        //weapnext
         Joy_GenerateButtonEvents(
                 (pPrimaryTrackedRemoteOld->Joystick.y > 0.7f && !dominantGripPushedOld ? 1 : 0),
                 (pPrimaryTrackedRemoteNew->Joystick.y > 0.7f && !dominantGripPushedNew ? 1 : 0),
-                1, KEY_JOYAXIS4PLUS);
+                1, KEY_MWHEELUP);
 
         Joy_GenerateButtonEvents(
                 (pSecondaryTrackedRemoteOld->Joystick.x > 0.7f && dominantGripPushedOld ? 1 : 0),
@@ -641,15 +600,17 @@ void HandleInput_Default( int control_scheme, ovrInputStateTrackedRemote *pDomin
                 (pSecondaryTrackedRemoteNew->Joystick.y > 0.7f && dominantGripPushedNew ? 1 : 0),
                 1, KEY_JOYAXIS6PLUS);
 
+        //invnext
         Joy_GenerateButtonEvents(
                 (pPrimaryTrackedRemoteOld->Joystick.y < -0.7f && dominantGripPushedOld ? 1 : 0),
                 (pPrimaryTrackedRemoteNew->Joystick.y < -0.7f && dominantGripPushedNew ? 1 : 0),
-                1, KEY_JOYAXIS8MINUS);
+                1, KEY_PAD_DPAD_RIGHT);
 
+        //invprev
         Joy_GenerateButtonEvents(
                 (pPrimaryTrackedRemoteOld->Joystick.y > 0.7f && dominantGripPushedOld ? 1 : 0),
                 (pPrimaryTrackedRemoteNew->Joystick.y > 0.7f && dominantGripPushedNew ? 1 : 0),
-                1, KEY_JOYAXIS8PLUS);
+                1, KEY_PAD_DPAD_LEFT);
     }
 
     //Save state

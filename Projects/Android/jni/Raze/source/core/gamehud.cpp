@@ -46,6 +46,8 @@
 #include "v_font.h"
 #include "gamestruct.h"
 #include "gamefuncs.h"
+#include "gamestate.h"
+#include "version.h"
 
 F2DDrawer twodpsp;
 
@@ -140,3 +142,26 @@ void DrawRateStuff()
 	}
 }
 
+void DrawVersionString ()
+{
+	static uint64_t first = screen->FrameTime;
+
+	//Only show version string for 5 seconds
+	if ((screen->FrameTime - first) > 15000)
+	{
+		return;
+	}
+
+	if (gamestate == GS_STARTUP ||
+		gamestate == GS_DEMOSCREEN) {
+		char buff[60];
+
+		int textScale = active_con_scale(twod) * 3;
+
+		mysnprintf(buff, countof(buff), "Team Beef Presents - %s", RAZEXR_VERSIONSTR);
+		DrawText(twod, ConFont, CR_WHITE, 0, 0, (char *) &buff[0],
+				 DTA_VirtualWidth, screen->GetWidth() / textScale,
+				 DTA_VirtualHeight, screen->GetHeight() / textScale,
+				 DTA_KeepRatio, true, TAG_DONE);
+	}
+}

@@ -72,6 +72,8 @@ void gl_PrintStartupLog();
 
 extern bool vid_hdr_active;
 
+void DrawVersionString ();
+
 namespace OpenGLRenderer
 {
 	FGLRenderer *GLRenderer;
@@ -199,12 +201,14 @@ void OpenGLFrameBuffer::Update()
 	Flush3D.Reset();
 
 	Flush3D.Clock();
+	DrawVersionString();
 	GLRenderer->Flush();
 	Flush3D.Unclock();
 
 	Swap();
 	Super::Update();
 }
+
 #ifdef __MOBILE__
 uint8_t * gles_convertRGB(uint8_t* src, uint8_t * dst, int width, int height)
 {
