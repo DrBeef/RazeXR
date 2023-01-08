@@ -134,6 +134,8 @@ void RenderViewpoint(FRenderViewpoint& mainvp, IntRect* bounds, float fov, float
 		const auto& eye = vrmode->mEyes[eye_ix];
 		screen->SetViewportRects(bounds);
 
+		screen->RenderState()->SetEye(eye_ix);
+
 		if (mainview) // Bind the scene frame buffer and turn on draw buffers used by ssao
 		{
 			bool useSSAO = (gl_ssao != 0);
@@ -171,7 +173,7 @@ void RenderViewpoint(FRenderViewpoint& mainvp, IntRect* bounds, float fov, float
 				RenderState.EnableDrawBuffers(1);
 			}
 
-			screen->PostProcessScene(false, CM_DEFAULT, flash, []() { 
+			screen->PostProcessScene(false, CM_DEFAULT, flash, []() {
 				hw_int_useindexedcolortextures = false;
 				PostProcess.Unclock();
 				Draw2D(&twodpsp, *screen->RenderState()); // draws the weapon sprites

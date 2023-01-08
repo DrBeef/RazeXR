@@ -30,6 +30,9 @@ struct VREyeInfo
 
 	VSMatrix GetProjection(float fov, float aspectRatio, float fovRatio) const;
 	DVector3 GetViewShift(FRotator angles) const;
+	VSMatrix GetHUDProjection(int width, int height) const;
+	VSMatrix GetPlayerSpriteProjection(int width, int height) const;
+
 private:
 	float getShift() const;
 	int getEye() const;
@@ -45,5 +48,4 @@ struct VRMode
 
 	static const VRMode *GetVRMode(bool toscreen = true);
 	void AdjustViewport(DFrameBuffer *fb) const;
-	VSMatrix GetHUDSpriteProjection() const;
 };

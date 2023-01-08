@@ -50,7 +50,7 @@ PolyRenderState::PolyRenderState()
 
 void PolyRenderState::ClearScreen()
 {
-	screen->mViewpoints->Set2D(*this, SCREENWIDTH, SCREENHEIGHT);
+	screen->mViewpoints->Set2D(nullptr, *this, SCREENWIDTH, SCREENHEIGHT);
 	SetColor(0, 0, 0);
 	Draw(DT_TriangleStrip, FFlatVertexBuffer::FULLSCREEN_INDEX, 4, true);
 }

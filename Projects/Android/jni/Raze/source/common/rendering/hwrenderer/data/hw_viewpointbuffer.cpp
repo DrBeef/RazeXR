@@ -32,6 +32,7 @@
 #include "hw_cvars.h"
 #include "menustate.h" // Hack?!
 #include "gamestate.h" // Hack?!
+#include "hw_vrmodes.h"
 
 static const int INITIAL_BUFFER_SIZE = 100;	// 100 viewpoints per frame should nearly always be enough
 
@@ -84,10 +85,11 @@ int HWViewpointBuffer::Bind(FRenderState &di, unsigned int index)
 	return index;
 }
 
-void HWViewpointBuffer::Set2D(FRenderState &di, int width, int height, int pll)
+extern bool cinemamode;
+void HWViewpointBuffer::Set2D(F2DDrawer *drawer, FRenderState &di, int width, int height, int pll)
 {
-	float scale = (menuactive != MENU_Off || gamestate != GS_LEVEL) ? 1.0f : 1.1f;
-	if (width != m2DWidth || height != m2DHeight || scale != m2DScale)
+	const bool isIn2D = drawer == nullptr || drawer->isIn2D;
+	const bool isDrawingFullscreen = (gamestate != GS_LEVEL) || cinemamode || menuactive != MENU_Off;
 	{
 		HWViewpointUniforms matrices;
 
@@ -99,10 +101,23 @@ void HWViewpointBuffer::Set2D(FRenderState &di, int width, int height, int pll)
 		matrices.mClipLine.X = -10000000.0f;
 		matrices.mShadowmapFilter = gl_shadowmap_filter;
 
-		int left = (int)(width * (1.0f - scale));
-		int top = (int)(height * (1.0f - scale));
-		matrices.mProjectionMatrix.ortho(left, (float)width * scale, (float)height * scale, top, -1.0f, 1.0f);
+		if (isDrawingFullscreen && isIn2D) //fullscreen 2D
+		{
+			matrices.mProjectionMatrix.ortho(0, (float) width, (float) height, 0, -1.0f, 1.0f);
+		}
+		else if (isIn2D) // HUD
+		{
+			auto vrmode = VRMode::GetVRMode(true);
+			matrices.mProjectionMatrix = vrmode->mEyes[di.GetEye()].GetHUDProjection(width, height);
+		}
+		else //Player Sprite
+		{
+			auto vrmode = VRMode::GetVRMode(true);
+			matrices.mProjectionMatrix = vrmode->mEyes[di.GetEye()].GetPlayerSpriteProjection(width, height);
+		}
 		matrices.CalcDependencies();
+		SetViewpoint(di, &matrices);
+		return;
 
 		for (int n = 0; n < mPipelineNbr; n++)
 		{
@@ -113,7 +128,6 @@ void HWViewpointBuffer::Set2D(FRenderState &di, int width, int height, int pll)
 
 		m2DWidth = width;
 		m2DHeight = height;
-		m2DScale = scale;
 		mLastMappedIndex = -1;
 	}
 	Bind(di, 0);

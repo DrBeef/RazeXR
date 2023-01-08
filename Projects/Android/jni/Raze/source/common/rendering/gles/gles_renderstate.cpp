@@ -698,7 +698,7 @@ void FGLRenderState::EnableLineSmooth(bool on)
 void FGLRenderState::ClearScreen()
 {
 
-	screen->mViewpoints->Set2D(*this, SCREENWIDTH, SCREENHEIGHT);
+	screen->mViewpoints->Set2D(nullptr, *this, SCREENWIDTH, SCREENHEIGHT);
 	SetColor(0, 0, 0);
 	Apply();
 

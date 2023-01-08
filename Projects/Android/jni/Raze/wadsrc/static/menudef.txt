@@ -558,6 +558,19 @@ OptionMenu "VROptionsMenu" protected
 	StaticText 	"when crossing sector boundaries"
 	StaticText 	""
 	Option "Positional Tracking",	"vr_positional_tracking", "YesNo"
+
+    StaticText ""
+    StaticText "HUD"
+    StaticText ""
+    Slider "VR HUD Scale",		        "vr_hud_scale", 0.05, 1.0, 0.05, 2
+    StaticText ""
+    Slider "VR HUD Stereo Effect",		"vr_hud_stereo", 0.0, 5.0, 0.1, 2
+    Slider "VR HUD Pitch Rotate",		"vr_hud_rotate", 0.0, 50.0, 1.0, 2
+    Option "VR HUD Fix Pitch",		    "vr_hud_fixed_pitch", "OnOff"
+    Option "VR HUD Fix Roll",		    "vr_hud_fixed_roll", "OnOff"
+    StaticText ""
+    SafeCommand "$OPTMNU_DEFAULTS", "resetcvar vr_hud_scale hud_scale vr_hud_stereo vr_hud_rotate vr_hud_fixed_pitch vr_hud_fixed_roll"
+
 }
 
 //-------------------------------------------------------------------------------------------

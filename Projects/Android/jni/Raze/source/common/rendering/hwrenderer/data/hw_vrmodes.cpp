@@ -29,12 +29,18 @@
 #include "hw_cvars.h"
 #include "hw_vrmodes.h"
 #include "v_video.h"
+#include "v_draw.h"
 #include "version.h"
 #include "i_interface.h"
 #include "RazeXR/mathlib.h"
 
 extern vec3_t hmdPosition;
 extern vec3_t hmdOrigin;
+extern vec3_t hmdorientation;
+
+float RazeXR_GetFOV();
+void VR_GetMove(float *joy_forward, float *joy_side, float *hmd_forward, float *hmd_side, float *up,
+				float *yaw, float *pitch, float *roll);
 
 // Set up 3D-specific console variables:
 CVAR(Int, vr_mode, 15, CVAR_GLOBALCONFIG|CVAR_ARCHIVE)
@@ -68,6 +74,13 @@ CVAR(Bool, vr_crouch_use_button, true, CVAR_ARCHIVE | CVAR_GLOBALCONFIG)
 
 CVAR(Float, vr_pickup_haptic_level, 0.2, CVAR_ARCHIVE | CVAR_GLOBALCONFIG)
 CVAR(Float, vr_quake_haptic_level, 0.8, CVAR_ARCHIVE | CVAR_GLOBALCONFIG)
+
+//HUD control
+CVAR(Float, vr_hud_scale, 0.6f, CVAR_ARCHIVE | CVAR_GLOBALCONFIG)
+CVAR(Float, vr_hud_stereo, 1.0f, CVAR_ARCHIVE | CVAR_GLOBALCONFIG)
+CVAR(Float, vr_hud_rotate, 30.f, CVAR_ARCHIVE | CVAR_GLOBALCONFIG)
+CVAR(Bool, vr_hud_fixed_pitch, true, CVAR_ARCHIVE | CVAR_GLOBALCONFIG)
+CVAR(Bool, vr_hud_fixed_roll, true, CVAR_ARCHIVE | CVAR_GLOBALCONFIG)
 
 int playerHeight = 0;
 
@@ -146,20 +159,118 @@ void VRMode::AdjustViewport(DFrameBuffer *screen) const
 	screen->mScreenViewport.left = (int)(screen->mScreenViewport.left * mHorizontalViewportScale);
 }
 
+extern float gameYaw;
 float getViewpointYaw()
 {
-	return 0.0f;
+	return gameYaw;
 }
 
-VSMatrix VRMode::GetHUDSpriteProjection() const
+VSMatrix VREyeInfo::GetHUDProjection(int width, int height) const
 {
-	VSMatrix mat;
-	int w = screen->GetWidth();
-	int h = screen->GetHeight();
-	float scaled_w = w / mWeaponProjectionScale;
-	float left_ofs = (w - scaled_w) / 2.f;
-	mat.ortho(left_ofs, left_ofs + scaled_w, (float)h, 0, -1.0f, 1.0f);
-	return mat;
+	// now render the main view
+	float fovratio;
+	float ratio = ActiveRatio(width, height);
+	if (ratio >= 1.33f)
+	{
+		fovratio = 1.33f;
+	}
+	else
+	{
+		fovratio = ratio;
+	}
+
+	VSMatrix new_projection;
+	new_projection.loadIdentity();
+
+	float stereo_separation = (vr_ipd * 0.5) * vr_hunits_per_meter * vr_hud_stereo * (getEye() == 1 ? 1.0 : -1.0);
+	new_projection.translate(stereo_separation, 0, 0);
+
+	// doom_units from meters
+	new_projection.scale(
+			-vr_hunits_per_meter,
+			vr_hunits_per_meter,
+			-vr_hunits_per_meter);
+
+	if (vr_hud_fixed_roll)
+	{
+		new_projection.rotate(-hmdorientation[ROLL], 0, 0, 1);
+	}
+
+	new_projection.rotate(vr_hud_rotate, 1, 0, 0);
+
+	if (vr_hud_fixed_pitch)
+	{
+		new_projection.rotate(-hmdorientation[PITCH], 1, 0, 0);
+	}
+
+	// hmd coordinates (meters) from ndc coordinates
+	// const float weapon_distance_meters = 0.55f;
+	// const float weapon_width_meters = 0.3f;
+	new_projection.translate(0.0, 0.0, 1.0);
+	new_projection.scale(
+			-vr_hud_scale,
+            vr_hud_scale,
+			-vr_hud_scale);
+
+	// ndc coordinates from pixel coordinates
+	new_projection.translate(-1.0, 1.0, 0);
+	new_projection.scale(2.0 / width, -2.0 / height, -1.0);
+
+	VSMatrix proj = GetProjection(RazeXR_GetFOV(), ratio, fovratio);
+	proj.multMatrix(new_projection);
+	new_projection = proj;
+
+	return new_projection;
+}
+
+VSMatrix VREyeInfo::GetPlayerSpriteProjection(int width, int height) const
+{
+	// now render the main view
+	float fovratio;
+	float ratio = ActiveRatio(width, height);
+	if (ratio >= 1.33f)
+	{
+		fovratio = 1.33f;
+	}
+	else
+	{
+		fovratio = ratio;
+	}
+
+	VSMatrix new_projection;
+	new_projection.loadIdentity();
+
+	float stereo_separation = (vr_ipd * 0.5) * vr_hunits_per_meter * (getEye() == 1 ? -1.0 : 1.0);
+	new_projection.translate(stereo_separation, 0, 0);
+
+	// doom_units from meters
+	new_projection.scale(
+			-vr_hunits_per_meter,
+			vr_hunits_per_meter,
+			-vr_hunits_per_meter);
+
+	new_projection.rotate(-hmdorientation[ROLL], 0, 0, 1);
+
+	// hmd coordinates (meters) from ndc coordinates
+	// const float weapon_distance_meters = 0.55f;
+	// const float weapon_width_meters = 0.3f;
+	new_projection.translate(0.0, 0.0, 1.0);
+
+	float weapon_scale = 0.7f;
+	new_projection.scale(
+			-weapon_scale,
+			weapon_scale,
+			-weapon_scale);
+
+	// ndc coordinates from pixel coordinates
+	new_projection.translate(-1.0, 1.0, 0);
+	new_projection.scale(2.0 / width, -2.0 / height, -1.0);
+
+	VSMatrix proj = GetProjection(RazeXR_GetFOV(), ratio, fovratio);
+	proj.multMatrix(new_projection);
+	new_projection = proj;
+
+	return new_projection;
 }
 
 float VREyeInfo::getShift() const
@@ -212,9 +323,6 @@ VSMatrix VREyeInfo::GetProjection(float fov, float aspectRatio, float fovRatio) 
 		return result;
 	}
 }
-
-void VR_GetMove(float *joy_forward, float *joy_side, float *hmd_forward, float *hmd_side, float *up,
-				float *yaw, float *pitch, float *roll);
 
 /* virtual */
 DVector3 VREyeInfo::GetViewShift(FRotator viewAngles) const

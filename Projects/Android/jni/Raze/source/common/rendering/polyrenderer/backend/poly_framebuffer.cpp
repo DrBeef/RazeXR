@@ -245,7 +245,7 @@ void PolyFrameBuffer::PostProcessScene(bool swscene, int fixedcm, float flash, c
 		FSpecialColormap* scm = &SpecialColormaps[fixedcm - CM_FIRSTSPECIALCOLORMAP];
 
 		mRenderState->SetViewport(mScreenViewport.left, mScreenViewport.top, mScreenViewport.width, mScreenViewport.height);
-		screen->mViewpoints->Set2D(*mRenderState, screen->GetWidth(), screen->GetHeight());
+		screen->mViewpoints->Set2D(nullptr, *mRenderState, screen->GetWidth(), screen->GetHeight());
 
 		ScreenQuadVertex vertices[4] =
 		{
