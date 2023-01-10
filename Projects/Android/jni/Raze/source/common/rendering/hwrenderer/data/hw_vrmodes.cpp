@@ -76,11 +76,11 @@ CVAR(Float, vr_pickup_haptic_level, 0.2, CVAR_ARCHIVE | CVAR_GLOBALCONFIG)
 CVAR(Float, vr_quake_haptic_level, 0.8, CVAR_ARCHIVE | CVAR_GLOBALCONFIG)
 
 //HUD control
-CVAR(Float, vr_hud_scale, 0.6f, CVAR_ARCHIVE | CVAR_GLOBALCONFIG)
-CVAR(Float, vr_hud_stereo, 1.0f, CVAR_ARCHIVE | CVAR_GLOBALCONFIG)
-CVAR(Float, vr_hud_rotate, 30.f, CVAR_ARCHIVE | CVAR_GLOBALCONFIG)
-CVAR(Bool, vr_hud_fixed_pitch, true, CVAR_ARCHIVE | CVAR_GLOBALCONFIG)
-CVAR(Bool, vr_hud_fixed_roll, true, CVAR_ARCHIVE | CVAR_GLOBALCONFIG)
+CVAR(Float, vr_hud_scale, 0.5f, CVAR_ARCHIVE | CVAR_GLOBALCONFIG)
+CVAR(Float, vr_hud_stereo, 2.0f, CVAR_ARCHIVE | CVAR_GLOBALCONFIG)
+CVAR(Float, vr_hud_rotate, 0.f, CVAR_ARCHIVE | CVAR_GLOBALCONFIG)
+CVAR(Bool, vr_hud_fixed_pitch, false, CVAR_ARCHIVE | CVAR_GLOBALCONFIG)
+CVAR(Bool, vr_hud_fixed_roll, false, CVAR_ARCHIVE | CVAR_GLOBALCONFIG)
 
 int playerHeight = 0;
 
@@ -240,7 +240,8 @@ VSMatrix VREyeInfo::GetPlayerSpriteProjection(int width, int height) const
 	VSMatrix new_projection;
 	new_projection.loadIdentity();
 
-	float stereo_separation = (vr_ipd * 0.5) * vr_hunits_per_meter * (getEye() == 1 ? -1.0 : 1.0);
+	float weapon_stereo_effect = 2.8f;
+	float stereo_separation = (vr_ipd * 0.5) * vr_hunits_per_meter * weapon_stereo_effect * (getEye() == 1 ? -1.0 : 1.0);
 	new_projection.translate(stereo_separation, 0, 0);
 
 	// doom_units from meters

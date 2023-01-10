@@ -76,7 +76,7 @@ CVARD(Bool, cl_interpolate, true, CVAR_ARCHIVE|CVAR_GLOBALCONFIG, "enable/disabl
 CVARD(Bool, cl_slopetilting, false, CVAR_ARCHIVE|CVAR_GLOBALCONFIG, "enable/disable slope tilting")
 CVARD(Int, cl_showweapon, 1, CVAR_ARCHIVE|CVAR_GLOBALCONFIG, "enable/disable show weapons")
 CVARD(Bool, cl_sointerpolation, true, CVAR_ARCHIVE, "enable/disable sector object interpolation") // only implemented in SW
-CVARD(Bool, cl_syncinput, false, CVAR_ARCHIVE|CVAR_GLOBALCONFIG, "enable/disable synchronized input with game's tickrate")
+CVARD(Bool, cl_syncinput, true, CVAR_ARCHIVE|CVAR_GLOBALCONFIG, "enable/disable synchronized input with game's tickrate")
 CVARD(Bool, cl_swsmoothsway, true, CVAR_ARCHIVE, "move SW weapon left and right smoothly while bobbing")
 CVARD(Bool, cl_showmagamt, false, CVAR_ARCHIVE, "show the amount of rounds left in the magazine of your weapon on the modern HUD")
 CVARD(Bool, cl_nomeleeblur, false, CVAR_ARCHIVE, "enable/disable blur effect with melee weapons in SW")

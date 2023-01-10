@@ -32,6 +32,9 @@ Prepared for public release: 03/21/2003 - Charlie Wiederhold, 3D Realms
 #include "mapinfo.h"
 #include "dukeactor.h"
 
+void get_weapon_pos_and_angle(float &x, float &y, float &z, float &pitch, float &yaw);
+
+
 BEGIN_DUKE_NS 
 
 
@@ -824,6 +827,32 @@ static void shootwhip(DDukeActor* actor, int p, int sx, int sy, int sz, int sa, 
 //
 //
 //---------------------------------------------------------------------------
+void shoot_r(DDukeActor* actor, int atwith);
+void shoot_r_override(DDukeActor* actor, int atwith)
+{
+	int l, j;
+	int sx, sy, sz, sa, p, vel, zvel, x, dal;
+	player_struct backup;
+	if (actor->isPlayer())
+	{
+		p = actor->spr.yvel;
+		{
+			float ax, y, z, pitch, yaw;
+			get_weapon_pos_and_angle(ax, y, z, pitch, yaw);
+			backup = ps[p];
+			ps[p].pos.X += (ax * 16.0f);
+			ps[p].pos.Y += (y * -16.0f);;
+			ps[p].pos.Z += (z * -256);
+			ps[p].angle.ang = degang(-yaw);
+			ps[p].horizon.horiz = pitchhoriz(-pitch);
+		}
+	}
+	shoot_r(actor, atwith);
+	if (actor->isPlayer())
+	{
+		ps[p] = backup;
+	}
+}
 
 void shoot_r(DDukeActor* actor, int atwith)
 {

@@ -44,6 +44,15 @@ float getViewpointYaw();
 
 void AddCommandString (const char *text, int keynum=0);
 
+void get_weapon_pos_and_angle(float &x, float &y, float &z, float &pitch, float &yaw)
+{
+    x = weaponoffset[2];
+    y = weaponoffset[0];
+    z = weaponoffset[1];
+    pitch = weaponangles[PITCH];
+    yaw = -90.0f - gameYaw + weaponangles[YAW] - hmdorientation[YAW];
+}
+
 void HandleInput_Default( int control_scheme, ovrInputStateTrackedRemote *pDominantTrackedRemoteNew, ovrInputStateTrackedRemote *pDominantTrackedRemoteOld, ovrTrackedController* pDominantTracking,
                           ovrInputStateTrackedRemote *pOffTrackedRemoteNew, ovrInputStateTrackedRemote *pOffTrackedRemoteOld, ovrTrackedController* pOffTracking,
                           int domButton1, int domButton2, int offButton1, int offButton2 )
