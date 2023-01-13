@@ -25,6 +25,7 @@ $RECYCLE.BIN/
 *.apk
 *.ap_
 *.class
+projects/Android/jni/Raze/*
 projects/Android/build/*
 projects/Android/.idea/*
 Projects/Android/.cxx/*
