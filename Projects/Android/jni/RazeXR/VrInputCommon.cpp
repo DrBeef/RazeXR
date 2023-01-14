@@ -10,6 +10,7 @@ Authors		:	Simon Brown
 
 #include "VrInput.h"
 
+
 ovrInputStateTrackedRemote leftTrackedRemoteState_old;
 ovrInputStateTrackedRemote leftTrackedRemoteState_new;
 ovrTrackedController leftRemoteTracking_new;
@@ -25,9 +26,6 @@ float remote_movementUp;
 float positional_movementSideways;
 float positional_movementForward;
 float snapTurn;
-
-float cinemamodeYaw;
-float cinemamodePitch;
 
 void Joy_GenerateButtonEvents(int oldbuttons, int newbuttons, int numbuttons, int base);
 

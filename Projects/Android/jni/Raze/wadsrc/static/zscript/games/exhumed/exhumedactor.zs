@@ -1,3 +1,0 @@
-class ExhumedActor : CoreActor native
-{
-}

@@ -22,7 +22,6 @@ EXTERN_CVAR(Bool, vr_crouch_use_button);
 
 #include "mathlib.h"
 
-#define LOG_TAG "RazeXR"
 
 #ifndef NDEBUG
 #define DEBUG 1
@@ -36,12 +35,11 @@ EXTERN_CVAR(Bool, vr_crouch_use_button);
 #define ALOGV(...)
 #endif
 
-extern bool cinemamode;
 extern float cinemamodeYaw;
 extern float cinemamodePitch;
 
 extern float playerYaw;
-extern bool resetGameYaw;
+extern int resetGameYaw;
 extern float gameYaw;
 
 extern vec3_t hmdPosition;
@@ -56,9 +54,6 @@ extern vec3_t offhandangles;
 extern vec3_t offhandoffset;
 
 extern bool player_moving;
-
-extern bool ready_teleport;
-extern bool trigger_teleport;
 
 extern bool shutdown;
 void shutdownVR();

@@ -1,2 +1,0 @@
-Mouse2 "+Open"
-Mouse3 "+Run"

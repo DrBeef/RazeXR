@@ -38,7 +38,7 @@ int argc=0;
 //Define all variables here that were externs in the VrCommon.h
 long long global_time;
 float playerYaw;
-bool resetGameYaw;
+int resetGameYaw;
 float gameYaw;
 vec3_t hmdPosition;
 vec3_t hmdOrigin;
@@ -52,9 +52,6 @@ vec3_t offhandangles;
 vec3_t offhandoffset;
 bool player_moving;
 bool shutdown;
-bool ready_teleport;
-bool trigger_teleport;
-bool cinemamode;
 
 //This is now controlled by the engine
 static bool useVirtualScreen = true;
@@ -95,7 +92,7 @@ void RazeXR_GetScreenRes(uint32_t *width, uint32_t *height)
 
 bool VR_UseScreenLayer()
 {
-	return useVirtualScreen || cinemamode;
+	return useVirtualScreen;
 }
 
 float VR_GetScreenLayerDistance()
@@ -203,9 +200,9 @@ void VR_GetMove(float *joy_forward, float *joy_side, float *hmd_forward, float *
     *up = remote_movementUp;
     *joy_side = remote_movementSideways;
     *hmd_side = positional_movementSideways;
-	*yaw = cinemamode ? cinemamodeYaw : hmdorientation[YAW] + snapTurn;
-	*pitch = cinemamode ? cinemamodePitch : hmdorientation[PITCH];
-	*roll = cinemamode ? 0.0f : hmdorientation[ROLL];
+	*yaw = hmdorientation[YAW] + snapTurn;
+	*pitch = hmdorientation[PITCH];
+	*roll = hmdorientation[ROLL];
 }
 
 void VR_Init()
@@ -213,24 +210,18 @@ void VR_Init()
 	//Initialise all our variables
 	playerYaw = 0.0f;
 	VectorClear(hmdOrigin);
-    resetGameYaw = true;
+    resetGameYaw = 1;
 	remote_movementSideways = 0.0f;
 	remote_movementForward = 0.0f;
 	remote_movementUp = 0.0f;
 	positional_movementSideways = 0.0f;
 	positional_movementForward = 0.0f;
-	snapTurn = 180.0f;
-	cinemamodeYaw = 0.0f;
-	cinemamodePitch = 0.0f;
+	snapTurn = 0.0f;
 
 	//init randomiser
 	srand(time(NULL));
 
 	shutdown = false;
-    ready_teleport = false;
-    trigger_teleport = false;
-
-	cinemamode = false;
 
 	chdir("/sdcard/RazeXR");
 }

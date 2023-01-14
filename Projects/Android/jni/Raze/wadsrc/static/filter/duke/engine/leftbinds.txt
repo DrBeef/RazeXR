@@ -1,7 +1,0 @@
-H "useitem 3"
-R "useitem 2"
-Q "+Quick_Kick"
-J "useitem 4"
-N "useitem 5"
-M "useitem 1"
-W "show_weapon"

@@ -30,15 +30,11 @@ extern float positional_movementSideways;
 extern float positional_movementForward;
 extern float snapTurn;
 
-extern float cinemamodeYaw;
-extern float cinemamodePitch;
-
 extern bool weaponStabilised;
 
 EXTERN_CVAR(Float, vr_hunits_per_meter)
 
 int getGameState();
-int getMenuState();
 void Joy_GenerateButtonEvents(int oldbuttons, int newbuttons, int numbuttons, int base);
 float getViewpointYaw();
 
@@ -119,20 +115,8 @@ void HandleInput_Default( int control_scheme, ovrInputStateTrackedRemote *pDomin
         secondaryButton2 = offButton2;
     }
 
-    //In cinema mode, right-stick controls mouse
-    const float mouseSpeed = 3.0f;
-    if (cinemamode)
-    {
-        if (fabs(pPrimaryTrackedRemoteNew->Joystick.x) > 0.1f) {
-            cinemamodeYaw -= mouseSpeed * pPrimaryTrackedRemoteNew->Joystick.x;
-        }
-        if (fabs(pPrimaryTrackedRemoteNew->Joystick.y) > 0.1f) {
-            cinemamodePitch -= mouseSpeed * pPrimaryTrackedRemoteNew->Joystick.y;
-        }
-    }
-
     // Only do the following if we are definitely not in the menu
-    if (getMenuState() == MENU_Off)
+    if (menuactive == MENU_Off)
     {
         float distance = sqrtf(powf(pOffTracking->Pose.position.x -
                                     pDominantTracking->Pose.position.x, 2) +
@@ -249,7 +233,7 @@ void HandleInput_Default( int control_scheme, ovrInputStateTrackedRemote *pDomin
                   remote_movementForward);
 
 
-            if (!cinemamode && !dominantGripPushedNew)
+            if (!dominantGripPushedNew)
             {
                 // Turning logic
                 static int increaseSnap = true;
@@ -264,6 +248,8 @@ void HandleInput_Default( int control_scheme, ovrInputStateTrackedRemote *pDomin
                         if (snapTurn < -180.0f) {
                             snapTurn += 360.f;
                         }
+
+                        resetGameYaw = 2;
                     }
                 } else if (pPrimaryTrackedRemoteNew->Joystick.x < 0.4f) {
                     increaseSnap = true;
@@ -283,6 +269,8 @@ void HandleInput_Default( int control_scheme, ovrInputStateTrackedRemote *pDomin
                         if (snapTurn > 180.0f) {
                             snapTurn -= 360.f;
                         }
+
+                        resetGameYaw = 2;
                     }
                 } else if (pPrimaryTrackedRemoteNew->Joystick.x > -0.4f) {
                     decreaseSnap = true;
@@ -291,8 +279,8 @@ void HandleInput_Default( int control_scheme, ovrInputStateTrackedRemote *pDomin
         }
     }
 
-    if (getMenuState() == MENU_On ||
-            getMenuState() == MENU_OnNoPause)
+    if (menuactive == MENU_On ||
+            menuactive == MENU_OnNoPause)
     {
         Joy_GenerateButtonEvents(
                 (pSecondaryTrackedRemoteOld->Joystick.x > 0.7f && !dominantGripPushedOld ? 1 : 0),

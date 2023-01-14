@@ -21,7 +21,7 @@
 #define DEBUG 1
 #endif
 
-#define LOG_TAG "TBXR"
+#define LOG_TAG "RazeXR"
 
 
 #define ALOGE(...) __android_log_print( ANDROID_LOG_ERROR, LOG_TAG, __VA_ARGS__ )

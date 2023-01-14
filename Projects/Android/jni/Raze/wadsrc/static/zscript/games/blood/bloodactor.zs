@@ -1,3 +1,0 @@
-class BloodActor : CoreActor native
-{
-}
