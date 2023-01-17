@@ -251,7 +251,7 @@ typedef struct
     PFN_xrGetDisplayRefreshRateFB pfnGetDisplayRefreshRate;
     PFN_xrRequestDisplayRefreshRateFB pfnRequestDisplayRefreshRate;
 
-    XrTime              PredictedDisplayTime;
+    XrFrameState        FrameState;
     int					SwapInterval;
     int					MainThreadTid;
     int					RenderThreadTid;
