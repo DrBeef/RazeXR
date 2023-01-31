@@ -38,7 +38,7 @@ int argc=0;
 //Define all variables here that were externs in the VrCommon.h
 long long global_time;
 float playerYaw;
-int resetGameYaw;
+int resyncVRYawWithGame;
 float gameYaw;
 vec3_t hmdPosition;
 vec3_t hmdOrigin;
@@ -210,7 +210,7 @@ void VR_Init()
 	//Initialise all our variables
 	playerYaw = 0.0f;
 	VectorClear(hmdOrigin);
-    resetGameYaw = 1;
+    resyncVRYawWithGame = 1;
 	remote_movementSideways = 0.0f;
 	remote_movementForward = 0.0f;
 	remote_movementUp = 0.0f;

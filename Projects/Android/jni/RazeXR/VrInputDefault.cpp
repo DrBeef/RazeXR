@@ -32,8 +32,6 @@ extern float snapTurn;
 
 extern bool weaponStabilised;
 
-EXTERN_CVAR(Float, vr_hunits_per_meter)
-
 int getGameState();
 void Joy_GenerateButtonEvents(int oldbuttons, int newbuttons, int numbuttons, int base);
 float getViewpointYaw();
@@ -250,7 +248,7 @@ void HandleInput_Default( int control_scheme, ovrInputStateTrackedRemote *pDomin
                             snapTurn += 360.f;
                         }
 
-                        resetGameYaw = 2;
+                        resyncVRYawWithGame = 2;
                     }
                 } else if (pPrimaryTrackedRemoteNew->Joystick.x < 0.4f) {
                     increaseSnap = true;
@@ -271,7 +269,7 @@ void HandleInput_Default( int control_scheme, ovrInputStateTrackedRemote *pDomin
                             snapTurn -= 360.f;
                         }
 
-                        resetGameYaw = 2;
+                        resyncVRYawWithGame = 2;
                     }
                 } else if (pPrimaryTrackedRemoteNew->Joystick.x > -0.4f) {
                     decreaseSnap = true;

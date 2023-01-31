@@ -39,7 +39,7 @@ extern float cinemamodeYaw;
 extern float cinemamodePitch;
 
 extern float playerYaw;
-extern int resetGameYaw;
+extern int resyncVRYawWithGame;
 extern float gameYaw;
 
 extern vec3_t hmdPosition;
