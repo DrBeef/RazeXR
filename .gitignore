@@ -15,8 +15,6 @@ $RECYCLE.BIN/
 *.o
 *.d
 
-#binaries
-*.so
 
 #libs
 #*.a
@@ -38,3 +36,5 @@ Projects/Android/.idea/codeStyles/Project.xml
 Projects/Android/.gradle/*
 drbeef-release-key.keystore
 Projects/Android/.idea/.name
+Projects/Android/libs/arm64-v8a/libopenxr_loader_meta.so
+Projects/Android/libs/arm64-v8a/libopenxr_loader_pico.so

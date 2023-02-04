@@ -74,10 +74,11 @@ void RazeXR_setUseScreenLayer(bool use)
 
 int RazeXR_SetRefreshRate(int refreshRate)
 {
-#ifdef META_QUEST
-	OXR(gAppState.pfnRequestDisplayRefreshRate(gAppState.Session, (float)refreshRate));
-	return refreshRate;
-#endif
+	if (strstr(gAppState.OpenXRHMD, "meta") != NULL)
+	{
+		OXR(gAppState.pfnRequestDisplayRefreshRate(gAppState.Session, (float)refreshRate));
+		return refreshRate;
+	}
 
 	return 0;
 }
@@ -288,13 +289,15 @@ void VR_FrameSetup()
 
 bool VR_GetVRProjection(int eye, float zNear, float zFar, float* projection)
 {
-#ifdef PICO_XR
+	if (strstr(gAppState.OpenXRHMD, "pico") != NULL)
+	{
 		XrMatrix4x4f_CreateProjectionFov(
 				&(gAppState.ProjectionMatrices[eye]), GRAPHICS_OPENGL_ES,
 				gAppState.Projections[eye].fov, zNear, zFar);
-#endif
+	}
 
-#ifdef META_QUEST
+	if (strstr(gAppState.OpenXRHMD, "meta") != NULL)
+	{
 		XrFovf fov = {};
 		for (int eye = 0; eye < ovrMaxNumEyes; eye++) {
 			fov.angleLeft += gAppState.Projections[eye].fov.angleLeft / 2.0f;
@@ -305,8 +308,8 @@ bool VR_GetVRProjection(int eye, float zNear, float zFar, float* projection)
 		XrMatrix4x4f_CreateProjectionFov(
 				&(gAppState.ProjectionMatrices[eye]), GRAPHICS_OPENGL_ES,
 				fov, zNear, zFar);
-#endif
-
+	}
+	
 	memcpy(projection, gAppState.ProjectionMatrices[eye].m, 16 * sizeof(float));
 	return true;
 }
