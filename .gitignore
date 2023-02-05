@@ -30,6 +30,7 @@ Projects/Android/.cxx/*
 *.json
 Projects/Android/.externalNativeBuild/*
 *.bin
+.gradle/*
 Projects/Android/.gradle/*
 *.ser
 Projects/Android/.idea/codeStyles/Project.xml
