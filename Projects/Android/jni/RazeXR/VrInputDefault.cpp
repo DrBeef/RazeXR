@@ -42,9 +42,9 @@ void get_weapon_pos_and_angle(float &x, float &y, float &z, float &pitch, float 
 {
     x = weaponoffset[2];
     y = weaponoffset[0];
-    z = weaponoffset[1];
-    pitch = weaponangles[PITCH];
-    yaw = -90.0f - gameYaw + weaponangles[YAW] - hmdorientation[YAW];
+    z = weaponoffset[1] + hmdPosition[1]; // position off floor
+    pitch = hmdorientation[PITCH] - weaponangles[PITCH];
+    yaw = hmdorientation[YAW] - weaponangles[YAW];
 }
 
 void HandleInput_Default( int control_scheme, ovrInputStateTrackedRemote *pDominantTrackedRemoteNew, ovrInputStateTrackedRemote *pDominantTrackedRemoteOld, ovrTrackedController* pDominantTracking,
@@ -145,18 +145,17 @@ void HandleInput_Default( int control_scheme, ovrInputStateTrackedRemote *pDomin
             weaponoffset[2] = pDominantTracking->Pose.position.z - hmdPosition[2];
 
             vec2_t v;
-            float yawRotation = getViewpointYaw() - hmdorientation[YAW];
-            rotateAboutOrigin(weaponoffset[0], weaponoffset[2], -yawRotation, v);
+            rotateAboutOrigin(weaponoffset[0], weaponoffset[2], hmdorientation[YAW], v);
             weaponoffset[0] = v[1];
             weaponoffset[2] = v[0];
 
             //Set gun angles
             vec3_t rotation = {0};
-            rotation[PITCH] = vr_weaponRotate;
+            rotation[PITCH] = -30;
             QuatToYawPitchRoll(pDominantTracking->Pose.orientation, rotation, weaponangles);
 
 
-            if (weaponStabilised) {
+/*            if (weaponStabilised) {
                 float z = pOffTracking->Pose.position.z -
                           pDominantTracking->Pose.position.z;
                 float x = pOffTracking->Pose.position.x -
@@ -169,7 +168,7 @@ void HandleInput_Default( int control_scheme, ovrInputStateTrackedRemote *pDomin
                     VectorSet(weaponangles, -RAD2DEG(atanf(y / zxDist)), -RAD2DEG(atan2f(x, -z)),
                               weaponangles[ROLL]);
                 }
-            }
+            }*/
         }
 
         float controllerYawHeading = 0.0f;
