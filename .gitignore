@@ -20,6 +20,7 @@ $RECYCLE.BIN/
 #*.a
 
 #files created by build
+build/*
 *.apk
 *.ap_
 *.class
