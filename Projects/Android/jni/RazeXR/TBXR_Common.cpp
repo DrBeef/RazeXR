@@ -477,7 +477,7 @@ static bool ovrFramebuffer_Create(
 		GLfloat borderColor[] = {0.0f, 0.0f, 0.0f, 0.0f};
 		GLenum textureTarget = GL_TEXTURE_2D_ARRAY;
 		GL(glBindTexture(textureTarget, colorTexture));
-		GL(glTexParameterfv(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_BORDER_COLOR, borderColor));
+		GL(glTexParameterfv(textureTarget, GL_TEXTURE_BORDER_COLOR, borderColor));
 		GL(glTexParameteri(textureTarget, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE));
 		GL(glTexParameteri(textureTarget, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE));
 		GL(glTexParameteri(textureTarget, GL_TEXTURE_MIN_FILTER, GL_LINEAR));
@@ -1818,7 +1818,7 @@ void TBXR_ClearFrameBuffer(int width, int height)
 	glViewport( 0, 0, width, height );
 
 	//Black
-	glClearColor( 0.0f, 0.0f, 0.0f, 1.0f );
+	glClearColor( 1.0f, 0.0f, 0.0f, 1.0f );
 
 	glScissor( 0, 0, width, height );
 	glClear( GL_COLOR_BUFFER_BIT );
