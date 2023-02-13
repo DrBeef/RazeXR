@@ -1752,6 +1752,8 @@ bool TBXR_IsFrameSetup()
 	return gAppState.FrameSetup;
 }
 
+void TBXR_ClearFrameBuffer(int width, int height);
+
 //All the stuff we want to do each frame
 void TBXR_FrameSetup()
 {
@@ -1823,6 +1825,15 @@ void TBXR_FrameSetup()
 
 	TBXR_ProcessHaptics();
 
+	ovrFramebuffer* frameBuffer = &(gAppState.Renderer.FrameBuffer[0]);
+	ovrFramebuffer_Acquire(frameBuffer);
+	ovrFramebuffer_SetCurrent(frameBuffer);
+	TBXR_ClearFrameBuffer(frameBuffer->ColorSwapChain.Width, frameBuffer->ColorSwapChain.Height);
+	frameBuffer = &(gAppState.Renderer.FrameBuffer[1]);
+	ovrFramebuffer_Acquire(frameBuffer);
+	ovrFramebuffer_SetCurrent(frameBuffer);
+	TBXR_ClearFrameBuffer(frameBuffer->ColorSwapChain.Width, frameBuffer->ColorSwapChain.Height);
+
 	gAppState.FrameSetup = true;
 }
 
@@ -1855,9 +1866,7 @@ void TBXR_ClearFrameBuffer(int width, int height)
 void TBXR_prepareEyeBuffer(int eye )
 {
 	ovrFramebuffer* frameBuffer = &(gAppState.Renderer.FrameBuffer[eye]);
-	ovrFramebuffer_Acquire(frameBuffer);
 	ovrFramebuffer_SetCurrent(frameBuffer);
-	TBXR_ClearFrameBuffer(frameBuffer->ColorSwapChain.Width, frameBuffer->ColorSwapChain.Height);
 }
 
 void TBXR_finishEyeBuffer(int eye )
@@ -1866,15 +1875,14 @@ void TBXR_finishEyeBuffer(int eye )
 
 	ovrFramebuffer *frameBuffer = &(renderer->FrameBuffer[eye]);
 
-	// Clear the alpha channel, other way OpenXR would not transfer the framebuffer fully
+/*	// Clear the alpha channel, other way OpenXR would not transfer the framebuffer fully
 	glColorMask(GL_FALSE, GL_FALSE, GL_FALSE, GL_TRUE);
 	glClearColor(0.0, 0.0, 0.0, 1.0);
 	glClear(GL_COLOR_BUFFER_BIT);
 	glColorMask(GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE);
-
+*/
 	//Clear edge to prevent smearing
-	ovrFramebuffer_Resolve(frameBuffer);
-	ovrFramebuffer_Release(frameBuffer);
+	//ovrFramebuffer_Resolve(frameBuffer);
 	ovrFramebuffer_SetNone();
 }
 
@@ -1911,6 +1919,9 @@ void TBXR_submitFrame()
 	if (gAppState.SessionActive == GL_FALSE) {
 		return;
 	}
+
+	ovrFramebuffer_Release(&(gAppState.Renderer.FrameBuffer[0]));
+	ovrFramebuffer_Release(&(gAppState.Renderer.FrameBuffer[1]));
 
 	TBXR_updateProjections();
 
