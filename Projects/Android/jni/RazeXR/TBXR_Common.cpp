@@ -1895,8 +1895,8 @@ void TBXR_submitFrame()
 		return;
 	}
 
-	ovrFramebuffer_Release(&(gAppState.Renderer.FrameBuffer[0]));
-	ovrFramebuffer_Release(&(gAppState.Renderer.FrameBuffer[1]));
+	ovrFramebuffer_Resolve(&(gAppState.Renderer.FrameBuffer));
+	ovrFramebuffer_Release(&(gAppState.Renderer.FrameBuffer));
 
 	TBXR_updateProjections();
 
