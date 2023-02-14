@@ -1825,7 +1825,7 @@ void TBXR_ClearFrameBuffer(int width, int height)
 	glViewport( 0, 0, width, height );
 
 	//Black
-	glClearColor( 1.0f, 0.0f, 0.0f, 1.0f );
+	glClearColor( 0.0f, 0.0f, 0.0f, 1.0f );
 
 	glScissor( 0, 0, width, height );
 	glClear( GL_COLOR_BUFFER_BIT );
