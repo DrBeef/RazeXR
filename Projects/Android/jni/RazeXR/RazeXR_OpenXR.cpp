@@ -18,7 +18,6 @@
 #define ENABLE_GL_DEBUG_VERBOSE 1
 
 //Let's go to the maximum!
-extern int NUM_MULTI_SAMPLES;
 extern int REFRESH	         ;
 extern float SS_MULTIPLIER    ;
 
@@ -76,11 +75,17 @@ int RazeXR_SetRefreshRate(int refreshRate)
 {
 	if (strstr(gAppState.OpenXRHMD, "meta") != NULL)
 	{
+		gAppState.currentDisplayRefreshRate = refreshRate;
 		OXR(gAppState.pfnRequestDisplayRefreshRate(gAppState.Session, (float)refreshRate));
 		return refreshRate;
 	}
 
 	return 0;
+}
+
+int RazeXR_GetRefreshRate()
+{
+	return (int)gAppState.currentDisplayRefreshRate;
 }
 
 void RazeXR_GetScreenRes(uint32_t *width, uint32_t *height)
@@ -535,11 +540,6 @@ JNIEXPORT jlong JNICALL Java_com_drbeef_razexr_GLES3JNILib_onCreate( JNIEnv * en
         if (ss->count > 0 && ss->dval[0] > 0.0)
         {
             SS_MULTIPLIER = ss->dval[0];
-        }
-
-        if (msaa->count > 0 && msaa->ival[0] > 0 && msaa->ival[0] < 10)
-        {
-            NUM_MULTI_SAMPLES = msaa->ival[0];
         }
 
         if (refresh->count > 0 && refresh->ival[0] > 0 && refresh->ival[0] <= 120)

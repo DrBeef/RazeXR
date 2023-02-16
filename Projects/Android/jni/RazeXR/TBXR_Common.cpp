@@ -42,9 +42,7 @@ PFNEGLSIGNALSYNCKHRPROC			eglSignalSyncKHR;
 PFNEGLGETSYNCATTRIBKHRPROC		eglGetSyncAttribKHR;
 #endif
 
-//Let's go to the maximum!
-int NUM_MULTI_SAMPLES	= 1;
-int REFRESH	            = 60;
+int REFRESH	            = 72;
 float SS_MULTIPLIER    = 1.0f;
 
 GLboolean stageSupported = GL_FALSE;
@@ -1844,23 +1842,6 @@ void TBXR_prepareEyeBuffer(int eye )
 	ovrFramebuffer_SetCurrent(frameBuffer);
 }
 
-void TBXR_finishEyeBuffer(int eye )
-{
-	ovrRenderer *renderer = &gAppState.Renderer;
-
-	ovrFramebuffer *frameBuffer = &(renderer->FrameBuffer);
-
-/*	// Clear the alpha channel, other way OpenXR would not transfer the framebuffer fully
-	glColorMask(GL_FALSE, GL_FALSE, GL_FALSE, GL_TRUE);
-	glClearColor(0.0, 0.0, 0.0, 1.0);
-	glClear(GL_COLOR_BUFFER_BIT);
-	glColorMask(GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE);
-*/
-	//Clear edge to prevent smearing
-	//ovrFramebuffer_Resolve(frameBuffer);
-	ovrFramebuffer_SetNone();
-}
-
 void TBXR_updateProjections()
 {
 	XrViewLocateInfo projectionInfo = {};
@@ -1896,6 +1877,7 @@ void TBXR_submitFrame()
 	}
 
 	ovrFramebuffer_Resolve(&(gAppState.Renderer.FrameBuffer));
+	ovrFramebuffer_SetNone();
 	ovrFramebuffer_Release(&(gAppState.Renderer.FrameBuffer));
 
 	TBXR_updateProjections();
