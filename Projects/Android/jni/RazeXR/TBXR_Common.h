@@ -113,7 +113,7 @@ ovrRenderer
 
 typedef struct
 {
-    ovrFramebuffer	FrameBuffer[ovrMaxNumEyes];
+    ovrFramebuffer	FrameBuffer;
 } ovrRenderer;
 
 /*
