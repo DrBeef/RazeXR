@@ -38,12 +38,11 @@ float getViewpointYaw();
 
 void AddCommandString (const char *text, int keynum=0);
 
-void get_weapon_pos_and_angle(float &x, float &y, float &z1, float &z2, float &pitch, float &yaw)
+void get_weapon_pos_and_angle(float &x, float &y, float &z, float &pitch, float &yaw)
 {
     x = weaponoffset[2];
     y = weaponoffset[0];
-    z1 = weaponoffset[1] + hmdPosition[1]; // position off floor
-    z2 = weaponoffset[1]; // position from headset location
+    z = weaponoffset[1] + hmdPosition[1]; // position off floor
     pitch = hmdorientation[PITCH] - weaponangles[PITCH];
     yaw = hmdorientation[YAW] - weaponangles[YAW];
 }
