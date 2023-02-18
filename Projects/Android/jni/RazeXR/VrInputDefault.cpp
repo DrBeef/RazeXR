@@ -186,7 +186,6 @@ void HandleInput_Default( int control_scheme, ovrInputStateTrackedRemote *pDomin
             offhandoffset[2] = v[0];
 
             vec3_t rotation = {0};
-            rotation[PITCH] = vr_weaponRotate;
             QuatToYawPitchRoll(pOffTracking->Pose.orientation, rotation, offhandangles);
 
             if (vr_move_use_offhand) {
