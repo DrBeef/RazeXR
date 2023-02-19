@@ -88,7 +88,7 @@ void HandleInput_Default( int control_scheme, ovrInputStateTrackedRemote *pDomin
     int secondaryButton1;
     int secondaryButton2;
 
-    if (control_scheme == 11) // Left handed Alt
+    if (vr_switch_sticks) // Switch sticks should switch buttons too, or you can't move and jump easily
     {
         primaryButtonsNew = pOffTrackedRemoteNew->Buttons;
         primaryButtonsOld = pOffTrackedRemoteOld->Buttons;
@@ -100,7 +100,7 @@ void HandleInput_Default( int control_scheme, ovrInputStateTrackedRemote *pDomin
         secondaryButton1 = domButton1;
         secondaryButton2 = domButton2;
     }
-    else // Left and right handed
+    else
     {
         primaryButtonsNew = pDominantTrackedRemoteNew->Buttons;
         primaryButtonsOld = pDominantTrackedRemoteOld->Buttons;
@@ -279,55 +279,69 @@ void HandleInput_Default( int control_scheme, ovrInputStateTrackedRemote *pDomin
     if (menuactive == MENU_On ||
             menuactive == MENU_OnNoPause)
     {
-        Joy_GenerateButtonEvents(
-                (pSecondaryTrackedRemoteOld->Joystick.x > 0.7f && !dominantGripPushedOld ? 1 : 0),
-                (pSecondaryTrackedRemoteNew->Joystick.x > 0.7f && !dominantGripPushedNew ? 1 : 0),
-                1, KEY_JOYAXIS1PLUS);
+        ovrInputStateTrackedRemote* t[2][2] = { {pOffTrackedRemoteOld, pOffTrackedRemoteNew},
+                                                {pDominantTrackedRemoteOld, pDominantTrackedRemoteNew} };
+        for (auto &remote: t)
+        {
+            Joy_GenerateButtonEvents(
+                    (remote[0]->Joystick.x > 0.7f && !dominantGripPushedOld ? 1 : 0),
+                    (remote[1]->Joystick.x > 0.7f && !dominantGripPushedNew ? 1 : 0),
+                    1, KEY_JOYAXIS1PLUS);
+
+            Joy_GenerateButtonEvents(
+                    (remote[0]->Joystick.x < -0.7f && !dominantGripPushedOld ? 1 : 0),
+                    (remote[1]->Joystick.x < -0.7f && !dominantGripPushedNew ? 1 : 0),
+                    1, KEY_JOYAXIS1MINUS);
+
+            Joy_GenerateButtonEvents(
+                    (remote[0]->Joystick.y < -0.7f && !dominantGripPushedOld ? 1 : 0),
+                    (remote[1]->Joystick.y < -0.7f && !dominantGripPushedNew ? 1 : 0),
+                    1, KEY_JOYAXIS2PLUS);
+
+            Joy_GenerateButtonEvents(
+                    (remote[0]->Joystick.y > 0.7f && !dominantGripPushedOld ? 1 : 0),
+                    (remote[1]->Joystick.y > 0.7f && !dominantGripPushedNew ? 1 : 0),
+                    1, KEY_JOYAXIS2MINUS);
+
+            Joy_GenerateButtonEvents(
+                    (remote[0]->Joystick.x > 0.7f && dominantGripPushedOld ? 1 : 0),
+                    (remote[1]->Joystick.x > 0.7f && dominantGripPushedNew ? 1 : 0),
+                    1, KEY_JOYAXIS5PLUS);
+
+            Joy_GenerateButtonEvents(
+                    (remote[0]->Joystick.x < -0.7f && dominantGripPushedOld ? 1 : 0),
+                    (remote[1]->Joystick.x < -0.7f && dominantGripPushedNew ? 1 : 0),
+                    1, KEY_JOYAXIS5MINUS);
+
+            Joy_GenerateButtonEvents(
+                    (remote[0]->Joystick.y < -0.7f && dominantGripPushedOld ? 1 : 0),
+                    (remote[1]->Joystick.y < -0.7f && dominantGripPushedNew ? 1 : 0),
+                    1, KEY_JOYAXIS6PLUS);
+
+            Joy_GenerateButtonEvents(
+                    (remote[0]->Joystick.y > 0.7f && dominantGripPushedOld ? 1 : 0),
+                    (remote[1]->Joystick.y > 0.7f && dominantGripPushedNew ? 1 : 0),
+                    1, KEY_JOYAXIS6MINUS);
+        }
 
         Joy_GenerateButtonEvents(
-                (pSecondaryTrackedRemoteOld->Joystick.x < -0.7f && !dominantGripPushedOld ? 1 : 0),
-                (pSecondaryTrackedRemoteNew->Joystick.x < -0.7f && !dominantGripPushedNew ? 1 : 0),
-                1, KEY_JOYAXIS1MINUS);
-
-        Joy_GenerateButtonEvents(
-                (pSecondaryTrackedRemoteOld->Joystick.y < -0.7f && !dominantGripPushedOld ? 1 : 0),
-                (pSecondaryTrackedRemoteNew->Joystick.y < -0.7f && !dominantGripPushedNew ? 1 : 0),
-                1, KEY_JOYAXIS2PLUS);
-
-        Joy_GenerateButtonEvents(
-                (pSecondaryTrackedRemoteOld->Joystick.y > 0.7f && !dominantGripPushedOld ? 1 : 0),
-                (pSecondaryTrackedRemoteNew->Joystick.y > 0.7f && !dominantGripPushedNew ? 1 : 0),
-                1, KEY_JOYAXIS2MINUS);
-
-        Joy_GenerateButtonEvents(
-                (pSecondaryTrackedRemoteOld->Joystick.x > 0.7f && dominantGripPushedOld ? 1 : 0),
-                (pSecondaryTrackedRemoteNew->Joystick.x > 0.7f && dominantGripPushedNew ? 1 : 0),
-                1, KEY_JOYAXIS5PLUS);
-
-        Joy_GenerateButtonEvents(
-                (pSecondaryTrackedRemoteOld->Joystick.x < -0.7f && dominantGripPushedOld ? 1 : 0),
-                (pSecondaryTrackedRemoteNew->Joystick.x < -0.7f && dominantGripPushedNew ? 1 : 0),
-                1, KEY_JOYAXIS5MINUS);
-
-        Joy_GenerateButtonEvents(
-                (pSecondaryTrackedRemoteOld->Joystick.y < -0.7f && dominantGripPushedOld ? 1 : 0),
-                (pSecondaryTrackedRemoteNew->Joystick.y < -0.7f && dominantGripPushedNew ? 1 : 0),
-                1, KEY_JOYAXIS6PLUS);
-
-        Joy_GenerateButtonEvents(
-                (pSecondaryTrackedRemoteOld->Joystick.y > 0.7f && dominantGripPushedOld ? 1 : 0),
-                (pSecondaryTrackedRemoteNew->Joystick.y > 0.7f && dominantGripPushedNew ? 1 : 0),
-                1, KEY_JOYAXIS6MINUS);
-
-        Joy_GenerateButtonEvents(
-                ((primaryButtonsOld & primaryButton1) != 0) && !dominantGripPushedOld ? 1 : 0,
-                ((primaryButtonsNew & primaryButton1) != 0) && !dominantGripPushedNew ? 1 : 0,
+                ((rightTrackedRemoteState_old.Buttons & xrButton_A) != 0) && !dominantGripPushedOld ? 1 : 0,
+                ((rightTrackedRemoteState_new.Buttons & xrButton_A) != 0) && !dominantGripPushedNew ? 1 : 0,
                 1, KEY_PAD_A);
 
-        //No Binding
         Joy_GenerateButtonEvents(
-                ((primaryButtonsOld & primaryButton2) != 0) && !dominantGripPushedOld ? 1 : 0,
-                ((primaryButtonsNew & primaryButton2) != 0) && !dominantGripPushedNew ? 1 : 0,
+                ((rightTrackedRemoteState_old.Buttons & xrButton_B) != 0) && !dominantGripPushedOld ? 1 : 0,
+                ((rightTrackedRemoteState_new.Buttons & xrButton_B) != 0) && !dominantGripPushedNew ? 1 : 0,
+                1, KEY_PAD_B);
+
+        Joy_GenerateButtonEvents(
+                ((leftTrackedRemoteState_old.Buttons & xrButton_X) != 0) && !dominantGripPushedOld ? 1 : 0,
+                ((leftTrackedRemoteState_new.Buttons & xrButton_X) != 0) && !dominantGripPushedNew ? 1 : 0,
+                1, KEY_PAD_A);
+
+        Joy_GenerateButtonEvents(
+                ((leftTrackedRemoteState_old.Buttons & xrButton_Y) != 0) && !dominantGripPushedOld ? 1 : 0,
+                ((leftTrackedRemoteState_new.Buttons & xrButton_Y) != 0) && !dominantGripPushedNew ? 1 : 0,
                 1, KEY_PAD_B);
     }
     else
