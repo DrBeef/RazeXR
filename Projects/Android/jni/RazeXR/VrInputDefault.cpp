@@ -151,7 +151,7 @@ void HandleInput_Default( int control_scheme, ovrInputStateTrackedRemote *pDomin
 
             //Set gun angles
             vec3_t rotation = {0};
-            rotation[PITCH] = -30;
+            rotation[PITCH] = -vr_weaponPitchAdjust;
             QuatToYawPitchRoll(pDominantTracking->Pose.orientation, rotation, weaponangles);
 
 
