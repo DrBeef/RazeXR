@@ -377,19 +377,19 @@ void HandleInput_Default( int control_scheme, ovrInputStateTrackedRemote *pDomin
                     !dominantGripPushedNew ? 1 : 0,
                     1, KEY_LCTRL);
 
-            //No Default Binding
+            //(Duke) Quick Kick
             Joy_GenerateButtonEvents(
                     ((pDominantTrackedRemoteOld->Touches & xrButton_ThumbRest) != 0) &&
                     !dominantGripPushedOld ? 1 : 0,
                     ((pDominantTrackedRemoteNew->Touches & xrButton_ThumbRest) != 0) &&
                     !dominantGripPushedNew ? 1 : 0,
-                    1, KEY_PAD_B);
+                    1, KEY_PAD_RSHOULDER);
 
         }
 
         //Dominant Hand - Secondary keys (grip pushed)
         {
-            //No Binding
+            //(Duke) Quick Kick
             Joy_GenerateButtonEvents(
                     ((pDominantTrackedRemoteOld->Buttons & xrButton_Trigger) != 0) &&
                     dominantGripPushedOld ? 1 : 0,
