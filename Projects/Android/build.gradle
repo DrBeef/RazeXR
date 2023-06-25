@@ -74,3 +74,13 @@ buildscript {
         google()
     }
 }
+
+task packRazeAssets(type: Zip) {
+    from "jni/Raze/wadsrc/static"
+    destinationDir file("../../assets/")
+    archiveName "raze.pk3"
+}
+
+tasks.matching {it.name.startsWith("assemble")}.all { Task task ->
+    task.dependsOn([packRazeAssets])
+}
