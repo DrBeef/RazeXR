@@ -37,7 +37,7 @@ int argc=0;
 //Define all variables here that were externs in the VrCommon.h
 long long global_time;
 float playerYaw;
-float vrYaw;
+float vrYaw, vrPitch;
 vec3_t hmdPosition;
 vec3_t hmdOrigin;
 vec3_t hmdorientation;
