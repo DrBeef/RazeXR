@@ -43,6 +43,7 @@ void get_weapon_pos_and_angle(float &x, float &y, float &z, float &pitch, float 
     x = weaponoffset[2];
     y = weaponoffset[0];
     z = weaponoffset[1] + hmdPosition[1]; // position off floor
+
     pitch = hmdorientation[PITCH] - weaponangles[PITCH];
     yaw = hmdorientation[YAW] - weaponangles[YAW];
 }
@@ -149,12 +150,19 @@ void HandleInput_Default( int control_scheme, ovrInputStateTrackedRemote *pDomin
             weaponoffset[0] = v[1];
             weaponoffset[2] = v[0];
 
-            //Set gun angles
             vec3_t rotation = {0};
-            rotation[PITCH] = -vr_weaponPitchAdjust;
-            rotation[YAW] = vr_weaponYawAdjust;
+            QuatToYawPitchRoll(pDominantTracking->Pose.orientation, rotation, rawcontrollerangles);
+
+            //Set gun angles
+            rotation[PITCH] = vr_weaponPitchAdjust;
+            rotation[YAW] = -vr_weaponYawAdjust;
+            rotation[ROLL] = -rawcontrollerangles[ROLL];
             QuatToYawPitchRoll(pDominantTracking->Pose.orientation, rotation, weaponangles);
 
+            ALOGV("        weaponangles  PITCH: %.4f, YAW: %.4f, ROLL: %.4f",
+                  weaponangles[PITCH],
+                  weaponangles[YAW],
+                  weaponangles[ROLL]);
 
 /*            if (weaponStabilised) {
                 float z = pOffTracking->Pose.position.z -
@@ -200,7 +208,7 @@ void HandleInput_Default( int control_scheme, ovrInputStateTrackedRemote *pDomin
         {
             vec2_t v;
             rotateAboutOrigin(positionDelta[0], positionDelta[2],
-                              gameYaw+hmdorientation[YAW], v);
+                              vrYaw + hmdorientation[YAW], v);
             positional_movementSideways = v[1];
             positional_movementForward = v[0];
         }
@@ -246,8 +254,6 @@ void HandleInput_Default( int control_scheme, ovrInputStateTrackedRemote *pDomin
                         if (snapTurn < -180.0f) {
                             snapTurn += 360.f;
                         }
-
-                        resyncVRYawWithGame = 2;
                     }
                 } else if (pPrimaryTrackedRemoteNew->Joystick.x < 0.4f) {
                     increaseSnap = true;
@@ -267,8 +273,6 @@ void HandleInput_Default( int control_scheme, ovrInputStateTrackedRemote *pDomin
                         if (snapTurn > 180.0f) {
                             snapTurn -= 360.f;
                         }
-
-                        resyncVRYawWithGame = 2;
                     }
                 } else if (pPrimaryTrackedRemoteNew->Joystick.x > -0.4f) {
                     decreaseSnap = true;
@@ -377,14 +381,17 @@ void HandleInput_Default( int control_scheme, ovrInputStateTrackedRemote *pDomin
                     !dominantGripPushedNew ? 1 : 0,
                     1, KEY_LCTRL);
 
-            //(Duke) Quick Kick
-            Joy_GenerateButtonEvents(
-                    ((pDominantTrackedRemoteOld->Touches & xrButton_ThumbRest) != 0) &&
-                    !dominantGripPushedOld ? 1 : 0,
-                    ((pDominantTrackedRemoteNew->Touches & xrButton_ThumbRest) != 0) &&
-                    !dominantGripPushedNew ? 1 : 0,
-                    1, KEY_PAD_RSHOULDER);
-
+            //Just reserve this for the Quest which has a clearly defined thumbrest location
+            if (strstr(gAppState.OpenXRHMD, "meta") != NULL)
+            {
+                //(Duke) Quick Kick
+                Joy_GenerateButtonEvents(
+                        ((pDominantTrackedRemoteOld->Touches & xrButton_ThumbRest) != 0) &&
+                        !dominantGripPushedOld ? 1 : 0,
+                        ((pDominantTrackedRemoteNew->Touches & xrButton_ThumbRest) != 0) &&
+                        !dominantGripPushedNew ? 1 : 0,
+                        1, KEY_PAD_B);
+            }
         }
 
         //Dominant Hand - Secondary keys (grip pushed)
@@ -397,17 +404,18 @@ void HandleInput_Default( int control_scheme, ovrInputStateTrackedRemote *pDomin
                     dominantGripPushedNew ? 1 : 0,
                     1, KEY_PAD_RSHOULDER);
 
-            //No Binding
+
+            //Inventory Use
             Joy_GenerateButtonEvents(
                     ((primaryButtonsOld & primaryButton1) != 0) && dominantGripPushedOld ? 1 : 0,
                     ((primaryButtonsNew & primaryButton1) != 0) && dominantGripPushedNew ? 1 : 0,
-                    1, KEY_PAD_LTHUMB);
+                    1, KEY_ENTER);
 
-            //No Binding
+            //Backsapce - Use this to undo any currently defined binds
             Joy_GenerateButtonEvents(
                     ((primaryButtonsOld & primaryButton2) != 0) && dominantGripPushedOld ? 1 : 0,
                     ((primaryButtonsNew & primaryButton2) != 0) && dominantGripPushedNew ? 1 : 0,
-                    1, KEY_RSHIFT);
+                    1, KEY_BACKSPACE);
 
             //No Binding
             Joy_GenerateButtonEvents(
@@ -424,14 +432,6 @@ void HandleInput_Default( int control_scheme, ovrInputStateTrackedRemote *pDomin
                     ((pDominantTrackedRemoteNew->Touches & xrButton_ThumbRest) != 0) &&
                     dominantGripPushedNew ? 1 : 0,
                     1, KEY_JOY6);
-
-            //No Default Binding
-            Joy_GenerateButtonEvents(
-                    ((pDominantTrackedRemoteOld->Buttons & xrButton_GripTrigger) != 0) &&
-                    !dominantGripPushedOld ? 1 : 0,
-                    ((pDominantTrackedRemoteNew->Buttons & xrButton_GripTrigger) != 0) &&
-                    !dominantGripPushedNew ? 1 : 0,
-                    1, KEY_JOY4);
         }
 
 
@@ -445,13 +445,11 @@ void HandleInput_Default( int control_scheme, ovrInputStateTrackedRemote *pDomin
                     !dominantGripPushedNew ? 1 : 0,
                     1, KEY_PAD_LTRIGGER);
 
-            //Inventory Use
+            //No Binding
             Joy_GenerateButtonEvents(
-                    ((secondaryButtonsOld & secondaryButton1) != 0) && !dominantGripPushedOld ? 1
-                                                                                              : 0,
-                    ((secondaryButtonsNew & secondaryButton1) != 0) && !dominantGripPushedNew ? 1
-                                                                                              : 0,
-                    1, KEY_ENTER);
+                    ((secondaryButtonsOld & secondaryButton1) != 0) && !dominantGripPushedOld ? 1 : 0,
+                    ((secondaryButtonsNew & secondaryButton1) != 0) && !dominantGripPushedNew ? 1 : 0,
+                    1, KEY_PAD_LTHUMB);
 
             //Toggle Map
             Joy_GenerateButtonEvents(

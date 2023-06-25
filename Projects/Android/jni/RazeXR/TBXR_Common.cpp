@@ -786,7 +786,7 @@ void QuatToYawPitchRoll(XrQuaternionf q, vec3_t rotation, vec3_t out) {
 
 	if (rotation[0] != 0.0f || rotation[1] != 0.0f || rotation[2] != 0.0f)
 	{
-		ovrMatrix4f rot = ovrMatrix4f_CreateRotation(DEG2RAD(rotation[0]), DEG2RAD(rotation[1]), DEG2RAD(rotation[2]));
+		ovrMatrix4f rot = ovrMatrix4f_CreateRotation(DEG2RAD(-rotation[0]), DEG2RAD(-rotation[1]), DEG2RAD(-rotation[2]));
 		mat = ovrMatrix4f_Multiply(&mat, &rot);
 	}
 

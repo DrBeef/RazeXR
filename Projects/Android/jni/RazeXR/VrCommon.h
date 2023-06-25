@@ -40,14 +40,14 @@ extern float cinemamodeYaw;
 extern float cinemamodePitch;
 
 extern float playerYaw;
-extern int resyncVRYawWithGame;
-extern float gameYaw;
+extern float vrYaw;
 
 extern vec3_t hmdPosition;
 extern vec3_t hmdOrigin;
 extern vec3_t hmdorientation;
 extern vec3_t positionDelta;
 
+extern vec3_t rawcontrollerangles;
 extern vec3_t weaponangles;
 extern vec3_t weaponoffset;
 
