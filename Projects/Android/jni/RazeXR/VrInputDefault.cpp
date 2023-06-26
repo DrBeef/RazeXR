@@ -38,11 +38,13 @@ float getViewpointYaw();
 
 void AddCommandString (const char *text, int keynum=0);
 
+EXTERN_CVAR(Float, vr_height_adjust)
+
 void get_weapon_pos_and_angle(float &x, float &y, float &z, float &pitch, float &yaw)
 {
     x = weaponoffset[2];
     y = weaponoffset[0];
-    z = weaponoffset[1] + hmdPosition[1]; // position off floor
+    z = weaponoffset[1] + hmdPosition[1] + vr_height_adjust; // position off floor
 
     pitch = hmdorientation[PITCH] - weaponangles[PITCH];
     yaw = hmdorientation[YAW] - weaponangles[YAW];
@@ -156,7 +158,6 @@ void HandleInput_Default( int control_scheme, ovrInputStateTrackedRemote *pDomin
             //Set gun angles
             rotation[PITCH] = vr_weaponPitchAdjust;
             rotation[YAW] = -vr_weaponYawAdjust;
-            rotation[ROLL] = -rawcontrollerangles[ROLL];
             QuatToYawPitchRoll(pDominantTracking->Pose.orientation, rotation, weaponangles);
 
             ALOGV("        weaponangles  PITCH: %.4f, YAW: %.4f, ROLL: %.4f",
