@@ -9,6 +9,7 @@ Authors		:	Simon Brown
 
 
 #include <android/keycodes.h>
+#include <c_dispatch.h>
 
 #include "VrInput.h"
 
@@ -35,8 +36,6 @@ extern bool weaponStabilised;
 int getGameState();
 void Joy_GenerateButtonEvents(int oldbuttons, int newbuttons, int numbuttons, int base);
 float getViewpointYaw();
-
-void AddCommandString (const char *text, int keynum=0);
 
 EXTERN_CVAR(Float, vr_height_adjust)
 
@@ -527,6 +526,15 @@ void HandleInput_Default( int control_scheme, ovrInputStateTrackedRemote *pDomin
                     dominantGripPushedNew ? 1 : 0,
                     1, KEY_JOY8);
 
+#ifdef DEBUG
+            if (dominantGripPushedOld &&
+                    !(pOffTrackedRemoteOld->Buttons & xrButton_GripTrigger) &&
+                    (pOffTrackedRemoteNew->Buttons & xrButton_GripTrigger))
+            {
+                C_DoCommand ("give all");
+            }
+
+#else
             //No Default Binding
             Joy_GenerateButtonEvents(
                     ((pOffTrackedRemoteOld->Buttons & xrButton_GripTrigger) != 0) &&
@@ -534,6 +542,7 @@ void HandleInput_Default( int control_scheme, ovrInputStateTrackedRemote *pDomin
                     ((pOffTrackedRemoteNew->Buttons & xrButton_GripTrigger) != 0) &&
                     dominantGripPushedNew && !vr_two_handed_weapons ? 1 : 0,
                     1, KEY_PAD_DPAD_UP);
+#endif
         }
 
         Joy_GenerateButtonEvents(
