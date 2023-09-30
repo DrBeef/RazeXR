@@ -6,6 +6,7 @@ import static android.system.Os.setenv;
 
 import java.io.BufferedReader;
 import java.io.File;
+import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.FileReader;
@@ -13,6 +14,8 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.util.Locale;
+import java.util.zip.ZipEntry;
+import java.util.zip.ZipInputStream;
 
 import android.Manifest;
 import android.annotation.SuppressLint;
@@ -156,11 +159,38 @@ import com.drbeef.externalhapticsservice.HapticServiceClient;
 		checkPermissionsAndInitialize();
 	}
 
+	public static File newFile(File destinationDir, ZipEntry zipEntry) throws IOException {
+		File destFile = new File(destinationDir, zipEntry.getName());
+
+		String destDirPath = destinationDir.getCanonicalPath();
+		String destFilePath = destFile.getCanonicalPath();
+
+		if (!destFilePath.startsWith(destDirPath + File.separator)) {
+			throw new IOException("Entry is outside of the target dir: " + zipEntry.getName());
+		}
+
+		return destFile;
+	}
+
 	public void create()
 	{
 		copy_asset("/sdcard/RazeXR", "raze.pk3", true);
 		copy_asset("/sdcard/RazeXR", "raze.sf2", false);
 		copy_asset("/sdcard/RazeXR", "commandline.txt", false);
+		copy_asset("/sdcard/RazeXR", "RazeXR.zip", true);
+		unzip("/sdcard/RazeXR/RazeXR.zip", new File("/sdcard/RazeXR"));
+
+		//Copy shareware duke if player doesn't own it
+		copy_asset("/sdcard/RazeXR/raze/duke", "DUKE3D.GRP", false);
+
+		//Now make paths for all the other games
+		makePath("/sdcard/RazeXR/raze/blood");
+		makePath("/sdcard/RazeXR/raze/shadowwarrior");
+		makePath("/sdcard/RazeXR/raze/rampage");
+		makePath("/sdcard/RazeXR/raze/ridesagain");
+		makePath("/sdcard/RazeXR/raze/exhumed");
+		makePath("/sdcard/RazeXR/raze/ww2gi");
+		makePath("/sdcard/RazeXR/raze/nam");
 
 		//Read these from a file and pass through
 		commandLineParams = new String("raze");
@@ -195,15 +225,54 @@ import com.drbeef.externalhapticsservice.HapticServiceClient;
 
 		mNativeHandle = GLES3JNILib.onCreate( this, commandLineParams );
 	}
-	
+
+	private void unzip(String fileZip, File destDir) {
+		try {
+			byte[] buffer = new byte[1024];
+			ZipInputStream zis = new ZipInputStream(new FileInputStream(fileZip));
+			ZipEntry zipEntry = zis.getNextEntry();
+			while (zipEntry != null) {
+				File newFile = newFile(destDir, zipEntry);
+				if (zipEntry.isDirectory()) {
+					if (!newFile.isDirectory() && !newFile.mkdirs()) {
+						throw new IOException("Failed to create directory " + newFile);
+					}
+				} else {
+					// fix for Windows-created archives
+					File parent = newFile.getParentFile();
+					if (!parent.isDirectory() && !parent.mkdirs()) {
+						throw new IOException("Failed to create directory " + parent);
+					}
+
+					// write file content
+					FileOutputStream fos = new FileOutputStream(newFile);
+					int len;
+					while ((len = zis.read(buffer)) > 0) {
+						fos.write(buffer, 0, len);
+					}
+					fos.close();
+				}
+				zipEntry = zis.getNextEntry();
+			}
+
+			zis.closeEntry();
+			zis.close();
+		}
+		catch (Exception e) {}
+	}
+
 	public void copy_asset(String path, String name, boolean force) {
 		File f = new File(path + "/" + name);
 		if (!f.exists() || force) {
 			
 			//Ensure we have an appropriate folder
-			new File(path).mkdirs();
+			makePath(path);
 			_copy_asset(name, path + "/" + name);
 		}
+	}
+
+	private void makePath(String path) {
+		new File(path).mkdirs();
 	}
 
 	public void _copy_asset(String name_in, String name_out) {
